@@ -1,0 +1,7 @@
+closed=0D00:00:00.000
+preopen=0D04:00:00.000
+open=0D09:00:00.000
+morning=0D09:30:00.000
+afternoon=0D12:00:00.000
+afterhours=0D16:00:00.000
+maintenance=0D20:00:00.000
