@@ -1,0 +1,3 @@
+[submodule "external/kx/taq"]
+	path = external/kx/taq
+	url = https://github.com/KxSystems/taq.git
