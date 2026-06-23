@@ -104,10 +104,10 @@ rm -rf ${NYSEBENCHMARKDIR}/${SIZE}/csv
 
 Two benchmarks are available:
 
-* **In-memory query engine benchmark** — compares query execution time across the KDB-X, KDB-X SQL, Polars, DuckDB, Pandas, and PyKX engines.
-* **In-memory KDB-X attribute and table format comparison** — evaluates the impact of attributes and table dictionary formats.
+1. **In-memory query engine benchmark** — compares query execution time across the KDB-X, KDB-X SQL, Polars, DuckDB, Pandas, and KDB-X Python (aka. `pykx`) engines.
+1. **In-memory KDB-X attribute and table format comparison** — evaluates the impact of attributes and table dictionary formats.
 
-### In-Memory Query Engine Benchmark — `benchmarks/inmemory/queryEngines.sh`
+### 1. In-Memory Query Engine Benchmark — `benchmarks/inmemory/queryEngines.sh`
 
 Query engines read data into memory from Hive-partitioned Parquet or kdb+ format. Convert the TAQ PSV files to these formats using `./generateDB.sh`:
 
@@ -135,11 +135,11 @@ To pin a specific library version, edit the inline script metadata in `pysrc/que
 #   "pykx==3.1.9",
 ```
 
-### Results
+#### Results
 
 The scripts write the results as pipe-separated values (PSV) files.
 
-### In-Memory KDB-X Attribute Benchmark — `benchmarks/inmemory/kdbAttributes.sh`
+### 2. In-Memory KDB-X Attribute Benchmark — `benchmarks/inmemory/kdbAttributes.sh`
 
 Data is read into memory from kdb+ format. Convert the TAQ PSV files to this format using `./generateDB.sh`:
 
@@ -154,6 +154,6 @@ export NUMANODE=0
 ./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE} --threads "0 4 16 64" --result-dir ./results/inmemory/kdbattr/${SIZE} --stats-dir ./results/inmemory/kdbattr/${SIZE}
 ```
 
-### Results
+#### Results
 
 The scripts write the results as pipe-separated values (PSV) files.
