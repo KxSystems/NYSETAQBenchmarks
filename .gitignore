@@ -1,0 +1,4 @@
+results
+config
+/pysrc/**/__pycache__/
+external

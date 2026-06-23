@@ -1,93 +1,159 @@
-# NYSETAQBenchmarks
+# KX NYSE TAQ Benchmarks
 
+## Overview
 
+This benchmark suite uses publicly available
+[NYSE TAQ data](https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/),
+with queries that are representative of common financial industry workloads.
 
-## Getting started
+The suite provides benchmarks to:
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+* compare in-memory query engines (KDB-X, PyKX, Polars, Pandas, and DuckDB);
+* evaluate the impact of KDB-X attributes and memory layout.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+Running any benchmark involves three steps:
 
-## Add your files
+1. Download the compressed PSV files from the NYSE FTP server.
+1. Convert the files into kdb+ or Parquet format.
+1. Select and run a benchmark.
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Data Size
 
+A single day of NYSE TAQ data is substantial. To reduce execution time,
+you can limit ingestion to a subset of the BBO split CSV files (the source
+of the `quote` table).
+
+Use the `SIZE` environment variable to balance execution time against data coverage:
+
+```bash
+export SIZE=small
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/kxdev/kdbx/nysetaqbenchmarks.git
-git branch -M main
-git push -uf origin main
+
+* In all modes except `full`, only a subset of the BBO split CSV files is downloaded.
+* Only the corresponding trades are converted into the HDB (for example, only
+  symbols whose names start with `Z`).
+
+The following statistics are based on data from 2025-01-02:
+
+| `SIZE` | Symbol first letters | HDB size (GB) | Nr of quote symbols | Nr of quotes |
+| --- | --- | ---: | ---: | ---: |
+| `small` | Z | 1 | 94 | 4 607 158 |
+| `medium` | I | 13 | 555 | 180 827 332 |
+| `large` | A–H | 52 | 4 849 | 707 738 295 |
+| `full` | A–Z | 233 | 11 155 | 2 313 872 956 |
+
+Use `medium` when running the benchmark with KDB-X Community Edition, which
+enforces a memory limit.
+
+## Step 1: Obtaining the PSV Files
+
+Although you can download, decompress, and prepare the PSV files manually, we recommend using the `getPSVs.sh` script from the [KDB-X taq module](https://code.kx.com/kdb-x/modules/taq/overview.html#key-features). The taq repository is included as a git submodule; initialize it with:
+
+```bash
+git submodule update --init --recursive
 ```
 
-## Integrate with your tools
+Set a directory for storing the PSV files:
 
-* [Set up project integrations](https://gitlab.com/kxdev/kdbx/nysetaqbenchmarks/-/settings/integrations)
+```bash
+export NYSEBENCHMARKDIR=/tmp/nysetaqkxbenchmark
+```
 
-## Collaborate with your team
+Fetch the latest available date from the NYSE FTP server and run `getPSVs.sh`:
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+```bash
+export DATE=$(curl -s https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/| grep -oE 'EQY_US_ALL_TRADE_2[0-9]{7}' | grep -oE '2[0-9]{7}'|head -1)
 
-## Test and Deploy
+./external/kx/taq/scripts/getPSVs.sh --csvdir ${NYSEBENCHMARKDIR}/${SIZE}/csv --dates ${DATE} --size ${SIZE}
+```
 
-Use the built-in continuous integration in GitLab.
+The `getPSVs.sh` script:
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+   1. Downloads the compressed PSV files using `curl -C` (which supports resuming interrupted downloads).
+   1. Decompresses the files.
+   1. Removes trailing lines.
+   1. Adds the correct extension (`.psv`).
 
-***
+## Step 2: Converting PSV Files to Binary Data Formats
 
-# Editing this README
+The PSV files must be converted to a binary format that the query engines can read directly. Both kdb+ and Parquet formats are supported, and each benchmark has its own data format requirement.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+The `./generateDB.sh` script wraps the underlying TAQ parsers. Each parser has its own dependencies.
 
-## Suggestions for a good README
+### kdb+ Parser
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+The kdb+ parser requires:
 
-## Name
-Choose a self-explaining name for your project.
+* [KDB-X to be installed](https://code.kx.com/kdb-x/get_started/kdb-x-install.html).
+* The KDB-X taq module to be available. This module is included as a git submodule (`git submodule update --init --recursive`), but its [dependencies](https://github.com/KxSystems/taq/blob/main/docs/install.md#dependencies) must be installed manually.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### Parquet Parser
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+The Parquet parser uses Python and the PyArrow library. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) to manage your Python environment. The full list of required libraries is defined in the inline script metadata in `pysrc/taqToParquet/main.py`.
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### Cleanup
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+Exercise caution when running cleanup: downloading PSV files can be time-consuming. Delete the PSV files only once the data is
+no longer needed.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```bash
+rm -rf ${NYSEBENCHMARKDIR}/${SIZE}/csv
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+## Step 3: Selecting and Running a Benchmark
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+Two benchmarks are available:
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+* **In-memory query engine benchmark** — compares query execution time across the KDB-X, KDB-X SQL, Polars, DuckDB, Pandas, and PyKX engines.
+* **In-memory KDB-X attribute and table format comparison** — evaluates the impact of attributes and table dictionary formats.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+### In-Memory Query Engine Benchmark — `benchmarks/inmemory/queryEngines.sh`
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+Query engines read data into memory from Hive-partitioned Parquet or kdb+ format. Convert the TAQ PSV files to these formats using `./generateDB.sh`:
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+```bash
+DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/csv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
+SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/csv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATE}
+```
 
-## License
-For open source projects, say how it is licensed.
+Once the on-disk data has been generated, you can start the benchmark. Python libraries are run via `uv`, so ensure [uv](https://docs.astral.sh/uv/getting-started/installation/) is installed. To test the engines with 0, 4, 16, and 64 secondary threads, run:
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```bash
+export NUMANODE=0
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE}  --threads "0 4 16 64" --result-dir ./results/inmemory/queryengines/${SIZE} --stats-dir ./results/inmemory/queryengines/${SIZE}
+```
+
+Use `--engines` to run a subset of engines (default: all):
+
+```bash
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE} --engines "kdb,duckdb"
+```
+
+To pin a specific library version, edit the inline script metadata in `pysrc/queryrunner/main.py`. For example:
+
+```python
+#   "pykx==3.1.9",
+```
+
+### Results
+
+The scripts write the results as pipe-separated values (PSV) files.
+
+### In-Memory KDB-X Attribute Benchmark — `benchmarks/inmemory/kdbAttributes.sh`
+
+Data is read into memory from kdb+ format. Convert the TAQ PSV files to this format using `./generateDB.sh`:
+
+```bash
+DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/csv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
+```
+
+Once the on-disk data has been generated, you can start the benchmark. To test with 0, 4, 16, and 64 secondary threads, run:
+
+```bash
+export NUMANODE=0
+./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE} --threads "0 4 16 64" --result-dir ./results/inmemory/kdbattr/${SIZE} --stats-dir ./results/inmemory/kdbattr/${SIZE}
+```
+
+### Results
+
+The scripts write the results as pipe-separated values (PSV) files.
