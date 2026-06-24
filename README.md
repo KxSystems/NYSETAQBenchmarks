@@ -8,7 +8,7 @@ with queries that are representative of common financial industry workloads.
 
 The suite provides benchmarks to:
 
-* compare in-memory query engines (KDB-X, PyKX, Polars, Pandas, and DuckDB);
+* compare in-memory query engines (KDB-X, KDB-X Python, Polars, Pandas, and DuckDB);
 * evaluate the impact of KDB-X attributes and memory layout.
 
 Running any benchmark involves three steps:
@@ -104,7 +104,7 @@ rm -rf ${NYSEBENCHMARKDIR}/${SIZE}/csv
 
 Two benchmarks are available:
 
-1. **In-memory query engine benchmark** — compares query execution time across the KDB-X, KDB-X SQL, Polars, DuckDB, Pandas, and KDB-X Python (aka. `pykx`) engines.
+1. **In-memory query engine benchmark** — compares query execution time across the KDB-X, KDB-X SQL, Polars, DuckDB, Pandas, and KDB-X Python (`pykx`) engines.
 1. **In-memory KDB-X attribute and table format comparison** — evaluates the impact of attributes and table dictionary formats.
 
 ### 1. In-Memory Query Engine Benchmark — `benchmarks/inmemory/queryEngines.sh`
@@ -132,7 +132,7 @@ Use `--engines` to run a subset of engines (default: all):
 To pin a specific library version, edit the inline script metadata in `pysrc/queryrunner/main.py`. For example:
 
 ```python
-#   "pykx==3.1.9",
+    "pykx==4.0.0",
 ```
 
 #### Results

@@ -8,7 +8,7 @@
 #   "pandas>=2.3",
 #   "polars>=1.35",
 #   "psutil>=7.1",
-#   "pykx>=3.1.9",
+#   "pykx>=4.0.0",
 #   "pyarrow>=13.0.0",
 #   "pyyaml",
 # ]
@@ -185,9 +185,9 @@ def main(args: argparse.Namespace) -> None:
             engineversion = duckdb.__version__
             logger.info("Using DuckDB with %s threads", threadnr)
         elif engine == "pykx":
-            from executors.inmemory.pykx import QueryExecutorPyKXInMemory
+            from executors.inmemory.pykx import QueryExecutor_pykx_InMemory
             import pykx as kx
-            runner = QueryExecutorPyKXInMemory(params, sort_cols=args.sortcols, index_on=args.indexon)
+            runner = QueryExecutor_pykx_InMemory(params, sort_cols=args.sortcols, index_on=args.indexon)
             threadnr = kx.q.system.num_threads
             engineversion = kx.__version__
         elif engine == "pandas":
@@ -209,9 +209,9 @@ def main(args: argparse.Namespace) -> None:
             threadnr = pl.thread_pool_size()
             engineversion = pl.__version__
         elif engine == "pykx":
-            from executors.ondisk.pykx import QueryExecutorPyKX
+            from executors.ondisk.pykx import QueryExecutor_pykx
             import pykx as kx
-            runner = QueryExecutorPyKX(params)
+            runner = QueryExecutor_pykx(params)
             threadnr = kx.q.system.num_threads
             engineversion = kx.__version__
         else:
@@ -300,7 +300,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('-storage_backend', type=str, choices=["inmemory", "ondisk"],
         required=True, help="Storage backend. Currently supported inmemory and ondisk")
     parser.add_argument('-engine', type=str, choices=["polars", "duckdb_con", "pykx", "pandas"],
-        required=True, help="Query engine. Currently supported polars and PyKX")
+        required=True, help="Query engine. Currently supported polars and pykx")
     parser.add_argument('-sortcols', type=parse_sortcols, required=False, help="Comma-separated columns to sort trade/quote by, e.g. 'time' or 'sym,time'.")
     parser.add_argument('-indexon', type=parse_sortcols, required=False, default=[], help="Comma-separated columns to add index to, e.g. 'sym' or 'sym,ex'.")
     parser.add_argument('-queryfile', type=Path, required=True, help="PSV file containing queries")

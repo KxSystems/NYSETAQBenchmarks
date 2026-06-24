@@ -5,15 +5,14 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-os.environ['PYKX_4_1_ENABLED'] = 'True'  # must be set before importing pykx
 import pykx as kx
 
 logger = logging.getLogger(__name__)
 
 
-class QueryExecutorPyKXInMemory:
+class QueryExecutor_pykx_InMemory:
     """
-    Handles the setup, execution of PyKX Python queries
+    Handles the setup, execution of KDB-X Python queries
     on NYSE TAQ kdb+ database (single partition loaded into memory).
     """
     def __init__(self, param: dict[str, Any], sort_cols: str | list[str], index_on: str | list[str]) -> None:
@@ -23,7 +22,6 @@ class QueryExecutorPyKXInMemory:
         kx.q['timeBucketsStep'] = kx.q('{`s#value[x]!key x}', param['timeBuckets'])
         kx.q._register("./src/pivot")
         kx.pivot = kx.q('.pvt.pivot')
-        kx.fills = kx.q('fills')
         self.eval_context: dict[str, Any] = {
             "kx": kx,
             "timedelta": timedelta,
