@@ -8,7 +8,7 @@
 #   "pandas>=2.3",
 #   "polars>=1.35",
 #   "psutil>=7.1",
-#   "pykx>=3.1.9",
+#   "pykx>=4.0.0",
 #   "pyarrow>=13.0.0",
 #   "pyyaml",
 # ]
@@ -300,7 +300,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('-storage_backend', type=str, choices=["inmemory", "ondisk"],
         required=True, help="Storage backend. Currently supported inmemory and ondisk")
     parser.add_argument('-engine', type=str, choices=["polars", "duckdb_con", "pykx", "pandas"],
-        required=True, help="Query engine. Currently supported polars and PyKX")
+        required=True, help="Query engine. Currently supported: polars, duckdb_con, pykx, and pandas")
     parser.add_argument('-sortcols', type=parse_sortcols, required=False, help="Comma-separated columns to sort trade/quote by, e.g. 'time' or 'sym,time'.")
     parser.add_argument('-indexon', type=parse_sortcols, required=False, default=[], help="Comma-separated columns to add index to, e.g. 'sym' or 'sym,ex'.")
     parser.add_argument('-queryfile', type=Path, required=True, help="PSV file containing queries")
