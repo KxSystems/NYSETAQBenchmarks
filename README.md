@@ -76,7 +76,7 @@ The `getPSVs.sh` script:
 
 ## Step 2: Converting PSV Files to Binary Data Formats
 
-The PSV files must be converted to a binary format that the query engines can read directly. Both kdb+ and Parquet formats are supported, and each benchmark has its own data format requirement.
+The PSV files must be converted to a binary format that the query engines can read directly. Both kdb+ and Parquet formats are supported. Each benchmark has its own data format requirement, so example commands are only provided in [Step 3](#step-3-selecting-and-running-a-benchmark).
 
 The `./generateDB.sh` script wraps the underlying TAQ parsers. Each parser has its own dependencies.
 
@@ -91,10 +91,9 @@ The kdb+ parser requires:
 
 The Parquet parser uses Python and the PyArrow library. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) to manage your Python environment. The full list of required libraries is defined in the inline script metadata in `pysrc/taqToParquet/main.py`.
 
-### Cleanup
+### PSV Cleanup
 
-Exercise caution when running cleanup: downloading PSV files can be time-consuming. Delete the PSV files only once the data is
-no longer needed.
+Exercise caution when running cleanup: downloading PSV files can be time-consuming. Delete the PSV files only when the binary data has been generated and you are sure that no other binary format will be required.
 
 ```bash
 rm -rf ${NYSEBENCHMARKDIR}/${SIZE}/csv
