@@ -8,16 +8,17 @@ with queries that are representative of common financial industry workloads.
 
 The suite provides benchmarks to:
 
-* compare in-memory query engines (KDB-X, PyKX, Polars, Pandas, and DuckDB);
-* evaluate the impact of KDB-X attributes and memory layout.
+* Compare in-memory query engines (KDB-X, KDB-X Python, Polars, Pandas, and DuckDB).
+* Evaluate the impact of KDB-X attributes and memory layout.
 
-Running any benchmark involves three steps:
+Running any benchmark involves four steps:
 
-1. Download the compressed PSV files from the NYSE FTP server.
-1. Convert the files into kdb+ or Parquet format.
-1. Select and run a benchmark.
+1. [Step 1](#step-1-selecting-a-data-size): Select a data size to control how much data is downloaded and used during the benchmark.
+1. [Step 2](#step-2-obtaining-the-psv-files): Download the compressed PSV files from the NYSE FTP server.
+1. [Step 3](#step-3-converting-psv-files-to-binary-data-formats): Convert the files into kdb+ or Parquet format.
+1. [Step 4](#step-4-selecting-and-running-a-benchmark): Select and run a benchmark.
 
-## Data Size
+## Step 1: Selecting a Data Size
 
 A single day of NYSE TAQ data is substantial. To reduce execution time,
 you can limit ingestion to a subset of the BBO split CSV files (the source
@@ -35,17 +36,17 @@ export SIZE=small
 
 The following statistics are based on data from 2025-01-02:
 
-| `SIZE` | Symbol first letters | HDB size (GB) | Nr of quote symbols | Nr of quotes |
-| --- | --- | ---: | ---: | ---: |
-| `small` | Z | 1 | 94 | 4 607 158 |
-| `medium` | I | 13 | 555 | 180 827 332 |
-| `large` | A–H | 52 | 4 849 | 707 738 295 |
-| `full` | A–Z | 233 | 11 155 | 2 313 872 956 |
+| `SIZE` | Recommended for | Symbol first letters | HDB size (GB) | Nr of quote symbols | Nr of quotes |
+| --- | --- | --- | ---: | ---: | ---: |
+| `small` | A quick test to get familiar with the benchmark suite | Z | 1 | 94 | 4 607 158 |
+| `medium` | KDB-X Community Edition users | I | 13 | 555 | 180 827 332 |
+| `large` | Users with an unlimited KDB-X license but limited memory | A–H | 52 | 4 849 | 707 738 295 |
+| `full` | The most thorough testing | A–Z | 233 | 11 155 | 2 313 872 956 |
 
 Use `medium` when running the benchmark with KDB-X Community Edition, which
 enforces a memory limit.
 
-## Step 1: Obtaining the PSV Files
+## Step 2: Obtaining the PSV Files
 
 Although you can download, decompress, and prepare the PSV files manually, we recommend using the `getPSVs.sh` script from the [KDB-X taq module](https://code.kx.com/kdb-x/modules/taq/overview.html#key-features). The taq repository is included as a git submodule; initialize it with:
 
@@ -74,9 +75,9 @@ The `getPSVs.sh` script:
    1. Removes trailing lines.
    1. Adds the correct extension (`.psv`).
 
-## Step 2: Converting PSV Files to Binary Data Formats
+## Step 3: Converting PSV Files to Binary Data Formats
 
-The PSV files must be converted to a binary format that the query engines can read directly. Both kdb+ and Parquet formats are supported, and each benchmark has its own data format requirement.
+The PSV files must be converted to a binary format that the query engines can read directly. Both kdb+ and Parquet formats are supported. Each benchmark has its own data format requirement, so example commands are only provided in [Step 4](#step-4-selecting-and-running-a-benchmark).
 
 The `./generateDB.sh` script wraps the underlying TAQ parsers. Each parser has its own dependencies.
 
@@ -85,26 +86,25 @@ The `./generateDB.sh` script wraps the underlying TAQ parsers. Each parser has i
 The kdb+ parser requires:
 
 * [KDB-X to be installed](https://code.kx.com/kdb-x/get_started/kdb-x-install.html).
-* The KDB-X taq module to be available. This module is included as a git submodule (`git submodule update --init --recursive`), but its [dependencies](https://github.com/KxSystems/taq/blob/main/docs/install.md#dependencies) must be installed manually.
+* The KDB-X taq module to be available. This module is included as a git submodule (`git submodule update --init --recursive`), but its [dependencies](https://github.com/KxSystems/taq/blob/main/docs/install.md#dependencies) must be installed manually to the [standard KX module path](https://code.kx.com/kdb-x/modules/module-framework/quickstart.html#search-path).
 
 ### Parquet Parser
 
-The Parquet parser uses Python and the PyArrow library. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) to manage your Python environment. The full list of required libraries is defined in the inline script metadata in `pysrc/taqToParquet/main.py`.
+The Parquet parser uses Python and the PyArrow library. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) to manage your Python environment. The full list of required libraries is defined in the inline script metadata in [pysrc/taqToParquet/main.py](./pysrc/taqToParquet/main.py).
 
-### Cleanup
+### PSV Cleanup
 
-Exercise caution when running cleanup: downloading PSV files can be time-consuming. Delete the PSV files only once the data is
-no longer needed.
+Exercise caution when running cleanup: downloading PSV files can be time-consuming. Delete the PSV files only when the binary data has been generated and you are sure that no other binary format will be required.
 
 ```bash
 rm -rf ${NYSEBENCHMARKDIR}/${SIZE}/csv
 ```
 
-## Step 3: Selecting and Running a Benchmark
+## Step 4: Selecting and Running a Benchmark
 
 Two benchmarks are available:
 
-1. **In-memory query engine benchmark** — compares query execution time across the KDB-X, KDB-X SQL, Polars, DuckDB, Pandas, and KDB-X Python (aka. `pykx`) engines.
+1. **In-memory query engine benchmark** — compares query execution time across the KDB-X, KDB-X SQL, Polars, DuckDB, Pandas, and KDB-X Python (`pykx`) engines.
 1. **In-memory KDB-X attribute and table format comparison** — evaluates the impact of attributes and table dictionary formats.
 
 ### 1. In-Memory Query Engine Benchmark — `benchmarks/inmemory/queryEngines.sh`
@@ -149,7 +149,7 @@ under `numactl -N ${NUMANODE} -m ${NUMANODE}` to pin CPU and memory allocation t
 To pin a specific library version, edit the inline script metadata in `pysrc/queryrunner/main.py`. For example:
 
 ```python
-#   "pykx==3.1.9",
+#   "pykx==4.0.0",
 ```
 
 #### Results
