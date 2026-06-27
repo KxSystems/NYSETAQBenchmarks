@@ -120,14 +120,31 @@ Once the on-disk data has been generated, you can start the benchmark. Python li
 
 ```bash
 export NUMANODE=0
-./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE}  --threads "0 4 16 64" --result-dir ./results/inmemory/queryengines/${SIZE} --stats-dir ./results/inmemory/queryengines/${SIZE}
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE}  --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/queryengines
 ```
 
-Use `--engines` to run a subset of engines (default: all):
+The script accepts the following mandatory parameters:
 
-```bash
-./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE} --engines "kdb,duckdb"
-```
+| Parameter | Description |
+| --- | --- |
+| `--db-dir` | Directory containing the generated databases. The script expects the `kdb` and `parquet/rowgroup` subdirectories created by `./generateDB.sh`. |
+| `-p`, `--param-dir` | Directory of the query parameters (e.g. `./artifacts/parameters/${SIZE}`). |
+| `-d`, `--date` | Target date to query, in the same format as `${DATE}`. |
+
+And the following optional parameters:
+
+| Parameter | Description |
+| --- | --- |
+| `-t`, `--threads` | Space-separated list of secondary-thread counts to test, e.g. `"0 4 16 64"`. Each engine runs once per value. Default: `"1 4"`. |
+| `-e`, `--engines` | Comma-separated subset of engines to run. Valid values: `kdb`, `sql`, `duckdb`, `polars`, `pykx`, `pandas`. Default: all of them. |
+| `-s`, `--stats-dir` | Directory to save per-table statistics (one YAML file per table, plus OS `time -v` output). Default: `./results/inmemory/queryengines`. |
+| `-i`, `--idx` | Filter queries by index: single (`42`), comma-separated list (`32,42,50`), or range (`40-44`). Default: run all queries. |
+| `--results` | Single PSV file that all per-engine results are merged into. The individual per-engine files are written to a temporary directory and removed afterwards. Default: `./results/inmemory/queryengines.psv`. |
+| `-h`, `--help` | Show usage and exit. |
+
+The `NUMANODE` environment variable is also honoured: when set, every engine is launched
+under `numactl -N ${NUMANODE} -m ${NUMANODE}` to pin CPU and memory allocation to that NUMA node.
+
 
 To pin a specific library version, edit the inline script metadata in `pysrc/queryrunner/main.py`. For example:
 
@@ -137,7 +154,38 @@ To pin a specific library version, edit the inline script metadata in `pysrc/que
 
 #### Results
 
-The scripts write the results as pipe-separated values (PSV) files.
+The script merges every engine's results into a single pipe-separated values (PSV) file
+(set by `--results`), one row per query (plus a few rows for the data-loading steps).
+
+The file starts with a header row. The columns are:
+
+| Column | Description |
+| --- | --- |
+| `storagebackend` | Where the data is read from: `inmemory` or `ondisk`. |
+| `compparam` | Compression parameter used for the data. |
+| `threadcount` | Number of (secondary/worker) threads the engine was configured to use. `0` means no secondary threads. |
+| `runner` | The harness driving the engine, e.g. `KDB-X` or `Python`. |
+| `engine` | The query engine, e.g. `pykx`, `duckdb_con`, `polars`, `pandas`. |
+| `format` | Data format. |
+| `sortcols` | Columns the `trade`/`quote` tables were sorted by before querying, e.g. `time` or `sym,time`. Empty if unsorted. |
+| `indexon` | Columns an index/attribute was applied to, e.g. `sym`. Empty if none. |
+| `engineversion` | Version string of the engine library, e.g. `1.5.4`. |
+| `idx` | Query index. Positive integers are benchmark queries; non-positive values are setup steps: `0` = load a partition into memory, `-1` = transform, `-2` = sort, `-3` = index. |
+| `tags` | Comma-separated category tags for the query (e.g. `timefilter,groupby,advanced`). Setup rows are tagged `load`. |
+| `query` | The query text that was executed (or a short description for setup rows). |
+| `status` | Outcome: `success`, `error` (query raised an exception), `idxfiltered` (skipped by the `--idx` filter), or `tagfiltered` (skipped by the `--tags` filter). |
+| `run1timeNS` | Execution time of run 1 (cold) in nanoseconds. Setup rows record their elapsed time here. |
+| `run2timeNS` | Execution time of run 2 (warm) in nanoseconds. |
+| `run3timeNS` | Execution time of run 3 (warm) in nanoseconds. |
+| `run3memKB` | Peak memory of the query of run 3 in KB. |
+| `run1ioKB` | Disk I/O during run 1 in KB. Should be zero for in-memory benchmarks. |
+| `run2ioKB` | Disk I/O during run 2 in KB. Should be zero for in-memory benchmarks. |
+| `run3ioKB` | Disk I/O during run 3 in KB. Should be zero for in-memory benchmarks. |
+| `ressizeKB` | Size of the query result in KB. |
+
+Each benchmark query is run three times (one cold run followed by two warm runs); columns are
+empty when a value does not apply (e.g. timing/IO columns for an `error` row, or warm-run
+columns for setup rows).
 
 ### 2. In-Memory KDB-X Attribute Benchmark — `benchmarks/inmemory/kdbAttributes.sh`
 
@@ -151,9 +199,9 @@ Once the on-disk data has been generated, you can start the benchmark. To test w
 
 ```bash
 export NUMANODE=0
-./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE} --threads "0 4 16 64" --result-dir ./results/inmemory/kdbattr/${SIZE} --stats-dir ./results/inmemory/kdbattr/${SIZE}
+./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/kdbattr.psv --stats-dir ./results/inmemory/${SIZE}/kdbattr
 ```
 
 #### Results
 
-The scripts write the results as pipe-separated values (PSV) files.
+The scripts write the results as pipe-separated values (PSV) files of the same format as [queryEngines.sh](#results)
