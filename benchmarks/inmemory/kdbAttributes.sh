@@ -2,13 +2,10 @@
 
 set -euo pipefail
 
-script_dir=$(dirname "${BASH_SOURCE[0]}")
-source "${script_dir}/../../external/kx/taq/scripts/util.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-THREAD_NRS=(1 4)
-RESULT_DIR="./results/inmemory/kdbattributes"
 STATS_DIR="./results/inmemory/kdbattributes"
-IDX_PARAM=""
+RESULTS_FILE="./results/inmemory/kdbattributes.psv"
 
 usage() {
     cat <<EOF
@@ -19,11 +16,10 @@ Options:
   -p, --param-dir    Directory of the query parameters
   -d, --date         Target date
   -t, --threads      Space-separated list of thread counts, e.g., "1 4 16", (default: "1 4")
-  -r, --result-dir   Directory for query results (default: ${RESULT_DIR})
   -s, --stats-dir    Directory to save table stats (default: ${STATS_DIR})
   -i, --idx          Filter queries by index: single (42), list (32,42,50), or range (40-44)
+  -r, --results      Single PSV that all per-engine results are merged into (default: ${RESULTS_FILE})
   -h, --help         Show this help message
-  --stats-dir        Directory to save table stats (default: ./stats)
 EOF
     exit 1
 }
@@ -34,26 +30,16 @@ while [[ $# -gt 0 ]]; do
         -p|--param-dir)  PARAM_DIR="$2"; shift 2 ;;
         -d|--date)       DATE="$2"; shift 2 ;;
         -t|--threads)    read -ra THREAD_NRS <<< "$2"; shift 2 ;;
-        -r|--result-dir) RESULT_DIR="$2"; shift 2 ;;
         -s|--stats-dir)  STATS_DIR="$2"; shift 2 ;;
         -i|--idx)        IDX_PARAM="-idx $2"; shift 2 ;;
+        -r|--results)       RESULTS_FILE="$2"; shift 2 ;;
         -h|--help)    usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
 done
 
-check_date $DATE
+init_benchmark
 
-export FLUSH=${script_dir}/../../flush/noflush.sh # Set FLUSH to a no-op script since we're working with in-memory data
-
-function get_numa_config () {
-    if [[ -z "${NUMANODE:-}" ]]; then
-        echo ""
-        return
-    fi
-
-    echo "numactl -N ${NUMANODE} -m ${NUMANODE}"
-}
 function execute_queries () {
     mkdir -p ${RESULT_DIR}
     echo "Running Queries..."
@@ -62,11 +48,17 @@ function execute_queries () {
         echo "--> Running with $s threads"
 
         $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} -sortcols "time" -indexon "" -queryfile ./artifacts/queries/inmemory/kdb_noattr.psv -result ${RESULT_DIR}/kdbNoAttr_${s}Threads.psv -s ${s}
+        add_nickname ${RESULT_DIR}/kdbNoAttr_${s}Threads.psv "kdbNoAttr"
         $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} -sortcols "time" -indexon "time" -queryfile ./artifacts/queries/inmemory/kdb_noattr.psv -result ${RESULT_DIR}/kdbTimeSorted_${s}Threads.psv -s ${s}
+        add_nickname ${RESULT_DIR}/kdbTimeSorted_${s}Threads.psv "kdbTimeSorted"
         $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -result ${RESULT_DIR}/kdb_${s}Threads.psv -s ${s}
+        add_nickname ${RESULT_DIR}/kdb_${s}Threads.psv "kdb"
         $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} -sortcols "sym,time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -result ${RESULT_DIR}/kdbParted_${s}Threads.psv -s ${s}
+        add_nickname ${RESULT_DIR}/kdbParted_${s}Threads.psv "kdbParted"
         $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} -format tabledict -sortcols time -queryfile ./artifacts/queries/inmemory/kdb_tabledict.psv -result ${RESULT_DIR}/kdbTableDict_${s}Threads.psv -s ${s}
+        add_nickname ${RESULT_DIR}/kdbTableDict_${s}Threads.psv "kdbTableDict"
         EACHPEACH=peach $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} -format tabledict -sortcols time -queryfile ./artifacts/queries/inmemory/kdb_tabledict.psv -result ${RESULT_DIR}/kdbTableDictPeach_${s}Threads.psv -s ${s}
+        add_nickname ${RESULT_DIR}/kdbTableDictPeach_${s}Threads.psv "kdbTableDictPeach"
     done
 }
 
@@ -81,11 +73,4 @@ function get_table_stats () {
     /usr/bin/time -v q ./src/runQueries.q ${COMMONPARAMS} -sortcols "sym,time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -tableStatsDir ${STATS_DIR}/kdbParted -q 2> ${STATS_DIR}/kdbParted/os.txt
 }
 
-START_TIME=$(date +%s)
-
-execute_queries
-get_table_stats
-
-echo "Benchmark suite complete."
-END_TIME=$(date +%s)
-echo "Benchmark completed successfully in $(date -u -d "@$((END_TIME - START_TIME))" +%T)"
+run_suite
