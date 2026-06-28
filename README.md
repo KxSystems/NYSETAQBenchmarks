@@ -13,10 +13,10 @@ The suite provides benchmarks to:
 
 Running any benchmark involves four steps:
 
-1. [Step 1](#step-1-selecting-a-data-size): Select a data size to control how much data is downloaded and used during the benchmark.
-1. [Step 2](#step-2-obtaining-the-psv-files): Download the compressed PSV files from the NYSE FTP server.
-1. [Step 3](#step-3-converting-psv-files-to-binary-data-formats): Convert the files into kdb+ or Parquet format.
-1. [Step 4](#step-4-selecting-and-running-a-benchmark): Select and run a benchmark.
+* [Step 1](#step-1-selecting-a-data-size): Select a data size to control how much data is downloaded and used during the benchmark.
+* [Step 2](#step-2-obtaining-the-psv-files): Download the compressed PSV files from the NYSE FTP server.
+* [Step 3](#step-3-converting-psv-files-to-binary-data-formats): Convert the files into kdb+ or Parquet format.
+* [Step 4](#step-4-selecting-and-running-a-benchmark): Select and run a benchmark.
 
 ## Step 1: Selecting a Data Size
 
