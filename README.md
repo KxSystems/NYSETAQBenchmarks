@@ -54,10 +54,13 @@ Although you can download, decompress, and prepare the PSV files manually, we re
 git submodule update --init --recursive
 ```
 
-Set a directory for storing the PSV files:
+Set a directory for storing the PSV files. We use a `DATA` directory inside the
+repository (it is listed in `.gitignore`, so the large downloads and generated
+databases are never committed). Point `NYSEBENCHMARKDIR` elsewhere if you prefer
+to keep the data on a different (e.g. faster or larger) filesystem:
 
 ```bash
-export NYSEBENCHMARKDIR=/tmp/nysetaqkxbenchmark
+export NYSEBENCHMARKDIR=$PWD/DATA
 ```
 
 Fetch the latest available date from the NYSE FTP server and run `getPSVs.sh`:
