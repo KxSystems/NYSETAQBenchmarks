@@ -127,7 +127,24 @@ Notes:
 `./generateDB.sh <csvdir> <dstdir> <date>` wraps the kdb+ and Parquet parsers;
 the format is chosen by the `DATAFORMAT` env var.
 
-**For the query-engine benchmark — generate BOTH formats:**
+**Which format does each engine need?** For the query-engine benchmark the
+required format depends on the `--engines` subset — the KDB-X engines read kdb+,
+the Python dataframe/SQL engines read Parquet:
+
+| `--engines` value | Engine | Required format |
+| --- | --- | --- |
+| `kdb` | KDB-X (q-sql) | kdb+ |
+| `sql` | KDB-X SQL | kdb+ |
+| `pykx` | KDB-X Python (`pykx`) | kdb+ |
+| `duckdb` | DuckDB | Parquet |
+| `polars` | Polars | Parquet |
+| `pandas` | Pandas | Parquet |
+
+So generate only kdb+ if restricting to `kdb`/`sql`/`pykx`, only Parquet if
+restricting to `duckdb`/`polars`/`pandas`, and **both** for the default (all
+engines). The attribute benchmark always needs kdb+ only.
+
+**For the query-engine benchmark with all engines — generate BOTH formats:**
 ```bash
 DATAFORMAT=kdb ./generateDB.sh \
   ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
