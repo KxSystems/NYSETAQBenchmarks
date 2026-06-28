@@ -86,6 +86,8 @@ The `./generateDB.sh` script wraps the underlying TAQ parsers. Each parser has i
 The kdb+ parser requires:
 
 * [KDB-X to be installed](https://code.kx.com/kdb-x/get_started/kdb-x-install.html).
+  The benchmark relies on modules, so KDB-X is required — it does not run on
+  kdb+ versions prior to 5.0.
 * The KDB-X taq module to be available. This module is included as a git submodule (`git submodule update --init --recursive`), but its [dependencies](https://github.com/KxSystems/taq/blob/main/docs/install.md#dependencies) must be installed manually to the [standard KX module path](https://code.kx.com/kdb-x/modules/module-framework/quickstart.html#search-path).
 
 ### Parquet Parser
