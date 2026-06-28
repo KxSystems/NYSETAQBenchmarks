@@ -68,7 +68,7 @@ Fetch the latest available date from the NYSE FTP server and run `getPSVs.sh`:
 ```bash
 export DATE=$(curl -s https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/| grep -oE 'EQY_US_ALL_TRADE_2[0-9]{7}' | grep -oE '2[0-9]{7}'|head -1)
 
-./external/kx/taq/scripts/getPSVs.sh --csvdir ${NYSEBENCHMARKDIR}/${SIZE}/csv --dates ${DATE} --size ${SIZE}
+./external/kx/taq/scripts/getPSVs.sh --csvdir ${NYSEBENCHMARKDIR}/${SIZE}/psv --dates ${DATE} --size ${SIZE}
 ```
 
 The `getPSVs.sh` script:
@@ -102,7 +102,7 @@ The Parquet parser uses Python and the PyArrow library. Install [uv](https://doc
 Exercise caution when running cleanup: downloading PSV files can be time-consuming. Delete the PSV files only when the binary data has been generated and you are sure that no other binary format will be required.
 
 ```bash
-rm -rf ${NYSEBENCHMARKDIR}/${SIZE}/csv
+rm -rf ${NYSEBENCHMARKDIR}/${SIZE}/psv
 ```
 
 ## Step 4: Selecting and Running a Benchmark
@@ -114,11 +114,24 @@ Two benchmarks are available:
 
 ### 1. In-Memory Query Engine Benchmark — `benchmarks/inmemory/queryEngines.sh`
 
-Query engines read data into memory from Hive-partitioned Parquet or kdb+ format. Convert the TAQ PSV files to these formats using `./generateDB.sh`:
+Query engines read data into memory from Hive-partitioned Parquet or kdb+ format. The required format depends on the engine: the KDB-X engines read kdb+ data, while the Python dataframe/SQL engines read Parquet. If you run all engines (the default), **both** formats must be generated.
+
+| Engine (`--engines` value) | Description | Required data format |
+| --- | --- | --- |
+| `kdb` | KDB-X (q-sql) | kdb+ |
+| `sql` | KDB-X SQL | kdb+ |
+| `pykx` | KDB-X Python (`pykx`) | kdb+ |
+| `duckdb` | DuckDB | Parquet |
+| `polars` | Polars | Parquet |
+| `pandas` | Pandas | Parquet |
+
+So you only need the kdb+ database if you restrict the run to `kdb`/`sql`/`pykx` (e.g. `--engines kdb,sql`), and only the Parquet database if you restrict it to `duckdb`/`polars`/`pandas`. Convert the TAQ PSV files to the format(s) you need using `./generateDB.sh`:
 
 ```bash
-DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/csv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
-SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/csv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATE}
+# kdb+ format — needed for the kdb, sql, and pykx engines
+DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
+# Hive-partitioned Parquet — needed for the duckdb, polars, and pandas engines
+SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATE}
 ```
 
 Once the on-disk data has been generated, you can start the benchmark. Python libraries are run via `uv`, so ensure [uv](https://docs.astral.sh/uv/getting-started/installation/) is installed. To test the engines with 0, 4, 16, and 64 secondary threads, run:
@@ -197,7 +210,7 @@ columns for setup rows).
 Data is read into memory from kdb+ format. Convert the TAQ PSV files to this format using `./generateDB.sh`:
 
 ```bash
-DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/csv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
+DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
 ```
 
 Once the on-disk data has been generated, you can start the benchmark. To test with 0, 4, 16, and 64 secondary threads, run:
