@@ -138,7 +138,7 @@ Once the on-disk data has been generated, you can start the benchmark. Python li
 
 ```bash
 export NUMANODE=0
-./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE}  --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/queryengines
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE}  --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/queryengines.psv
 ```
 
 The script accepts the following mandatory parameters:
@@ -155,7 +155,7 @@ And the following optional parameters:
 | --- | --- |
 | `-t`, `--threads` | Space-separated list of secondary-thread counts to test, e.g. `"0 4 16 64"`. Each engine runs once per value. Default: `"1 4"`. |
 | `-e`, `--engines` | Comma-separated subset of engines to run. Valid values: `kdb`, `sql`, `duckdb`, `polars`, `pykx`, `pandas`. Default: all of them. |
-| `-s`, `--stats-dir` | Directory to save per-table statistics (one YAML file per table, plus OS `time -v` output). Default: `./results/inmemory/queryengines`. |
+| `-s`, `--stats-dir` | Directory to save per-table statistics (one YAML file per table), environment information, plus OS `time -v` output. |
 | `-i`, `--idx` | Filter queries by index: single (`42`), comma-separated list (`32,42,50`), or range (`40-44`). Default: run all queries. |
 | `--results` | Single PSV file that all per-engine results are merged into. The individual per-engine files are written to a temporary directory and removed afterwards. Default: `./results/inmemory/queryengines.psv`. |
 | `-h`, `--help` | Show usage and exit. |
@@ -217,7 +217,7 @@ Once the on-disk data has been generated, you can start the benchmark. To test w
 
 ```bash
 export NUMANODE=0
-./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/kdbattr.psv --stats-dir ./results/inmemory/${SIZE}/kdbattr
+./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/kdbattr.psv
 ```
 
 #### Results
