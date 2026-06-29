@@ -25,11 +25,52 @@ function init_benchmark () {
 
     # Per-engine result PSVs are written to a scratch directory and then merged
     # into RESULTS_FILE; the scratch directory is removed on exit.
-    RESULT_DIR=$(mktemp -d)
+    RESULT_DIR="$(dirname "${RESULTS_FILE}")/tmp"
     trap 'rm -rf "${RESULT_DIR}"' EXIT
 
     # Set FLUSH to a no-op script since we're working with in-memory data
     export FLUSH=${COMMON_DIR}/../../flush/noflush.sh
+}
+
+# Write a YAML snapshot of the run parameters, environment and host system to a file.
+function save_environment () {
+    local out=$1
+
+    local cpu_model cpu_arch sockets cores_per_socket threads_per_core
+    if [[ $(uname) == "Linux" ]]; then
+        sockets=$(lscpu | awk -F: '/^Socket\(s\):/{gsub(/[ \t]/,"",$2); print $2}')
+        cores_per_socket=$(lscpu | awk -F: '/^Core\(s\) per socket:/{gsub(/[ \t]/,"",$2); print $2}')
+        threads_per_core=$(lscpu | awk -F: '/^Thread\(s\) per core:/{gsub(/[ \t]/,"",$2); print $2}')
+        cpu_model=$(lscpu | awk -F: '/^Model name:/{gsub(/^[ \t]+/,"",$2); print $2}')
+    else
+        sockets=1
+        cores_per_socket=$(sysctl -n hw.ncpu)
+        threads_per_core=1
+        cpu_model=$(sysctl -n machdep.cpu.brand_string)
+    fi
+    cpu_arch=$(arch)
+
+    cat > "${out}" <<EOF
+test time: "$(date)"
+parameters:
+  size: "${SIZE}"
+  db-dir: "${DB_DIR}"
+  date: "${DATE}"
+envvars:
+  NUMANODE: "${NUMANODE:-}"
+system:
+  os:
+    name: "$(uname)"
+    kernel: "$(uname -r)"
+  cpu:
+    arch: "${cpu_arch}"
+    model: "${cpu_model}"
+    socketnr: ${sockets}
+    corepersocket: ${cores_per_socket}
+    threadpercore: ${threads_per_core}
+EOF
+
+    echo "Saved environment info to ${out}"
 }
 
 function get_numa_config () {
@@ -79,7 +120,7 @@ function run_suite () {
     start_time=$(date +%s)
 
     execute_queries
-    get_table_stats
+    [[ -n "${STATS_DIR:-}" ]] && get_table_stats
     merge_results
 
     echo "Benchmark suite complete."

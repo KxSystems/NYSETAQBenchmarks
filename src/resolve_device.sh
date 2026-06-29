@@ -98,7 +98,7 @@ PARENT_DEV=$(lsblk -dno pkname "$MOUNT_SOURCE" | head -n 1)
 
 # If lsblk fails to find a parent (e.g., it is already the raw disk), default to the source name
 if [[ -n "$PARENT_DEV" ]]; then
-    echo "$PARENT_DEV"
+    echo "$(basename "$MOUNT_SOURCE")"
 else
     # Fallback: Just print the source (e.g., /dev/sda)
     echo "$MOUNT_SOURCE"

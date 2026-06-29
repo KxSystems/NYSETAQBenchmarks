@@ -4,7 +4,7 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-STATS_DIR="./results/inmemory/queryengines"
+STATS_DIR=""
 ENGINES="kdb,sql,duckdb,polars,pykx,pandas"
 RESULTS_FILE="./results/inmemory/queryengines.psv"
 
@@ -18,9 +18,9 @@ Options:
   -d, --date         Target date
   -t, --threads      Space-separated list of thread counts, e.g., "1 4 16", (default: "1 4")
   -e, --engines      Comma-separated list of engines to test (default: "kdb,sql,duckdb,polars,pykx,pandas")
-  -s, --stats-dir    Directory to save table stats (default: ${STATS_DIR})
-  -i, --idx          Filter queries by index: single (42), list (32,42,50), or range (40-44)
-  -r, --results      Single PSV that all per-engine results are merged into (default: ${RESULTS_FILE})
+  -s, --stats-dir    (optional) Directory to save table and environment statistics
+  -i, --idx          (optional) Filter queries by index: single (42), list (32,42,50), or range (40-44)
+  -r, --results      (optional) Single PSV that all per-engine results are merged into (default: ${RESULTS_FILE})
   -h, --help         Show this help message
 EOF
     exit 1
@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
         -e|--engines)    ENGINES="$2"; shift 2 ;;
         -s|--stats-dir)  STATS_DIR="$2"; shift 2 ;;
         -i|--idx)        IDX_PARAM="-idx $2"; shift 2 ;;
-        -r|--results)       RESULTS_FILE="$2"; shift 2 ;;
+        -r|--results)    RESULTS_FILE="$2"; shift 2 ;;
         -h|--help)    usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -109,6 +109,8 @@ function get_table_stats () {
     if engine_enabled pandas; then
         /usr/bin/time -v uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -date $DATE -db ${DB_DIR}/parquet/rowgroup -engine pandas -sortcols "time" -queryfile ./artifacts/queries/inmemory/pandas.psv -tags none -tableStatsDir ${STATS_DIR}/pandas 2> ${STATS_DIR}/pandas/os.txt
     fi
+
+    save_environment ${STATS_DIR}/environment.yaml
 }
 
 function merge_results () {
