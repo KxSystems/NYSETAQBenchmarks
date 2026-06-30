@@ -165,7 +165,7 @@ def main(args: argparse.Namespace) -> None:
     params = load_parameters(args.paramdir)
     params["datadate"] = args.date
     storage_backend = args.storage_backend.lower()
-    if storage_backend == "inmemory":
+    if storage_backend == "memory":
         if engine == "polars":
             if len(args.indexon) > 0:
                 raise ValueError("Polars does not support indices")
@@ -201,7 +201,7 @@ def main(args: argparse.Namespace) -> None:
             engineversion = pd.__version__
         else:
             raise ValueError(f"Invalid engine parameter: {args.engine}")
-    elif storage_backend == "ondisk":
+    elif storage_backend == "disk":
         if engine == "polars":
             from executors.ondisk.polars import QueryExecutorPolars
             import polars as pl
@@ -297,8 +297,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument('-db', type=Path, required=True, help="Path to hive-partitioned parquet DB root")
-    parser.add_argument('-storage_backend', type=str, choices=["inmemory", "ondisk"],
-        required=True, help="Storage backend. Currently supported inmemory and ondisk")
+    parser.add_argument('-storage_backend', type=str, choices=["memory", "disk"],
+        required=True, help="Storage backend. Currently supported memory and disk")
     parser.add_argument('-engine', type=str, choices=["polars", "duckdb_con", "pykx", "pandas"],
         required=True, help="Query engine. Currently supported: polars, duckdb_con, pykx, and pandas")
     parser.add_argument('-sortcols', type=parse_sortcols, required=False, help="Comma-separated columns to sort trade/quote by, e.g. 'time' or 'sym,time'.")

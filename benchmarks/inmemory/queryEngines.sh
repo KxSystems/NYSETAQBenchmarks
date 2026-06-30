@@ -51,7 +51,7 @@ init_benchmark
 function execute_queries () {
     mkdir -p ${RESULT_DIR}
     echo "Running Queries..."
-    local COMMONPARAMS="-storage_backend inmemory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM}"
+    local COMMONPARAMS="-storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM}"
     for s in "${THREAD_NRS[@]}"; do
         echo "--> Running with $s threads"
 
@@ -89,7 +89,7 @@ function execute_queries () {
 }
 
 function get_table_stats () {
-    local COMMONPARAMS="-storage_backend inmemory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM}"
+    local COMMONPARAMS="-storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM}"
     echo "Getting table stats..."
     mkdir -p ${STATS_DIR}/{kdb,kdbParted,kdbxsql,duckdb,duckdb_index,polars,pandas}
     if engine_enabled kdb; then

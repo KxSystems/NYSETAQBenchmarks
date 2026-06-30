@@ -1,23 +1,99 @@
+if[(5.0>.z.K); -2 "kdb+ 5 is required";exit 1];
+
+USAGE: "usage: q ", string[.z.f], " [-help] -db DB -paramdir DIR -queryfile FILE -querymeta FILE",
+  " -storage_backend (memory|disk) [-format (KDB|TABLEDICT|PARQUET|PARQUET_ROWGROUP)]",
+  " [-engine (q-sql|SQL)] [-sortcols COLS] [-indexon COL] [-date DATE]",
+  " [-queryoutput DIR] [-result FILE] [-tableStatsDir DIR] [-encr FILE] [-tags TAGS]",
+  " [-idx FILTER] [-debug]\n\n",
+  "Loads a kdb+/Parquet database (in memory or on disk) and runs the benchmark queries against it,\n",
+  "writing per-query timings, memory usage and IO stats to the result file.\n\n",
+  "Required options:\n",
+  "  -db DB               Database directory to load (or root, e.g. ${DB_DIR}/kdb)\n",
+  "  -storage_backend B   Where the data is read from: 'memory' or 'disk'\n",
+  "  -paramdir DIR        Directory containing the query parameters\n",
+  "  -queryfile FILE      PSV file with the queries to run\n",
+  "  -querymeta FILE      PSV file with the query metadata (idx|querytag)\n\n",
+  "Optional options:\n",
+  "  -format FMT          Data format: KDB (default for disk), TABLEDICT, PARQUET, PARQUET_ROWGROUP\n",
+  "  -engine ENG          Query engine: q-sql (default) or SQL\n",
+  "  -sortcols COLS       Comma-separated sort columns, e.g. 'sym,time'\n",
+  "  -indexon COL         Column to add an attribute to: '' (none), 'time' or 'sym'\n",
+  "  -date DATE           Partition date to load (required for the 'memory' backend)\n",
+  "  -queryoutput DIR     Directory to persist query outputs as CSV\n",
+  "  -result FILE         PSV file to append per-query results to\n",
+  "  -tableStatsDir DIR   Directory to save per-table statistics as YAML\n",
+  "  -encr FILE           Encryption key file for an encrypted database\n",
+  "  -tags TAGS           Comma-separated query tags to filter on\n",
+  "  -idx FILTER          Filter queries by index: single (42), list (32,42,50) or range (40-44)\n",
+  "  -debug               Do not exit when finished (keep the q process alive)\n\n",
+  "Environment variables:\n",
+  "  FLUSH                Command used to flush OS caches between queries (required)\n",
+  "  EACHPEACH            '', 'each' or 'peach' to control table-dictionary iteration\n",
+  "  IOSTAT               Set to 'false' to disable IO statistics collection\n",
+  "  QMAP                 Set to 'true' to run .Q.MAP[] after loading the database"
+
+ko: key o: first each .Q.opt .z.x;
+if[`help in ko; .log.info USAGE; exit 0]
+
+MANDATORY: `db`paramdir`queryfile`querymeta`storage_backend;
+if[count missing: MANDATORY except ko;
+  -2 "Missing mandatory parameter(s): ", ", " sv string missing;
+  -2 "Run with -help for usage.";
+  exit 1]
+
+ALLOWED: MANDATORY,`format`engine`sortcols`indexon`date`queryoutput`result`tableStatsDir`encr`tags`idx`debug;
+if[count unknown: ko except ALLOWED;
+  -2 "Unknown parameter(s): ", ", " sv string unknown;
+  -2 "Run with -help for usage.";
+  exit 1]
+
+
+STORAGE_BACKEND: lower o `$"storage_backend"
+if[not STORAGE_BACKEND in ("memory"; "disk");
+  -2 "Unknown storage backend ", STORAGE_BACKEND; exit 2]
+
+if[(STORAGE_BACKEND ~ "memory") and not `date in ko;
+  -2 "Date column is required for inmemory tests"; exit 2]
+
+if["" ~ getenv `FLUSH;
+  -2 "Environment variable FLUSH is not set. Maybe config/queryenv was not loaded.";
+  exit 2]
+
+if[not lower[getenv `EACHPEACH] in (""; "each"; "peach");
+  -2 "Invalid value for EACHPEACH environment variable. Allowed values are '', 'each' or 'peach'.";
+  exit 2];
+
 .logger:use`kx.log
 .log:.logger.createLog[]
 
 system "l src/pivot.q"    / This will be available as a KX module
 system "l src/memusage.q" / This is also available as a DI module
 
-if["" ~ getenv `FLUSH;
-  .log.info "Environment variable FLUSH is not set. Maybe config/queryenv was not loaded.";
-  exit 2]
-
-ko: key o: first each .Q.opt .z.x;
-
 DB: o `db
 PARAMDIR: hsym `$o`paramdir
-STORAGE_BACKEND: lower o `$"storage_backend"
+
+
 INDEXON: trim lower o `$"indexon"
 FORMAT: `$upper o `format
 ENGINE: (`$"q-sql")^`$upper o `engine
 SORTCOLS: `$"," vs o `sortcols
 QUERYOUTPUT: hsym `$o `queryoutput
+
+checkInputFileExistence: {[f]
+  fn: o `$f;
+  if[()~key hsym `$fn;
+    -2 "File for -", f, " does not exist: ", fn; exit 3]}
+
+checkInputFileExistence each ("queryfile"; "querymeta")
+
+QueryTable: ("****";enlist "|") 0: `$o `queryfile;
+.log.info "Loading and executing queries from ", o `queryfile;
+QueryMetaTable: `idx`querytag xcol ("**";enlist "|") 0: `$o `querymeta;
+
+if[not QueryTable[`idx] ~ QueryMetaTable`idx;
+  -2 "Index mismatch between the query and the query meta files";
+  exit 4]
+
 
 resultH: `
 if[`result in key o;
@@ -26,11 +102,6 @@ if[`result in key o;
   resultH: hopen resFile;
   resultH "storagebackend|compparam|threadcount|runner|engine|format|sortcols|indexon|engineversion|idx|tags|query|status|run1timeNS|run2timeNS|run3timeNS|run3memKB|run1ioKB|run2ioKB|run3ioKB|ressizeKB\n"]
 
-
-
-QueryTable: ("****";enlist "|") 0: `$o `queryfile;
-.log.info "Loading and executing queries from ", o `queryfile;
-QueryMetaTable: `idx`querytag xcol ("**";enlist "|") 0: `$o `querymeta;
 
 Tags: ("," vs o`tags) except enlist ""
 
@@ -43,9 +114,6 @@ parseIdxFilter: {[s:`C]
   }
 (IdxFilter:`J): $[`idx in ko; parseIdxFilter o`idx; `long$()]
 
-if[not lower[getenv `EACHPEACH] in (""; "each"; "peach");
-  .log.error "Invalid value for EACHPEACH environment variable. Allowed values are '', 'each' or 'peach'.";
-  exit 3];
 EACHPEACH: $["" ~ getenv `EACHPEACH; each; value lower getenv `EACHPEACH];
 
 IOStatError: `kB_read`kB_wrtn`kB_sum!3#0Nj
@@ -328,10 +396,7 @@ startTime: .z.p
 Device: first system "./src/resolve_device.sh ", DB
 .log.info "Monitoring device ", Device
 
-$[STORAGE_BACKEND ~ "inmemory"; [
-  if[not `date in ko;
-      .log.error "Date column is required for INMEMORYNOATTR format";
-      exit 5];
+$[STORAGE_BACKEND ~ "memory"; [
   compparm: "0_0_0"; / data is not compressed in memory
   WriterFN:: writeRes[resultH; (STORAGE_BACKEND; compparm; ENGINE; FORMAT; SORTCOLS; INDEXON)];
   $[FORMAT = `TABLEDICT; [
@@ -342,7 +407,7 @@ $[STORAGE_BACKEND ~ "inmemory"; [
     attrib: getAttrib[INDEXON; SORTCOLS];
     loadKDBPartitionIntoMemory[hsym `$DB; Device; WriterFN; "D"$o `date; SORTCOLS; attrib]]
    ]];
-  STORAGE_BACKEND ~ "ondisk";
+  [
     $[FORMAT like "PARQUET*"; [
       compparm: "nyi_nyi_nyi";
       WriterFN:: writeRes[resultH; (STORAGE_BACKEND; compparm; ENGINE; FORMAT; SORTCOLS; INDEXON)];
@@ -352,8 +417,7 @@ $[STORAGE_BACKEND ~ "inmemory"; [
       compparm: $[count compparmall; "_" sv string @[;`logicalBlockSize`algorithm`zipLevel] compparmall; "0_0_0"];
       WriterFN:: writeRes[resultH; (STORAGE_BACKEND; compparm; ENGINE; FORMAT; SORTCOLS; INDEXON)];
       loadKDBDB[DB; Device; WriterFN]
-    ]; [.log.error "Unknown format ", FORMAT; exit 1]]; [
-    .log.error "Unknown storage backend ", STORAGE_BACKEND; exit 1]];
+    ]; [.log.error "Unknown format ", FORMAT; exit 1]]]];
 
 if[not FORMAT ~ `INMEMORYTABLEDICT;
   if[`tableStatsDir in ko; captureTableStats[hsym `$o `tableStatsDir] each `master`trade`quote]];
@@ -363,16 +427,10 @@ system "l src/getQueryParameters.q"
 getQueryParameters PARAMDIR
 
 if[ENGINE ~ `SQL;
-  ([init]):use`kx.sql;
-  init[];
+  .s.init[];
   .s.F[`exnames]: .s.fx exnames;
   .s.F[`timebucketsstep]: .s.fx timeBucketsStep;
   timeBuckets: `bound xasc ([] bucket: key timeBuckets; bound: value timeBuckets);
-  ]
-
-if[not QueryTable[`idx] ~ QueryMetaTable`idx;
-  .log.error "Index mismatch between the query and the query meta files";
-  exit 4
   ]
 
 queries: QueryTable lj `idx xkey QueryMetaTable;
