@@ -43,7 +43,7 @@ init_benchmark
 function execute_queries () {
     mkdir -p ${RESULT_DIR}
     echo "Running Queries..."
-    local COMMONPARAMS="-date $DATE -db ${DB_DIR}/kdb -storage_backend INMEMORY -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM}"
+    local COMMONPARAMS="-date $DATE -db ${DB_DIR}/kdb -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM}"
     for s in "${THREAD_NRS[@]}"; do
         echo "--> Running with $s threads"
 
@@ -63,7 +63,7 @@ function execute_queries () {
 }
 
 function get_table_stats () {
-    local COMMONPARAMS="-date $DATE -db ${DB_DIR}/kdb -storage_backend INMEMORY -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM} -tags none"
+    local COMMONPARAMS="-date $DATE -db ${DB_DIR}/kdb -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM} -tags none"
     echo "Getting table stats..."
     mkdir -p ${STATS_DIR}/{kdbNoAttr,kdbTimeSorted,kdb,kdbParted}
 

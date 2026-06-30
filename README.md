@@ -179,7 +179,7 @@ The file starts with a header row. The columns are:
 
 | Column | Description |
 | --- | --- |
-| `storagebackend` | Where the data is read from: `inmemory` or `ondisk`. |
+| `storagebackend` | Where the data is read from: `memory` or `disk`. |
 | `compparam` | Compression parameter used for the data. |
 | `threadcount` | Number of (secondary/worker) threads the engine was configured to use. `0` means no secondary threads. |
 | `runner` | The harness driving the engine, e.g. `KDB-X` or `Python`. |
