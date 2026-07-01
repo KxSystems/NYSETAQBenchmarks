@@ -53,7 +53,6 @@ function save_environment () {
     cat > "${out}" <<EOF
 test time: "$(date)"
 parameters:
-  size: "${SIZE}"
   db-dir: "${DB_DIR}"
   date: "${DATE}"
 envvars:
