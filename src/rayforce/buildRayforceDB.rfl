@@ -1,0 +1,32 @@
+;; Build the Rayforce native database for the in-memory benchmark.
+;;
+;; This is the Rayforce data-generation step: a one-pass converter from the
+;; source CSV to a Rayforce splayed table. `.csv.splayed` parses, columnarises
+;; and persists in a single streaming pass, building the accelerator indexes
+;; (STR dictionaries, per-chunk numeric min/max) that `.db.splayed.get` relies
+;; on for fast mmap loads. `.csv.parted` (row-chunked) is the on-disk / rowgroup
+;; variant; the in-memory benchmark loads a whole table, so it uses splayed.
+;;
+;; Sorting is intentionally NOT done here: the runner sorts by `time` as a
+;; measured load step, so the conversion stays a plain format transform.
+;;
+;; Inputs (environment variables):
+;;   RAY_CSVDIR  directory containing trade.csv and quote.csv (comma-delimited,
+;;               with a header row of column names)
+;;   RAY_DBDIR   output directory; writes RAY_DBDIR/trade and RAY_DBDIR/quote
+
+(set csvdir (.os.getenv "RAY_CSVDIR"))
+(set dbdir  (.os.getenv "RAY_DBDIR"))
+
+;; Column type schemas — order matches src/rayforce/exportRayCSV.q. The CSV
+;; carries a header row, so column names are taken from it automatically.
+(.csv.splayed [SYMBOL I64 F64 I64 SYMBOL SYMBOL SYMBOL SYMBOL I64 I64]
+              (concat csvdir "/trade.csv") (concat dbdir "/trade"))
+(println "trade -> splayed done")
+
+(.csv.splayed [SYMBOL I64 F64 F64 I64 I64 SYMBOL SYMBOL SYMBOL I64 I64 SYMBOL]
+              (concat csvdir "/quote.csv") (concat dbdir "/quote"))
+(println "quote -> splayed done")
+
+(println "Rayforce DB build complete.")
+(exit 0)

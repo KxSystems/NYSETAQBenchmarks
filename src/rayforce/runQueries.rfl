@@ -1,0 +1,90 @@
+;; Rayforce in-memory benchmark runner.
+;;
+;; Loads the Rayforce splayed trade/quote tables into memory, sorts by `time`
+;; (a measured setup step), then runs each benchmark query three times (run1
+;; cold, run2/run3 warm) capturing nanosecond timings, a memory delta and the
+;; serialized result size.
+;;
+;; It emits a compact comma-CSV of machine columns
+;;   idx,status,run1timeNS,run2timeNS,run3timeNS,run3memKB,ressizeKB
+;; which src/rayforce/runRayforce.sh joins with the query text/tags and constant
+;; columns to produce the 21-column pipe PSV the suite merges.
+;;
+;; Inputs (environment variables):
+;;   RAY_DBDIR    splayed DB dir containing trade/ and quote/
+;;   RAY_PARAMS   generated Rayfall prelude that binds query parameter globals
+;;   RAY_DRIVER   generated Rayfall file of (runq idx (fn [] <query>)) calls
+;;   RAY_RESULT   output CSV path
+
+;; ---- result accumulators -------------------------------------------------
+(set RIDX (list)) (set RSTAT (list))
+(set RR1 (list)) (set RR2 (list)) (set RR3 (list))
+(set RMEM (list)) (set RSZ (list))
+
+(set push (fn [i s r1 r2 r3 m z]
+  (set RIDX  (concat RIDX  (enlist i)))
+  (set RSTAT (concat RSTAT (enlist s)))
+  (set RR1   (concat RR1   (enlist r1)))
+  (set RR2   (concat RR2   (enlist r2)))
+  (set RR3   (concat RR3   (enlist r3)))
+  (set RMEM  (concat RMEM  (enlist m)))
+  (set RSZ   (concat RSZ   (enlist z)))))
+
+;; timeit returns milliseconds (f64, derived from a ns clock) -> integer ns
+(set ns (fn [ms] (as 'I64 (round (* ms 1000000.0)))))
+(set membytes (fn [] (at (.sys.mem) 'bytes-allocated)))
+(set kb (fn [b] (as 'I64 (div (if (> b 0) b 0) 1024))))
+
+;; ---- one benchmark query -------------------------------------------------
+;; thunk is (fn [] <query>) returning a table. run1 is the cold first eval;
+;; run2/run3 are warm. A failing query is recorded as status=error, never
+;; aborting the run.
+;; NOTE: a try handler lambda does NOT capture the enclosing fn's params, so the
+;; error path reads the index from a global (CURIDX) set before the try. Without
+;; this, the first failing query would abort the whole run instead of recording
+;; status=error and continuing.
+(set runq (fn [idx thunk]
+  (set CURIDX idx)
+  (try
+    (do
+      (let t1 (timeit (thunk)))
+      (let t2 (timeit (thunk)))
+      (let m0 (membytes))
+      (let t3 (timeit (thunk)))
+      (let m1 (membytes))
+      (let res (thunk))
+      (push idx 'success (ns t1) (ns t2) (ns t3) (kb (- m1 m0)) (kb (count (ser res)))))
+    (fn [e] (push CURIDX 'error 0 0 0 0 0)))))
+
+;; ---- load parameters -----------------------------------------------------
+(load (.os.getenv "RAY_PARAMS"))
+
+;; ---- LOAD (idx 0) + SORT (idx -2): measured setup steps ------------------
+;; Load the on-disk table fully into RAM before querying: `.db.splayed.get` then
+;; materialize an in-memory copy with `take t (count t)`. Querying the raw
+;; mmap'd splayed handle would (a) hide disk page-faults inside "warm" query
+;; timings and (b) leave symbol columns in the enumerated on-disk form. This
+;; keeps the comparison a true in-memory one across all engines.
+(set dbdir (.os.getenv "RAY_DBDIR"))
+(let tl (timeit (do
+  (set trade (.db.splayed.get (concat dbdir "/trade")))
+  (set quote (.db.splayed.get (concat dbdir "/quote")))
+  (set trade (take trade (count trade)))
+  (set quote (take quote (count quote))))))
+(push 0 'success (ns tl) (ns tl) (ns tl)
+  (kb (+ (count (ser trade)) (count (ser quote)))) 0)
+
+(let ts (timeit (do
+  (set trade (xasc trade 'time))
+  (set quote (xasc quote 'time)))))
+(push -2 'success (ns ts) (ns ts) (ns ts) 0 0)
+
+;; ---- run all queries -----------------------------------------------------
+(load (.os.getenv "RAY_DRIVER"))
+
+;; ---- write machine results ----------------------------------------------
+(set RES (table [idx status run1timeNS run2timeNS run3timeNS run3memKB ressizeKB]
+                (list RIDX RSTAT RR1 RR2 RR3 RMEM RSZ)))
+(.csv.write RES (.os.getenv "RAY_RESULT"))
+(println (concat "Rayforce runner wrote " (.os.getenv "RAY_RESULT")))
+(exit 0)

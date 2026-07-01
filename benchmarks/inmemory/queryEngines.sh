@@ -5,7 +5,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 STATS_DIR=""
-ENGINES="kdb,sql,duckdb,polars,pykx,pandas"
+ENGINES="kdb,sql,duckdb,polars,pykx,pandas,rayforce"
 RESULTS_FILE="./results/inmemory/queryengines.psv"
 
 usage() {
@@ -17,7 +17,7 @@ Options:
   -p, --param-dir    Directory of the query parameters
   -d, --date         Target date
   -t, --threads      Space-separated list of thread counts, e.g., "1 4 16", (default: "1 4")
-  -e, --engines      Comma-separated list of engines to test (default: "kdb,sql,duckdb,polars,pykx,pandas")
+  -e, --engines      Comma-separated list of engines to test (default: "kdb,sql,duckdb,polars,pykx,pandas,rayforce")
   -s, --stats-dir    (optional) Directory to save table and environment statistics
   -i, --idx          (optional) Filter queries by index: single (42), list (32,42,50), or range (40-44)
   -r, --results      (optional) Single PSV that all per-engine results are merged into (default: ${RESULTS_FILE})
@@ -84,6 +84,18 @@ function execute_queries () {
         if engine_enabled pandas; then
             OMP_NUM_THREADS=$(( s > 1 ? s : 1 )) NUMEXPR_NUM_THREADS=$(( s > 1 ? s : 1 )) MKL_NUM_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py -engine pandas -sortcols "time" -date $DATE -db ${DB_DIR}/parquet/rowgroup -queryfile ./artifacts/queries/inmemory/pandas.psv ${COMMONPARAMS} -result ${RESULT_DIR}/pandasInMemory_${s}Threads.psv
             add_nickname ${RESULT_DIR}/pandasInMemory_${s}Threads.psv "pandas"
+        fi
+        if engine_enabled rayforce; then
+            # Rayforce loads its native splayed DB (${DB_DIR}/rayforce) fully into
+            # memory. -c is the worker-pool size, so 0 secondary threads maps to a
+            # single-core pool.
+            RAYCORES=$(( s > 1 ? s : 1 ))
+            $(get_numa_config) bash ./src/rayforce/runRayforce.sh \
+                --db-dir ${DB_DIR} --param-dir ${PARAM_DIR} --date $DATE --cores ${RAYCORES} \
+                --queryfile ./artifacts/queries/inmemory/rayforce.psv \
+                --result ${RESULT_DIR}/rayforce_${s}Threads.psv \
+                ${IDX_PARAM:+--idx ${IDX_PARAM#-idx }}
+            add_nickname ${RESULT_DIR}/rayforce_${s}Threads.psv "rayforce"
         fi
     done
 }

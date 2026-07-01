@@ -1,0 +1,22 @@
+;; Static Rayfall prelude shared by every benchmark run. Loaded before the
+;; generated per-size parameter prelude. Holds constants that never change with
+;; the dataset: the exchange-id -> exchange-name map (from pysrc/taqToParquet
+;; schemas.py EXNAMES) and a couple of nanosecond time constants used by the
+;; query translations.
+
+;; Exchange code -> full name. Used by queries that group `by exnames ex`.
+(set exnames (dict
+  ['A 'B 'C 'D 'I 'J 'K 'L 'M 'N 'P 'S 'T 'Q 'V 'W 'X 'Y 'Z]
+  ["NYSE American" "NASDAQ OMX BX" "NYSE National"
+   "FINRA Alternative Display Facility" "International Securities Exchange"
+   "Cboe EDGA Exchange" "Cboe EDGX Exchange" "Long-Term Stock Exchange"
+   "Chicago Stock Exchange" "New York Stock Exchange" "NYSE Arca"
+   "Consolidated Tape System" "NASDAQ Stock Market" "NASDAQ Stock Exchange"
+   "The Investors' Exchange" "Chicago Broad Options Exchange" "NASDAQ OMX PSX"
+   "Cboe BYX Exchange" "Cboe BZX Exchange"]))
+
+;; Nanosecond time-of-day constants (Rayforce stores `time` as I64 ns).
+(set NS_SEC   1000000000)
+(set NS_MIN   60000000000)
+(set NS_HOUR  3600000000000)
+(set NS_DAY   86400000000000)
