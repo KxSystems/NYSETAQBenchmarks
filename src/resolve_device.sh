@@ -90,6 +90,29 @@ if [[ -z "${MOUNT_SOURCE:-}" ]]; then
     exit "$EXIT_ERR_GENERIC"
 fi
 
+# Handle LVM logical volumes. The filesystem on an LV reports as ext4/xfs/etc.,
+# so LVM is detected here from the device type rather than the FSTYPE case above.
+# An LV can be striped/mirrored across many physical volumes; we only resolve it
+# when it maps to a single underlying disk, and error otherwise.
+SOURCE_TYPE=$(lsblk -dno TYPE "$MOUNT_SOURCE" 2>/dev/null | head -n 1)
+if [[ "$SOURCE_TYPE" == "lvm" ]]; then
+    # Walk the inverse dependency tree (-s) to the whole disks backing the LV.
+    # KNAME avoids the tree-drawing characters added to the NAME column.
+    mapfile -t LVM_DISKS < <(lsblk -sno KNAME,TYPE "$MOUNT_SOURCE" 2>/dev/null \
+        | awk '$2 == "disk" { print $1 }' | sort -u)
+
+    if [[ "${#LVM_DISKS[@]}" -eq 0 ]]; then
+        log_error "Could not resolve any physical device for LVM volume '$MOUNT_SOURCE'."
+        exit "$EXIT_ERR_GENERIC"
+    elif [[ "${#LVM_DISKS[@]}" -gt 1 ]]; then
+        log_error "LVM volume '$MOUNT_SOURCE' spans multiple physical devices (${LVM_DISKS[*]}); cannot resolve a single device."
+        exit "$EXIT_ERR_UNSUPPORTED"
+    fi
+
+    echo "${LVM_DISKS[0]}"
+    exit "$EXIT_SUCCESS"
+fi
+
 # Resolve the parent kernel name (physical disk) from the partition or logical volume.
 # -d: don't print slaves (we want the parent)
 # -n: no headings
