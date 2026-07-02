@@ -88,10 +88,11 @@ awk -v ver="${EVERSION}" -v cores="${CORES}" '
     tags=(idx in qtags)?qtags[idx]:"load";
     if (idx in qtext)      { q=qtext[idx] }
     else if (idx==0)       { q="load splayed DB (mmap)"; tags="load" }
-    else if (idx==-2)      { q="sort by time (materialize into RAM)"; tags="load" }
+    else if (idx==-2)      { q="sort by sym,time (materialize into RAM)"; tags="load" }
+    else if (idx==-3)      { q="add grouped index on sym"; tags="load" }
     else                   { q="setup" }
     print "memory","0_0_0",cores,"Rayforce","rayforce","rayforce", \
-          "time","sym",ver,idx,tags,q,status, \
+          "sym,time","sym",ver,idx,tags,q,status, \
           r1,r2,r3,mem,0,0,0,rsz
   }
 ' "${QUERYFILE}" "${WORK}/machine.csv" > "${RESULT}"
