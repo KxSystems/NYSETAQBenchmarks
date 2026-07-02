@@ -1,6 +1,6 @@
 ;; Rayforce in-memory benchmark runner.
 ;;
-;; Loads the Rayforce splayed trade/quote tables into memory, sorts by `time`
+;; Loads the Rayforce splayed trade/quote tables into memory, sorts by (sym, time)
 ;; (a measured setup step), then runs each benchmark query three times (run1
 ;; cold, run2/run3 warm) capturing nanosecond timings, a memory delta and the
 ;; serialized result size.
@@ -75,8 +75,8 @@
   (kb (+ (count (ser trade)) (count (ser quote)))) 0)
 
 (let ts (timeit (do
-  (set trade (xasc trade 'time))
-  (set quote (xasc quote 'time)))))
+  (set trade (xasc trade ['sym 'time]))
+  (set quote (xasc quote ['sym 'time])))))
 (push -2 'success (ns ts) (ns ts) (ns ts) 0 0)
 
 ;; ---- INDEX (idx -3): grouped hash index on `sym`, a measured setup step ----
