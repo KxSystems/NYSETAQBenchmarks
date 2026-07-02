@@ -89,6 +89,7 @@ awk -v ver="${EVERSION}" -v cores="${CORES}" '
     if (idx in qtext)      { q=qtext[idx] }
     else if (idx==0)       { q="load splayed DB (mmap)"; tags="load" }
     else if (idx==-2)      { q="sort by time (materialize into RAM)"; tags="load" }
+    else if (idx==-3)      { q="add grouped index on sym"; tags="load" }
     else                   { q="setup" }
     print "memory","0_0_0",cores,"Rayforce","rayforce","rayforce", \
           "time","sym",ver,idx,tags,q,status, \

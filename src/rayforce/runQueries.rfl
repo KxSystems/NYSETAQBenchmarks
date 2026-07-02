@@ -79,6 +79,20 @@
   (set quote (xasc quote 'time)))))
 (push -2 'success (ns ts) (ns ts) (ns ts) 0 0)
 
+;; ---- INDEX (idx -3): grouped hash index on `sym`, a measured setup step ----
+;; Mirror of the kdb runner's addAttr step (`g#sym` on the time-sorted tables):
+;; rebuild each table with its sym column carrying the grouped (hash) index
+;; that the engine consults for (== sym X) point filters. Applied after the
+;; sort because reordering ops drop column indexes.
+(let ti (timeit (do
+  (set trade (table (key trade)
+    (map (fn [c] (if (== c 'sym) (.attr.set 'grouped (at trade c)) (at trade c)))
+         (key trade))))
+  (set quote (table (key quote)
+    (map (fn [c] (if (== c 'sym) (.attr.set 'grouped (at quote c)) (at quote c)))
+         (key quote)))))))
+(push -3 'success (ns ti) (ns ti) (ns ti) 0 0)
+
 ;; ---- run all queries -----------------------------------------------------
 (load (.os.getenv "RAY_DRIVER"))
 
