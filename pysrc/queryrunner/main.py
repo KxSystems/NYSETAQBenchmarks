@@ -252,8 +252,8 @@ def main(args: argparse.Namespace) -> None:
             logger.error("Query file not found: %s", args.queryfile)
             sys.exit(3)
 
-        if args.queryoutput is not None:
-            args.queryoutput.mkdir(parents=True, exist_ok=True)
+        if args.queryOutputDir is not None:
+            args.queryOutputDir.mkdir(parents=True, exist_ok=True)
 
         with open(args.queryfile, 'r', encoding='utf-8') as queryfile, \
              open(args.querymeta, "r", encoding="utf-8") as querymeta:
@@ -268,8 +268,8 @@ def main(args: argparse.Namespace) -> None:
                 query = row['query'].strip()
                 querytags = set(row['tags'].strip().split(",") + rowmeta['tags'].strip().split(","))
                 querytags.discard("")
-                if idx.startswith("#"):
-                    idx = idx[1:]
+                if query.startswith("#"):
+                    query = query[1:]
                     result = QueryResult(query, "skip")
                 elif query == '':
                     result = QueryResult(query, "emptyquery")
@@ -278,7 +278,7 @@ def main(args: argparse.Namespace) -> None:
                 elif len(tags) > 0 and len(tags & querytags) == 0:
                     result = QueryResult(query, "tagfiltered")
                 else:
-                    result = run_query(runner, args.db, ios, idx, querytags, query, row['parameter'].strip(), args.queryoutput)
+                    result = run_query(runner, args.db, ios, idx, querytags, query, row['parameter'].strip(), args.queryOutputDir)
 
                 writer.writerow(row_start + [idx, ",".join(querytags)] + result.to_csv_row())
                 f_out.flush()
@@ -307,7 +307,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('-querymeta', type=Path, required=True, help="PSV file containing the query metas")
     parser.add_argument('-paramdir', type=Path, required=True, help="Directory containing parameter txt files")
     parser.add_argument('-tags', type=str, required=False, help="Comma separated tags for filtering queries.")
-    parser.add_argument('-queryoutput', type=Path, required=False, help="Directory to save query results.")
+    parser.add_argument('-queryOutputDir', type=Path, required=False, help="Directory to save query results.")
     parser.add_argument('-tableStatsDir', dest='table_stats_dir', type=Path, required=False, help="Directory to save master/trade/quote table statistics YAML files.")
     parser.add_argument('-date', type=lambda s: datetime.strptime(s, '%Y%m%d').date(), required=True, help='Date in YYYYMMDD format')
 

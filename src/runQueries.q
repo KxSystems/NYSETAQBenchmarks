@@ -3,7 +3,7 @@ if[(5.0>.z.K); -2 "kdb+ 5 is required";exit 1];
 USAGE: "usage: q ", string[.z.f], " [-help] -db DB -paramdir DIR -queryfile FILE -querymeta FILE",
   " -storage_backend (memory|disk) [-format (KDB|TABLEDICT|PARQUET|PARQUET_ROWGROUP)]",
   " [-engine (q-sql|SQL)] [-sortcols COLS] [-indexon COL] [-date DATE]",
-  " [-queryoutput DIR] [-result FILE] [-tableStatsDir DIR] [-encr FILE] [-tags TAGS]",
+  " [-queryOutputDir DIR] [-result FILE] [-tableStatsDir DIR] [-encr FILE] [-tags TAGS]",
   " [-idx FILTER] [-debug]\n\n",
   "Loads a kdb+/Parquet database (in memory or on disk) and runs the benchmark queries against it,\n",
   "writing per-query timings, memory usage and IO stats to the result file.\n\n",
@@ -19,7 +19,7 @@ USAGE: "usage: q ", string[.z.f], " [-help] -db DB -paramdir DIR -queryfile FILE
   "  -sortcols COLS       Comma-separated sort columns, e.g. 'sym,time'\n",
   "  -indexon COL         Column to add an attribute to: '' (none), 'time' or 'sym'\n",
   "  -date DATE           Partition date to load (required for the 'memory' backend)\n",
-  "  -queryoutput DIR     Directory to persist query outputs as CSV\n",
+  "  -queryOutputDir DIR     Directory to persist query outputs as CSV\n",
   "  -result FILE         PSV file to append per-query results to\n",
   "  -tableStatsDir DIR   Directory to save per-table statistics as YAML\n",
   "  -encr FILE           Encryption key file for an encrypted database\n",
@@ -41,7 +41,7 @@ if[count missing: MANDATORY except ko;
   -2 "Run with -help for usage.";
   exit 1]
 
-ALLOWED: MANDATORY,`format`engine`sortcols`indexon`date`queryoutput`result`tableStatsDir`encr`tags`idx`debug;
+ALLOWED: MANDATORY,`format`engine`sortcols`indexon`date`queryOutputDir`result`tableStatsDir`encr`tags`idx`debug;
 if[count unknown: ko except ALLOWED;
   -2 "Unknown parameter(s): ", ", " sv string unknown;
   -2 "Run with -help for usage.";
@@ -68,6 +68,7 @@ if[not lower[getenv `EACHPEACH] in (""; "each"; "peach");
 
 system "l src/pivot.q"    / This will be available as a KX module
 system "l src/memusage.q" / This is also available as a DI module
+system "l src/util.q"
 
 DB: o `db
 PARAMDIR: hsym `$o`paramdir
@@ -77,7 +78,7 @@ INDEXON: trim lower o `$"indexon"
 FORMAT: `$upper o `format
 ENGINE: (`$"q-sql")^`$upper o `engine
 SORTCOLS: `$"," vs o `sortcols
-QUERYOUTPUT: hsym `$o `queryoutput
+QUERYOUTPUT: hsym `$o `queryOutputDir
 
 checkInputFileExistence: {[f]
   fn: o `$f;
@@ -105,13 +106,6 @@ if[`result in key o;
 
 Tags: ("," vs o`tags) except enlist ""
 
-parseIdxFilter: {[s:`C]
-  if["," in s; :"J"$"," vs s]; / list
-  if["-" in s;                 / range
-    (s;e): "J"$"-" vs s;
-    :s + til 1 + e - s];
-  :enlist "J"$s                / single value
-  }
 (IdxFilter:`J): $[`idx in ko; parseIdxFilter o`idx; `long$()]
 
 EACHPEACH: $["" ~ getenv `EACHPEACH; each; value lower getenv `EACHPEACH];
