@@ -28,6 +28,7 @@ class QueryExecutorDuckDBCon:
 
         io_load_start = ios.get_io_stat()
         t_load_start = time.perf_counter_ns()
+        self.con.execute("SET preserve_insertion_order = true") # this is the default, but make it explicite
         self.con.execute("CREATE TABLE exnames AS SELECT * FROM read_parquet($1)", parameters=[str(db_path / "exnames.parquet")])
 
         self.con.execute("CREATE TABLE master AS SELECT * EXCLUDE (date) FROM read_parquet($1, hive_partitioning=True)",
@@ -58,7 +59,7 @@ class QueryExecutorDuckDBCon:
         self.con.execute("CREATE OR REPLACE TABLE trade AS SELECT make_timestamp_ns(epoch_ns(date)+time) AS time, " +
             "make_timestamp_ns(epoch_ns(date)+participantTimestamp) AS participantTimestamp, " +
             "make_timestamp_ns(epoch_ns(date)+tradeReportingFacilityTRFTimestamp) AS tradeReportingFacilityTRFTimestamp, " +
-            "row_number() OVER () AS rn, * EXCLUDE (date, time, participantTimestamp, tradeReportingFacilityTRFTimestamp) FROM trade")  # rowid ensures stable sorting for same-timestamp records
+            "* EXCLUDE (date, time, participantTimestamp, tradeReportingFacilityTRFTimestamp) FROM trade")
         self.con.execute("CREATE TYPE sym_trade_enum AS ENUM (SELECT DISTINCT sym FROM trade)") # master might not contain all syms in trade
         self.con.execute("ALTER TABLE trade ALTER sym TYPE sym_trade_enum")
         trade=self.con.table("trade")
@@ -69,7 +70,7 @@ class QueryExecutorDuckDBCon:
         self.con.execute("CREATE OR REPLACE TABLE quote AS SELECT make_timestamp_ns(epoch_ns(date)+time) AS time, " +
             "make_timestamp_ns(epoch_ns(date)+participantTimestamp) AS participantTimestamp, " +
             "make_timestamp_ns(epoch_ns(date)+FINRAADFTimestamp) AS FINRAADFTimestamp, " +
-            "row_number() OVER () AS rn, * EXCLUDE (date, time, participantTimestamp, FINRAADFTimestamp) FROM quote")  # rowid ensures stable sorting for same-timestamp records
+            "* EXCLUDE (date, time, participantTimestamp, FINRAADFTimestamp) FROM quote")
         logger.info("applying transformations")
         self.con.execute("CREATE TYPE sym_quote_enum AS ENUM (SELECT DISTINCT sym FROM quote)")
         self.con.execute("ALTER TABLE quote ALTER sym TYPE sym_quote_enum")
@@ -85,9 +86,9 @@ class QueryExecutorDuckDBCon:
         t_load_start = time.perf_counter_ns()
         order_by = ", ".join(self.sort_cols)
         logger.info("ordering trade by %s", order_by)
-        self.con.execute(f"CREATE OR REPLACE TABLE trade AS SELECT * EXCLUDE (rn) FROM trade ORDER BY {order_by}")
+        self.con.execute(f"CREATE OR REPLACE TABLE trade AS SELECT * FROM trade ORDER BY {order_by}, rowid")
         logger.info("ordering quote by %s", order_by)
-        self.con.execute(f"CREATE OR REPLACE TABLE quote AS SELECT * EXCLUDE (rn) FROM quote ORDER BY {order_by}")
+        self.con.execute(f"CREATE OR REPLACE TABLE quote AS SELECT * FROM quote ORDER BY {order_by}, rowid")
 
         t_load_elapsed = time.perf_counter_ns() - t_load_start
         io_load_end = ios.get_io_stat()

@@ -35,19 +35,20 @@ idx|tags|query|parameter
 34||select from normalize EACHPEACH[{select from x where size = (max;size) fby ex}; trade] where size = (max;size) fby ex|
 35||(update tag:`maxbid, sym: mostFreqInstr from select from quote[mostFreqInstr] where bid=(max; bid) fby ex, time=(min;time) fby ex), update tag: `minask, sym: mostFreqInstr from select from quote[mostFreqInstr] where ask=(min; ask) fby ex, time=(min;time) fby ex|
 36||normalize EACHPEACH[{select from x where size = (min;size) fby ex}; trade]|
-37||normalize EACHPEACH[{select from (select seqDecr: seq where (<) prior seq from x) where 0 < count each seqDecr}; trade]|
-38||update key[timeBuckets] timeBucket from select sum cnt, sum size by ex, timeBucket from normalize EACHPEACH[{0!select cnt: count i, sum size by ex, timeBucket: value[timeBuckets] bin time from x}; trade]|
-39||normalize EACHPEACH[{0!select cnt: count i, sum size by timeBucket: timeBucketsStep time from x where not corr=0h}; trade]|
-40||normalize EACHPEACH[{0!select o: first price, h: max price, l: min price, c: last price, s: sum size by 5 xbar time.minute from x where not null stop}; (hundredInstrs inter key trade)#trade]|
-41||update inbal: (bsize - asize) % bsize + asize from select first asize, first bsize by time.minute from quote anInfreqInstr|
-42||normalize EACHPEACH[{select wsumAsk:asize wsum ask, wsumBid: bsize wsum bid, sdevasksize: sdev asize, sdevbid:sdev bid, corPrice:ask cor bid, corSize: asize cor bsize from x}; (fivehundredInfreqInstrs inter key quote)#quote]|
-43||normalize EACHPEACH[{select from x where price = min price}; trade]|
-44||select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by pricegroup: sums differ price from trade mostFreqInstr|
-45||normalize EACHPEACH[{0!select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by pricegroup: sums differ price from x}; hundredInstrs#trade]|
-46||normalize EACHPEACH[{0!select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by pricegroup: sums differ price from x where ex in "LM" }; trade]|
-47||select medMidSize: med (bsize + asize) from quote anInfreqInstr|
-48||select medSize: med size by ex from raze EACHPEACH[{select ex, size from x}; trade]|
-49||{cnt: count each x; ([] sym: twentyInstrs where cnt) ,' raze x} EACHPEACH[{aj[`time; select time, price, size, stop, cond, ex from trade x; select time, bid, ask, bsize, asize, quotecond: cond, quoteex: ex from quote x]}; twentyInstrs]|
-50||aj[`time; select time, price, size, stop, cond, ex from trade aFreqInstr; select time, bid, ask, bsize, asize, quotecond: cond, quoteex: ex from quote aFreqInstr]|
-51||{cnt: count each x; ([] sym: key[trade] where cnt) ,' raze x} EACHPEACH[{aj[`ex`time; select time, price, size, stop, cond, ex from trade[x] where size>500000i; select time, bid, ask, bsize, asize, quotecond: cond, ex from quote x]}; key trade]|
-52||{cnt: count each x; ([] sym: key[trade] where cnt) ,' raze x} EACHPEACH[{aj[`time; select time, price, size, stop, cond, ex from trade[x] where time within 0D16:20 0D16:30; select time, bid, ask, bsize, asize, quotecond: cond from quote x]}; key trade]|
+37||normalize EACHPEACH[{select from x where size = (min;size) fby ex}; trade]|
+38||normalize EACHPEACH[{select from (select seqDecr: seq where (<) prior seq from x) where 0 < count each seqDecr}; trade]|
+39||update key[timeBuckets] timeBucket from select sum cnt, sum size by ex, timeBucket from normalize EACHPEACH[{0!select cnt: count i, sum size by ex, timeBucket: value[timeBuckets] bin time from x}; trade]|
+40||normalize EACHPEACH[{0!select cnt: count i, sum size by timeBucket: timeBucketsStep time from x where not corr=0h}; trade]|
+41||normalize EACHPEACH[{0!select o: first price, h: max price, l: min price, c: last price, s: sum size by 5 xbar time.minute from x where not null stop}; (hundredInstrs inter key trade)#trade]|
+42||update inbal: (bsize - asize) % bsize + asize from select first asize, first bsize by time.minute from quote anInfreqInstr|
+43||normalize EACHPEACH[{select wsumAsk:asize wsum ask, wsumBid: bsize wsum bid, sdevasksize: sdev asize, sdevbid:sdev bid, corPrice:ask cor bid, corSize: asize cor bsize from x}; (fivehundredInfreqInstrs inter key quote)#quote]|
+44||normalize EACHPEACH[{select from x where price = min price}; trade]|
+45||select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by pricegroup: sums differ price from trade mostFreqInstr|
+46||normalize EACHPEACH[{0!select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by pricegroup: sums differ price from x}; hundredInstrs#trade]|
+47||normalize EACHPEACH[{0!select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by pricegroup: sums differ price from x where ex in "LM" }; trade]|
+48||select medMidSize: med (bsize + asize) from quote anInfreqInstr|
+49||select medSize: med size by ex from raze EACHPEACH[{select ex, size from x}; trade]|
+50||{cnt: count each x; ([] sym: twentyInstrs where cnt) ,' raze x} EACHPEACH[{aj[`time; select time, price, size, stop, cond, ex from trade x; select time, bid, ask, bsize, asize, quotecond: cond, quoteex: ex from quote x]}; twentyInstrs]|
+51||aj[`time; select time, price, size, stop, cond, ex from trade aFreqInstr; select time, bid, ask, bsize, asize, quotecond: cond, quoteex: ex from quote aFreqInstr]|
+52||{cnt: count each x; ([] sym: key[trade] where cnt) ,' raze x} EACHPEACH[{aj[`ex`time; select time, price, size, stop, cond, ex from trade[x] where size>500000i; select time, bid, ask, bsize, asize, quotecond: cond, ex from quote x]}; key trade]|
+53||{cnt: count each x; ([] sym: key[trade] where cnt) ,' raze x} EACHPEACH[{aj[`time; select time, price, size, stop, cond, ex from trade[x] where time within 0D16:20 0D16:30; select time, bid, ask, bsize, asize, quotecond: cond from quote x]}; key trade]|

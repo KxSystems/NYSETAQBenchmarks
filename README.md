@@ -1,5 +1,36 @@
 # KX NYSE TAQ Benchmarks
 
+## QuickStart
+
+To run the in-memory query engine benchmark on a `medium`-sized dataset, execute
+the following from the repository root. See the numbered steps below for details,
+prerequisites (KDB-X, `uv`), and other data sizes/benchmarks.
+
+```bash
+# Fetch the taq submodule used to download the data
+git submodule update --init --recursive
+
+# Configuration
+export SIZE=medium                    # ~13 GB HDB; suitable for KDB-X Community Edition
+export NYSEBENCHMARKDIR=$PWD/DATA     # where downloads and generated databases live
+export DATE=$(curl -s https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/| grep -oE 'EQY_US_ALL_TRADE_2[0-9]{7}' | grep -oE '2[0-9]{7}'|head -1)
+
+# Step 2: download and prepare the PSV files
+./external/kx/taq/scripts/getPSVs.sh --csvdir ${NYSEBENCHMARKDIR}/${SIZE}/psv --dates ${DATE} --size ${SIZE}
+
+# Step 3: generate the binary databases (kdb+ for kdb/sql/pykx, Parquet for duckdb/polars/pandas)
+DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
+SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATE}
+
+# Step 4: run the benchmark
+export NUMANODE=0
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/queryengines
+```
+
+Results are written to `./results/inmemory/${SIZE}/queryengines.psv` (one row per
+query, as a pipe-separated values file). See [Results](#results) for the column
+descriptions.
+
 ## Overview
 
 This benchmark suite uses publicly available
@@ -39,7 +70,7 @@ The following statistics are based on data from 2025-01-02:
 | `SIZE` | Recommended for | Symbol first letters | HDB size (GB) | Nr of quote symbols | Nr of quotes |
 | --- | --- | --- | ---: | ---: | ---: |
 | `small` | A quick test to get familiar with the benchmark suite | Z | 1 | 94 | 4 607 158 |
-| `medium` | KDB-X Community Edition users | I | 13 | 555 | 180 827 332 |
+| `medium` | For KDB-X Community Edition users | I | 13 | 555 | 180 827 332 |
 | `large` | Users with an unlimited KDB-X license but limited memory | A–H | 52 | 4 849 | 707 738 295 |
 | `full` | The most thorough testing | A–Z | 233 | 11 155 | 2 313 872 956 |
 
@@ -158,6 +189,7 @@ And the following optional parameters:
 | `-s`, `--stats-dir` | Directory to save per-table statistics (one YAML file per table, plus OS `time -v` output). Default: `./results/inmemory/queryengines`. |
 | `-i`, `--idx` | Filter queries by index: single (`42`), comma-separated list (`32,42,50`), or range (`40-44`). Default: run all queries. |
 | `--results` | Single PSV file that all per-engine results are merged into. The individual per-engine files are written to a temporary directory and removed afterwards. Default: `./results/inmemory/queryengines.psv`. |
+| `-q`, `--query-output-dir` | Directory to persist query outputs. Each engine writes its results as `queryoutput_<idx>.csv` into a per-engine subdirectory, for cross-engine correctness checks (see [Verifying Query Output Correctness](#verifying-query-output-correctness)). Default: outputs are not persisted. |
 | `-h`, `--help` | Show usage and exit. |
 
 The `NUMANODE` environment variable is also honoured: when set, every engine is launched
@@ -227,7 +259,9 @@ The scripts write the results as pipe-separated values (PSV) files of the same f
 ## Extending the Benchmarks
 
 The suite is designed to be extended in two common ways: adding another query
-engine, and growing the query set. Both are described below.
+engine, and growing the query set. Both are described below. Whichever you do,
+every engine must produce the **same output for every query** — see
+[Verifying Query Output Correctness](#verifying-query-output-correctness).
 
 ### Adding a New Python-Based In-Memory Query Engine
 
@@ -332,3 +366,44 @@ point. Rather than renumbering by hand, use
    purely by row position, so indices stay aligned across files as long as the
    inserted row sits at the same position in each. Commit or back up first, and
    pass only the query/meta PSVs — not result files.
+
+### Verifying Query Output Correctness
+
+A benchmark is only meaningful if every engine computes the **same result** for
+each query. This is a hard requirement: a query added to a new engine must return
+output equivalent to the existing engines (same rows, columns, and values), so
+that timings compare like for like. Equivalence is exact for most types; floating
+-point columns are compared within a small tolerance (`FLOATDIFFTHREASHOLD`, see
+below).
+
+To check this, persist each engine's query outputs and compare them:
+
+1. **Persist the outputs.** Both driver scripts
+   ([queryEngines.sh](./benchmarks/inmemory/queryEngines.sh) and
+   [kdbAttributes.sh](./benchmarks/inmemory/kdbAttributes.sh)) accept
+   `-q, --query-output-dir <dir>`. When given, each engine writes its results as
+   `queryoutput_<idx>.csv` into a per-engine subdirectory of `<dir>`. The CSVs are
+   in kdb+-loadable format (see the `write_csv` requirement in
+   [Adding a New Engine](#adding-a-new-python-based-in-memory-query-engine)).
+
+   ```bash
+   ./benchmarks/inmemory/queryEngines.sh --db-dir ... --param-dir ... --date ... \
+       --query-output-dir ./results/inmemory/output
+   ```
+
+2. **Compare two engines.** Point [src/compareOutput.q](./src/compareOutput.q) at
+   the two per-engine output directories. For every query in the metadata file it
+   checks row count, column count, column names, and then compares content
+   cell-by-cell (floats within `FLOATDIFFTHREASHOLD`, char columns via `like`,
+   everything else by exact match), logging the first mismatch per column:
+
+   ```bash
+   q src/compareOutput.q -querymeta ./artifacts/queries/inmemory/querymeta.psv \
+       -queryoutput1 ./results/inmemory/output/kdb \
+       -queryoutput2 ./results/inmemory/output/duckdb
+   ```
+
+   It exits `0` when every query matches; otherwise it logs the differences and
+   continues per query. Pass `-idx` to restrict the comparison to specific query
+   indices — single (`42`), list (`32,42,50`) or range (`40-44`) — and `-debug`
+   to keep the process alive after comparison for investigation of differences.
