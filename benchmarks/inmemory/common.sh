@@ -136,5 +136,8 @@ function run_suite () {
 
     echo "Benchmark suite complete."
     end_time=$(date +%s)
-    echo "Benchmark completed successfully in $(date -u -d "@$((end_time - start_time))" +%T)"
+
+    local elapsed=$((end_time - start_time))
+
+    echo "Benchmark completed successfully in $((elapsed / 86400))d $(date -u -d "@$((elapsed % 86400))" +%T)"
 }

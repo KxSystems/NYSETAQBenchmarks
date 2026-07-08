@@ -202,6 +202,15 @@ To pin a specific library version, edit the inline script metadata in `pysrc/que
 #   "pykx==4.0.0",
 ```
 
+#### Engine-Specific Environment Variables
+
+Some engines read optional environment variables at runtime. `export` them before
+launching a benchmark.
+
+| Variable | Engine(s) | Default | Description |
+| --- | --- | --- | --- |
+| `SYMENUMBYTABLE` | `duckdb` | `false` | ENUM encoding of the `sym` column. When `false`, a single shared `sym_enum` (union of symbols across all three tables) is applied to master, trade and quote. When `true`, each table gets its own ENUM built from only that table's distinct symbols (`sym_master_enum`, `sym_trade_enum`, `sym_quote_enum`). Truthy values (case-insensitive): `true`, `1`, `yes`. |
+
 #### Results
 
 The script merges every engine's results into a single pipe-separated values (PSV) file

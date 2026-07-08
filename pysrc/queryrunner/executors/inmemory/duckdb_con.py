@@ -1,4 +1,19 @@
+"""
+DuckDB in-memory query executor.
+
+Environment variables:
+  SYMENUMBYTABLE (optional) Controls how the `sym` column is encoded as an
+                 ENUM type. Defaults to "false".
+                 - false (default): a single shared ENUM (`sym_enum`), built
+                   from the union of symbols across master, trade and quote, is
+                   applied to all three tables.
+                 - true: each table gets its own ENUM built from only that
+                   table's distinct symbols (`sym_master_enum`,
+                   `sym_trade_enum`, `sym_quote_enum`).
+                 Accepted truthy values (case-insensitive): true, 1, yes.
+"""
 import logging
+import os
 import time
 from datetime import date
 from pathlib import Path
@@ -50,8 +65,16 @@ class QueryExecutorDuckDBCon:
         io_load_start = ios.get_io_stat()
         t_load_start = time.perf_counter_ns()
         logger.info("applying transformations")
-        self.con.execute("CREATE TYPE sym_master_enum AS ENUM (SELECT DISTINCT sym FROM master)")
-        self.con.execute("ALTER TABLE master ALTER sym TYPE sym_master_enum")
+        sym_enum_by_table = os.getenv('SYMENUMBYTABLE', 'false').lower() in ('true', '1', 'yes')
+        if sym_enum_by_table:
+            self.con.execute("CREATE TYPE sym_master_enum AS ENUM (SELECT DISTINCT sym FROM master)")
+            self.con.execute("CREATE TYPE sym_trade_enum AS ENUM (SELECT DISTINCT sym FROM trade)")
+            self.con.execute("CREATE TYPE sym_quote_enum AS ENUM (SELECT DISTINCT sym FROM quote)")
+            master_enum, trade_enum, quote_enum = "sym_master_enum", "sym_trade_enum", "sym_quote_enum"
+        else:
+            self.con.execute("CREATE TYPE sym_enum AS ENUM (SELECT DISTINCT sym FROM master UNION SELECT DISTINCT sym FROM trade UNION SELECT DISTINCT sym FROM quote)")
+            master_enum = trade_enum = quote_enum = "sym_enum"
+        self.con.execute(f"ALTER TABLE master ALTER sym TYPE {master_enum}")
         master=self.con.table("master")
         logger.info("Shape of master: %s x %s", master.shape[0], master.shape[1])
 
@@ -60,8 +83,7 @@ class QueryExecutorDuckDBCon:
             "make_timestamp_ns(epoch_ns(date)+participantTimestamp) AS participantTimestamp, " +
             "make_timestamp_ns(epoch_ns(date)+tradeReportingFacilityTRFTimestamp) AS tradeReportingFacilityTRFTimestamp, " +
             "* EXCLUDE (date, time, participantTimestamp, tradeReportingFacilityTRFTimestamp) FROM trade")
-        self.con.execute("CREATE TYPE sym_trade_enum AS ENUM (SELECT DISTINCT sym FROM trade)") # master might not contain all syms in trade
-        self.con.execute("ALTER TABLE trade ALTER sym TYPE sym_trade_enum")
+        self.con.execute(f"ALTER TABLE trade ALTER sym TYPE {trade_enum}")
         trade=self.con.table("trade")
         logger.info("Shape of trade: %s x %s", trade.shape[0], trade.shape[1])
 
@@ -72,8 +94,7 @@ class QueryExecutorDuckDBCon:
             "make_timestamp_ns(epoch_ns(date)+FINRAADFTimestamp) AS FINRAADFTimestamp, " +
             "* EXCLUDE (date, time, participantTimestamp, FINRAADFTimestamp) FROM quote")
         logger.info("applying transformations")
-        self.con.execute("CREATE TYPE sym_quote_enum AS ENUM (SELECT DISTINCT sym FROM quote)")
-        self.con.execute("ALTER TABLE quote ALTER sym TYPE sym_quote_enum")
+        self.con.execute(f"ALTER TABLE quote ALTER sym TYPE {quote_enum}")
         quote=self.con.table("quote")
         logger.info("Shape of quote: %s x %s", quote.shape[0], quote.shape[1])
         t_load_elapsed = time.perf_counter_ns() - t_load_start
