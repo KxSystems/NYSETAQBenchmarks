@@ -353,7 +353,7 @@ runQuery: {[db: `C; device: `C; writerFN; tags; idx:`C; querytags; query:`C; par
   .log.info "[", idx, "]   Collecting garbage";
   .Q.gc[];
   .log.info "[", idx, "] Running query third time";
-  threadcount: system "s";
+  threadcount: 1|system "s";
   $[threadcount < 2; [ / we can get memory usage only in single-threaded mode, otherwise set it to null
     s: .z.p;
     res: .[.Q.ts; (executor; enlist query); ::];
