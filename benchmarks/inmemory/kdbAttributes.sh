@@ -19,6 +19,7 @@ Options:
   -s, --stats-dir    (optional) Directory to save table and environment statistics
   -i, --idx          (optional) Filter queries by index: single (42), list (32,42,50), or range (40-44)
   -r, --results      (optional) Single PSV that all per-engine results are merged into (default: ${RESULTS_FILE})
+  -q, --query-output-dir (optional) Directory to persist query outputs
   -h, --help         Show this help message
 EOF
     exit 1
@@ -33,6 +34,7 @@ while [[ $# -gt 0 ]]; do
         -s|--stats-dir)  STATS_DIR="$2"; shift 2 ;;
         -i|--idx)        IDX_PARAM="-idx $2"; shift 2 ;;
         -r|--results)    RESULTS_FILE="$2"; shift 2 ;;
+        -q|--query-output-dir) QUERY_OUTPUT_DIR="$2"; shift 2 ;;
         -h|--help)    usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -47,17 +49,19 @@ function execute_queries () {
     for s in "${THREAD_NRS[@]}"; do
         echo "--> Running with $s threads"
 
-        $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} -sortcols "time" -indexon "" -queryfile ./artifacts/queries/inmemory/kdb_noattr.psv -result ${RESULT_DIR}/kdbNoAttr_${s}Threads.psv -s ${s}
+        $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param kdbNoAttr) -sortcols "time" -indexon "" -queryfile ./artifacts/queries/inmemory/kdb_noattr.psv -result ${RESULT_DIR}/kdbNoAttr_${s}Threads.psv -s ${s}
         add_nickname ${RESULT_DIR}/kdbNoAttr_${s}Threads.psv "kdbNoAttr"
-        $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} -sortcols "time" -indexon "time" -queryfile ./artifacts/queries/inmemory/kdb_noattr.psv -result ${RESULT_DIR}/kdbTimeSorted_${s}Threads.psv -s ${s}
+        $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param kdbTimeSorted) -sortcols "time" -indexon "time" -queryfile ./artifacts/queries/inmemory/kdb_noattr.psv -result ${RESULT_DIR}/kdbTimeSorted_${s}Threads.psv -s ${s}
         add_nickname ${RESULT_DIR}/kdbTimeSorted_${s}Threads.psv "kdbTimeSorted"
-        $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -result ${RESULT_DIR}/kdb_${s}Threads.psv -s ${s}
+        $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param kdb) -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -result ${RESULT_DIR}/kdb_${s}Threads.psv -s ${s}
         add_nickname ${RESULT_DIR}/kdb_${s}Threads.psv "kdb"
-        $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} -sortcols "sym,time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -result ${RESULT_DIR}/kdbParted_${s}Threads.psv -s ${s}
+        $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param kdbManualOpt) -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb_manualopt.psv -result ${RESULT_DIR}/kdbManualOpt_${s}Threads.psv -s ${s}
+        add_nickname ${RESULT_DIR}/kdbManualOpt_${s}Threads.psv "kdbManualOpt"
+        $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param kdbParted) -sortcols "sym,time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -result ${RESULT_DIR}/kdbParted_${s}Threads.psv -s ${s}
         add_nickname ${RESULT_DIR}/kdbParted_${s}Threads.psv "kdbParted"
-        $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} -format tabledict -sortcols time -queryfile ./artifacts/queries/inmemory/kdb_tabledict.psv -result ${RESULT_DIR}/kdbTableDict_${s}Threads.psv -s ${s}
+        $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param kdbTableDict) -format tabledict -sortcols time -queryfile ./artifacts/queries/inmemory/kdb_tabledict.psv -result ${RESULT_DIR}/kdbTableDict_${s}Threads.psv -s ${s}
         add_nickname ${RESULT_DIR}/kdbTableDict_${s}Threads.psv "kdbTableDict"
-        EACHPEACH=peach $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} -format tabledict -sortcols time -queryfile ./artifacts/queries/inmemory/kdb_tabledict.psv -result ${RESULT_DIR}/kdbTableDictPeach_${s}Threads.psv -s ${s}
+        EACHPEACH=peach $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param kdbTableDictPeach) -format tabledict -sortcols time -queryfile ./artifacts/queries/inmemory/kdb_tabledict.psv -result ${RESULT_DIR}/kdbTableDictPeach_${s}Threads.psv -s ${s}
         add_nickname ${RESULT_DIR}/kdbTableDictPeach_${s}Threads.psv "kdbTableDictPeach"
     done
 }

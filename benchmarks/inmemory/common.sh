@@ -17,6 +17,18 @@ source "${COMMON_DIR}/../../external/kx/taq/scripts/util.sh"
 # defaults and override these during argument parsing.
 THREAD_NRS=(1 4)
 IDX_PARAM=""
+QUERY_OUTPUT_DIR=""
+
+# Emit the -queryOutputDir flag for the per-engine subdirectory $1, or nothing
+# when query output persistence is disabled (no -q/--query-output-dir given).
+# The subdirectory is created here because runQueries.q writes into it without
+# creating it (main.py does mkdir, but the q engines rely on it existing).
+function query_output_param() {
+    if [[ -n "${QUERY_OUTPUT_DIR}" ]]; then
+        mkdir -p "${QUERY_OUTPUT_DIR}/$1"
+        echo "-queryOutputDir ${QUERY_OUTPUT_DIR}/$1"
+    fi
+}
 
 # Validate DATE, create the scratch result directory, and point FLUSH at the
 # no-op script (in-memory data needs no cache flush). Call after parsing args.
@@ -124,5 +136,8 @@ function run_suite () {
 
     echo "Benchmark suite complete."
     end_time=$(date +%s)
-    echo "Benchmark completed successfully in $(date -u -d "@$((end_time - start_time))" +%T)"
+
+    local elapsed=$((end_time - start_time))
+
+    echo "Benchmark completed successfully in $((elapsed / 86400))d $(date -u -d "@$((elapsed % 86400))" +%T)"
 }
