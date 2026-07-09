@@ -94,7 +94,7 @@ fi
 # so LVM is detected here from the device type rather than the FSTYPE case above.
 # An LV can be striped/mirrored across many physical volumes; we only resolve it
 # when it maps to a single underlying disk, and error otherwise.
-SOURCE_TYPE=$(lsblk -dno TYPE "$MOUNT_SOURCE" 2>/dev/null | head -n 1)
+SOURCE_TYPE=$(lsblk -no TYPE "$MOUNT_SOURCE" 2>/dev/null | head -n 1 || true)
 if [[ "$SOURCE_TYPE" == "lvm" ]]; then
     # Walk the inverse dependency tree (-s) to the whole disks backing the LV.
     # KNAME avoids the tree-drawing characters added to the NAME column.
@@ -117,14 +117,14 @@ fi
 # -d: don't print slaves (we want the parent)
 # -n: no headings
 # -o pkname: print parent kernel name
-PARENT_DEV=$(lsblk -dno pkname "$MOUNT_SOURCE" | head -n 1)
+PARENT_DEV=$(lsblk -no PKNAME "$MOUNT_SOURCE" 2>/dev/null | head -n 1 || true)
 
 # If lsblk fails to find a parent (e.g., it is already the raw disk), default to the source name
 if [[ -n "$PARENT_DEV" ]]; then
-    echo "$(basename "$MOUNT_SOURCE")"
+    echo "$PARENT_DEV"
 else
     # Fallback: Just print the source (e.g., /dev/sda)
-    echo "$MOUNT_SOURCE"
+    echo "$(basename "$MOUNT_SOURCE")"
 fi
 
 exit "$EXIT_SUCCESS"

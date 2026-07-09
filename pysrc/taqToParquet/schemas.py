@@ -104,7 +104,7 @@ TRADE_SCHEMA: Final[pa.Schema] = pa.schema([
     pa.field('Exchange', pa.dictionary(pa.int32(), pa.string())),
     pa.field('Symbol', pa.string()),
     pa.field('Sale Condition', pa.string()), # transformed to: pa.dictionary(pa.int32(), pa.string())
-    pa.field('Trade Volume', pa.int32()),  # or pa.uint32
+    pa.field('Trade Volume', pa.float32()),
     pa.field('Trade Price', pa.float32()),
     pa.field('Trade Stop Stock Indicator', pa.dictionary(pa.int32(), pa.string())),
     pa.field('Trade Correction Indicator', pa.uint16()),
