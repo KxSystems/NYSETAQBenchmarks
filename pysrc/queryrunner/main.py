@@ -244,9 +244,8 @@ def main(args: argparse.Namespace) -> None:
             logger.info("Saving table statistics to %s", args.table_stats_dir)
             args.table_stats_dir.mkdir(parents=True, exist_ok=True)
             table_stats_dict = runner.get_table_stats()
-            for t_name, table_stats in table_stats_dict.items():
-                with open(args.table_stats_dir / f"{t_name}.yaml", 'w') as f:
-                    yaml.dump(table_stats, f, indent=2, sort_keys=False)
+            with open(args.table_stats_dir / "stats.yaml", 'w') as f:
+                yaml.dump(table_stats_dict, f, indent=2, sort_keys=False)
 
         if not args.queryfile.exists():
             logger.error("Query file not found: %s", args.queryfile)

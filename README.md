@@ -13,21 +13,22 @@ git submodule update --init --recursive
 # Configuration
 export SIZE=medium                    # ~13 GB HDB; suitable for KDB-X Community Edition
 export NYSEBENCHMARKDIR=$PWD/DATA     # where downloads and generated databases live
-export DATE=$(curl -s https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/| grep -oE 'EQY_US_ALL_TRADE_2[0-9]{7}' | grep -oE '2[0-9]{7}'|head -1)
+export DATADATE=$(curl -s https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/| grep -oE 'EQY_US_ALL_TRADE_2[0-9]{7}' | grep -oE '2[0-9]{7}'|head -1)
 
 # Step 2: download and prepare the PSV files
-./external/kx/taq/scripts/getPSVs.sh --csvdir ${NYSEBENCHMARKDIR}/${SIZE}/psv --dates ${DATE} --size ${SIZE}
+./external/kx/taq/scripts/getPSVs.sh --csvdir ${NYSEBENCHMARKDIR}/${SIZE}/psv --dates ${DATADATE} --size ${SIZE}
 
 # Step 3: generate the binary databases (kdb+ for kdb/sql/pykx, Parquet for duckdb/polars/pandas)
-DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
-SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATE}
+DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATADATE}
+SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATADATE}
 
 # Step 4: run the benchmark
 export NUMANODE=0
-./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/queryengines
+TESTDATE=$(date +%Y%m%d)
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATADATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/${TESTDATE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}/queryengines
 ```
 
-Results are written to `./results/inmemory/${SIZE}/queryengines.psv` (one row per
+Results are written to `./results/inmemory/${SIZE}/${TESTDATE}/queryengines.psv` (one row per
 query, as a pipe-separated values file). See [Results](#results) for the column
 descriptions.
 
@@ -97,9 +98,9 @@ export NYSEBENCHMARKDIR=$PWD/DATA
 Fetch the latest available date from the NYSE FTP server and run `getPSVs.sh`:
 
 ```bash
-export DATE=$(curl -s https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/| grep -oE 'EQY_US_ALL_TRADE_2[0-9]{7}' | grep -oE '2[0-9]{7}'|head -1)
+export DATADATE=$(curl -s https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/| grep -oE 'EQY_US_ALL_TRADE_2[0-9]{7}' | grep -oE '2[0-9]{7}'|head -1)
 
-./external/kx/taq/scripts/getPSVs.sh --csvdir ${NYSEBENCHMARKDIR}/${SIZE}/psv --dates ${DATE} --size ${SIZE}
+./external/kx/taq/scripts/getPSVs.sh --csvdir ${NYSEBENCHMARKDIR}/${SIZE}/psv --dates ${DATADATE} --size ${SIZE}
 ```
 
 The `getPSVs.sh` script:
@@ -160,16 +161,17 @@ So you only need the kdb+ database if you restrict the run to `kdb`/`sql`/`pykx`
 
 ```bash
 # kdb+ format — needed for the kdb, sql, and pykx engines
-DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
+DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATADATE}
 # Hive-partitioned Parquet — needed for the duckdb, polars, and pandas engines
-SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATE}
+SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATADATE}
 ```
 
 Once the on-disk data has been generated, you can start the benchmark. Python libraries are run via `uv`, so ensure [uv](https://docs.astral.sh/uv/getting-started/installation/) is installed. To test the engines with 0, 4, 16, and 64 secondary threads, run:
 
 ```bash
 export NUMANODE=0
-./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE}  --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/queryengines
+TESTDATE=$(date +%Y%m%d)
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATADATE}  --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/${TESTDATE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}
 ```
 
 The script accepts the following mandatory parameters:
@@ -178,7 +180,7 @@ The script accepts the following mandatory parameters:
 | --- | --- |
 | `--db-dir` | Directory containing the generated databases. The script expects the `kdb` and `parquet/rowgroup` subdirectories created by `./generateDB.sh`. |
 | `-p`, `--param-dir` | Directory of the query parameters (e.g. `./artifacts/parameters/${SIZE}`). |
-| `-d`, `--date` | Target date to query, in the same format as `${DATE}`. |
+| `-d`, `--date` | Target date to query, in the same format as `${DATADATE}`. |
 
 And the following optional parameters:
 
@@ -220,6 +222,7 @@ The file starts with a header row. The columns are:
 
 | Column | Description |
 | --- | --- |
+|`solution` | distinguishes runs of the same engine with different sort/index options (e.g. `kdb`, `kdbParted`). |
 | `storagebackend` | Where the data is read from: `memory` or `disk`. |
 | `compparam` | Compression parameter used for the data. |
 | `threadcount` | Number of (secondary/worker) threads the engine was configured to use. `0` means no secondary threads. |
@@ -251,14 +254,15 @@ columns for setup rows).
 Data is read into memory from kdb+ format. Convert the TAQ PSV files to this format using `./generateDB.sh`:
 
 ```bash
-DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
+DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATADATE}
 ```
 
 Once the on-disk data has been generated, you can start the benchmark. To test with 0, 4, 16, and 64 secondary threads, run:
 
 ```bash
 export NUMANODE=0
-./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/kdbattr.psv --stats-dir ./results/inmemory/${SIZE}/kdbattr
+TESTDATE=$(date +%Y%m%d)
+./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATADATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/${TESTDATE}/kdbattr.psv --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}
 ```
 
 #### Results

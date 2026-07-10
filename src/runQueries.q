@@ -168,23 +168,25 @@ loadParquetDB: {[db: `C; rowgroup: `b; device: `C; writerFN]
 
 /////////////////// functions for in-memory tests ///////////////////
 
-captureTableStats: {[tableStatsDir:`s; tName]
-  tableStatsFile: .Q.dd[tableStatsDir; `$string[tName], ".yaml"];
+captureTableStats: {[tableStatsDir:`s]
+  tableStatsFile: .Q.dd[tableStatsDir; `$"stats.yaml"];
   if[not ()~key tableStatsFile; hdel tableStatsFile];
 
   h: hopen tableStatsFile;
-  h "name: ", (string tName), "\n";
-  h "size (MB): ", (string floor .mem.objsize[value tName] % 1024*1024), "\n";
-  h "rowCount: ", (string count value tName), "\n";
-  h "columnCount: ", (string count cols tName), "\n";
-  h "columns: \n";
-  {[h;tName;c]
-    / enums stored as 'symbol'
-    t: $[0h ~ type tName c; `string; "s" ~ .Q.ty tName c; `symbol; key tName c];
-    h "  - name: ", (string c), "\n";
-    h "    type: ", (string t), "\n";
-    h "    attr: ", (string meta[tName][c;`a]), "\n";
-    }[h; tName] each cols tName;
+  h "proprietary: 'yes'\n";
+  h {[h; tName]
+    h "name: ", (string tName), "\n";
+    h "size (MB): ", (string floor .mem.objsize[value tName] % 1024*1024), "\n";
+    h "rowCount: ", (string count value tName), "\n";
+    h "columnCount: ", (string count cols tName), "\n";
+    h "columns: \n";
+    {[h;tName;c]
+      / enums stored as 'symbol'
+      t: $[0h ~ type tName c; `string; "s" ~ .Q.ty tName c; `symbol; key tName c];
+      h "  - name: ", (string c), "\n";
+      h "    type: ", (string t), "\n";
+      h "    attr: ", (string meta[tName][c;`a]), "\n";
+      }[h; tName] each cols tName}' `master`trade`quote;
   hclose h
   }
 
@@ -414,7 +416,7 @@ $[STORAGE_BACKEND ~ "memory"; [
     ]; [.log.error "Unknown format ", FORMAT; exit 1]]]];
 
 if[not FORMAT ~ `INMEMORYTABLEDICT;
-  if[`tableStatsDir in ko; captureTableStats[hsym `$o `tableStatsDir] each `master`trade`quote]];
+  if[`tableStatsDir in ko; captureTableStats hsym `$o `tableStatsDir]];
 
 .log.info "Loading parameters from ", 1_string PARAMDIR
 system "l src/getQueryParameters.q"
