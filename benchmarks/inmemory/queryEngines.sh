@@ -107,9 +107,10 @@ function execute_queries () {
 }
 
 function get_table_stats () {
-    local COMMONPARAMS="-date $DATE -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM}"
+    local TEMPRES=$(mktemp)
+    local COMMONPARAMS="-date $DATE -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM} -result ${TEMPRES}"
     echo "Getting table stats..."
-    mkdir -p ${STATS_DIR}/{kdb,kdbParted,kdbxsql,duckdb,duckdb_index,polars,pykx,pandas}
+    mkdir -p ${STATS_DIR}/{kdb,kdbParted,kdbxsql,duckdb,duckdbSymTimeSort,duckdbIndex,polars,pykx,pandas}
     if engine_enabled kdb; then
         /usr/bin/time -v q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols time -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -tags none -tableStatsDir ${STATS_DIR}/kdb -q 2> ${STATS_DIR}/kdb/os.txt
         /usr/bin/time -v q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols "sym,time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -tags none -tableStatsDir ${STATS_DIR}/kdbParted -q 2> ${STATS_DIR}/kdbParted/os.txt
@@ -119,7 +120,8 @@ function get_table_stats () {
     fi
     if engine_enabled duckdb; then
         /usr/bin/time -v uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -queryfile ./artifacts/queries/inmemory/duckdb.psv -tags none -tableStatsDir ${STATS_DIR}/duckdb 2> ${STATS_DIR}/duckdb/os.txt
-        /usr/bin/time -v uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/duckdb.psv -tags none -tableStatsDir ${STATS_DIR}/duckdb_index 2> ${STATS_DIR}/duckdb_index/os.txt
+        /usr/bin/time -v uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "sym,time" -queryfile ./artifacts/queries/inmemory/duckdb.psv -tags none -tableStatsDir ${STATS_DIR}/duckdbSymTimeSort 2> ${STATS_DIR}/duckdbSymTimeSort/os.txt
+        /usr/bin/time -v uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/duckdb.psv -tags none -tableStatsDir ${STATS_DIR}/duckdbIndex 2> ${STATS_DIR}/duckdbIndex/os.txt
     fi
     if engine_enabled polars; then
         /usr/bin/time -v uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine polars -sortcols "time" -queryfile ./artifacts/queries/inmemory/polars.psv -tags none -tableStatsDir ${STATS_DIR}/polars 2> ${STATS_DIR}/polars/os.txt
@@ -131,6 +133,7 @@ function get_table_stats () {
         /usr/bin/time -v uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine pandas -sortcols "time" -queryfile ./artifacts/queries/inmemory/pandas.psv -tags none -tableStatsDir ${STATS_DIR}/pandas 2> ${STATS_DIR}/pandas/os.txt
     fi
 
+    rm ${TEMPRES}
     save_environment ${STATS_DIR}/environment.yaml
 }
 
