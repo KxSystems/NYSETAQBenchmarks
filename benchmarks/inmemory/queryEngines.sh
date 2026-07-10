@@ -5,7 +5,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 STATS_DIR=""
-ENGINES="kdb,sql,duckdb,polars,pykx,pandas"
+ENGINES="kdb,kdbxsql,duckdb,polars,pykx,pandas"
 RESULTS_FILE="./results/inmemory/queryengines.psv"
 
 usage() {
@@ -17,7 +17,7 @@ Options:
   -p, --param-dir    Directory of the query parameters
   -d, --date         Target date
   -t, --threads      Space-separated list of thread counts, e.g., "1 4 16", (default: "1 4")
-  -e, --engines      Comma-separated list of engines to test (default: "kdb,sql,duckdb,polars,pykx,pandas")
+  -e, --engines      Comma-separated list of engines to test (default: "kdb,kdbxsql,duckdb,polars,pykx,pandas")
   -s, --stats-dir    (optional) Directory to save table and environment statistics
   -i, --idx          (optional) Filter queries by index: single (42), list (32,42,50), or range (40-44)
   -r, --results      (optional) Single PSV that all per-engine results are merged into (default: ${RESULTS_FILE})
@@ -58,50 +58,50 @@ function execute_queries () {
         echo "--> Running with $s threads"
 
         if engine_enabled kdb; then
-            nickname="kdb"
-            $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param $nickname) -db ${DB_DIR}/kdb -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -result ${RESULT_DIR}/${nickname}_${s}Threads.psv -s ${s}
-            add_nickname ${RESULT_DIR}/${nickname}_${s}Threads.psv "$nickname"
+            solution="kdb"
+            $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/kdb -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv -s ${s}
+            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv "$solution"
 
-            nickname="kdbParted"
-            $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param $nickname) -db ${DB_DIR}/kdb -sortcols "sym,time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -result ${RESULT_DIR}/${nickname}_${s}Threads.psv -s ${s}
-            add_nickname ${RESULT_DIR}/${nickname}_${s}Threads.psv $nickname
+            solution="kdbParted"
+            $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/kdb -sortcols "sym,time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv -s ${s}
+            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
 
-            nickname="kdbManualOpt"
-            $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param $nickname) -db ${DB_DIR}/kdb -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb_manualopt.psv -result ${RESULT_DIR}/${nickname}_${s}Threads.psv -s ${s}
-            add_nickname ${RESULT_DIR}/${nickname}_${s}Threads.psv $nickname
+            solution="kdbManualOpt"
+            $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/kdb -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb_manualopt.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv -s ${s}
+            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
         fi
-        if engine_enabled sql; then
-            nickname="kdbxsql"
-            $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param $nickname) -db ${DB_DIR}/kdb -engine sql -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/sql.psv -result ${RESULT_DIR}/${nickname}_${s}Threads.psv -s ${s}
-            add_nickname ${RESULT_DIR}/${nickname}_${s}Threads.psv $nickname
+        if engine_enabled kdbxsql; then
+            solution="kdbxsql"
+            $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/kdb -engine sql -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/sql.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv -s ${s}
+            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
         fi
         if engine_enabled duckdb; then
-            nickname="duckdb"
-            DUCKDB_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $nickname) -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -queryfile ./artifacts/queries/inmemory/duckdb.psv -result ${RESULT_DIR}/${nickname}_${s}Threads.psv
-            add_nickname ${RESULT_DIR}/${nickname}_${s}Threads.psv $nickname
+            solution="duckdb"
+            DUCKDB_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -queryfile ./artifacts/queries/inmemory/duckdb.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv
+            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
 
-            nickname="duckdbSymTimeSort"
-            DUCKDB_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $nickname) -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "sym,time" -queryfile ./artifacts/queries/inmemory/duckdb.psv -result ${RESULT_DIR}/${nickname}_${s}Threads.psv
-            add_nickname ${RESULT_DIR}/${nickname}_${s}Threads.psv $nickname
+            solution="duckdbSymTimeSort"
+            DUCKDB_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "sym,time" -queryfile ./artifacts/queries/inmemory/duckdb.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv
+            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
 
-            nickname="duckdbIndex"
-            DUCKDB_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $nickname) -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/duckdb.psv -result ${RESULT_DIR}/${nickname}_${s}Threads.psv
-            add_nickname ${RESULT_DIR}/${nickname}_${s}Threads.psv $nickname
+            solution="duckdbIndex"
+            DUCKDB_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/duckdb.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv
+            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
         fi
         if engine_enabled polars; then
-            nickname="polars"
-            POLARS_MAX_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $nickname) -db ${DB_DIR}/parquet/rowgroup -engine polars -sortcols "time" -queryfile ./artifacts/queries/inmemory/polars.psv -result ${RESULT_DIR}/${nickname}_${s}Threads.psv
-            add_nickname ${RESULT_DIR}/${nickname}_${s}Threads.psv $nickname
+            solution="polars"
+            POLARS_MAX_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/parquet/rowgroup -engine polars -sortcols "time" -queryfile ./artifacts/queries/inmemory/polars.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv
+            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
         fi
         if engine_enabled pykx; then
-            nickname="pykx"
-            QARGS="-s ${s}" $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $nickname) -db ${DB_DIR}/kdb -engine pykx -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/pykx.psv -result ${RESULT_DIR}/${nickname}_${s}Threads.psv
-            add_nickname ${RESULT_DIR}/${nickname}_${s}Threads.psv $nickname
+            solution="pykx"
+            QARGS="-s ${s}" $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/kdb -engine pykx -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/pykx.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv
+            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
         fi
         if engine_enabled pandas; then
-            nickname="pandas"
-            OMP_NUM_THREADS=$(( s > 1 ? s : 1 )) NUMEXPR_NUM_THREADS=$(( s > 1 ? s : 1 )) MKL_NUM_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $nickname) -db ${DB_DIR}/parquet/rowgroup -engine pandas -sortcols "time" -queryfile ./artifacts/queries/inmemory/pandas.psv -result ${RESULT_DIR}/${nickname}_${s}Threads.psv
-            add_nickname ${RESULT_DIR}/${nickname}_${s}Threads.psv $nickname
+            solution="pandas"
+            OMP_NUM_THREADS=$(( s > 1 ? s : 1 )) NUMEXPR_NUM_THREADS=$(( s > 1 ? s : 1 )) MKL_NUM_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/parquet/rowgroup -engine pandas -sortcols "time" -queryfile ./artifacts/queries/inmemory/pandas.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv
+            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
         fi
     done
 }
@@ -109,12 +109,12 @@ function execute_queries () {
 function get_table_stats () {
     local COMMONPARAMS="-date $DATE -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM}"
     echo "Getting table stats..."
-    mkdir -p ${STATS_DIR}/{kdb,kdbParted,kdbxsql,duckdb,duckdb_index,polars,pandas}
+    mkdir -p ${STATS_DIR}/{kdb,kdbParted,kdbxsql,duckdb,duckdb_index,polars,pykx,pandas}
     if engine_enabled kdb; then
         /usr/bin/time -v q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols time -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -tags none -tableStatsDir ${STATS_DIR}/kdb -q 2> ${STATS_DIR}/kdb/os.txt
-        /usr/bin/time -v q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols "sym,time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -tags none -tableStatsDir ${STATS_DIR}/kdbParted-q 2> ${STATS_DIR}/kdbParted/os.txt
+        /usr/bin/time -v q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols "sym,time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -tags none -tableStatsDir ${STATS_DIR}/kdbParted -q 2> ${STATS_DIR}/kdbParted/os.txt
     fi
-    if engine_enabled sql; then # same as kdb+ inmemory grouped
+    if engine_enabled kdbxsql; then # same as kdb+ inmemory grouped
         /usr/bin/time -v q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols time -indexon "sym" -queryfile ./artifacts/queries/inmemory/sql.psv -tags none -tableStatsDir ${STATS_DIR}/kdbxsql -q 2> ${STATS_DIR}/kdbxsql/os.txt
     fi
     if engine_enabled duckdb; then
@@ -123,6 +123,9 @@ function get_table_stats () {
     fi
     if engine_enabled polars; then
         /usr/bin/time -v uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine polars -sortcols "time" -queryfile ./artifacts/queries/inmemory/polars.psv -tags none -tableStatsDir ${STATS_DIR}/polars 2> ${STATS_DIR}/polars/os.txt
+    fi
+    if engine_enabled pykx; then
+        /usr/bin/time -v uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/kdb -engine pykx -sortcols "time" -queryfile ./artifacts/queries/inmemory/pykx.psv -tags none -tableStatsDir ${STATS_DIR}/pykx 2> ${STATS_DIR}/pykx/os.txt
     fi
     if engine_enabled pandas; then
         /usr/bin/time -v uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine pandas -sortcols "time" -queryfile ./artifacts/queries/inmemory/pandas.psv -tags none -tableStatsDir ${STATS_DIR}/pandas 2> ${STATS_DIR}/pandas/os.txt

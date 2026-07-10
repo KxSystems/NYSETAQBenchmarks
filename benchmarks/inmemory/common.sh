@@ -93,14 +93,14 @@ function get_numa_config () {
     echo "numactl -N ${NUMANODE} -m ${NUMANODE}"
 }
 
-# Prepend a 'nickname' column to a result PSV. The runners are unaware of
+# Prepend a 'solution' column to a result PSV. The runners are unaware of
 # nicknames (e.g. 'kdb' vs 'kdbParted' are the same engine/runner with different
 # sort/index options), so we label each result file here using the predefined
-# nickname for the run that produced it.
+# solution for the run that produced it.
 function add_nickname () {
-    local file="$1" nick="$2"
+    local file="$1" sol="$2"
     [[ -f "${file}" ]] || return 0
-    awk -v nick="${nick}" 'BEGIN{FS=OFS="|"} {print (NR==1 ? "nickname" : nick), $0}' "${file}" > "${file}.tmp"
+    awk -v sol="${sol}" 'BEGIN{FS=OFS="|"} {print (NR==1 ? "solution" : sol), $0}' "${file}" > "${file}.tmp"
     mv "${file}.tmp" "${file}"
 }
 
@@ -131,8 +131,8 @@ function run_suite () {
     start_time=$(date +%s)
 
     execute_queries
-    [[ -n "${STATS_DIR:-}" ]] && get_table_stats
     merge_results
+    [[ -n "${STATS_DIR:-}" ]] && get_table_stats
 
     echo "Benchmark suite complete."
     end_time=$(date +%s)
