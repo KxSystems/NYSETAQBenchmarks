@@ -1,9 +1,9 @@
 ;; Rayforce in-memory benchmark runner.
 ;;
-;; Loads the Rayforce splayed trade/quote tables into memory, sorts by (sym, time)
-;; (a measured setup step), then runs each benchmark query three times (run1
-;; cold, run2/run3 warm) capturing nanosecond timings, a memory delta and the
-;; serialized result size.
+;; Loads the Rayforce splayed trade/quote tables into memory, applies the layout
+;; selected by RAY_LAYOUT (grouped or parted), then runs each benchmark query
+;; three times (run1 cold, run2/run3 warm) capturing nanosecond timings, a
+;; memory delta and the logical in-memory result size.
 ;;
 ;; It emits a compact comma-CSV of machine columns
 ;;   idx,status,run1timeNS,run2timeNS,run3timeNS,run3memKB,ressizeKB
@@ -15,6 +15,8 @@
 ;;   RAY_PARAMS   generated Rayfall prelude that binds query parameter globals
 ;;   RAY_DRIVER   generated Rayfall file of (runq idx (fn [] <query>)) calls
 ;;   RAY_RESULT   output CSV path
+;;   RAY_LAYOUT   grouped: time sort + grouped sym hash index
+;;                parted:  sym,time sort + contiguous sym part index
 
 ;; ---- result accumulators -------------------------------------------------
 (set RIDX (list)) (set RSTAT (list))
@@ -47,13 +49,18 @@
   (set CURIDX idx)
   (try
     (do
+      (.sys.gc)
       (let t1 (timeit (thunk)))
+      (.sys.gc)
       (let t2 (timeit (thunk)))
-      (let m0 (membytes))
+      (.sys.gc)
       (let t3 (timeit (thunk)))
-      (let m1 (membytes))
-      (let res (thunk))
-      (push idx 'success (ns t1) (ns t2) (ns t3) (kb (- m1 m0)) (kb (count (ser res)))))
+      (.sys.gc)
+      ;; Keep memory instrumentation out of the three performance timings.
+      ;; The fourth execution mirrors q's .Q.ts-style measurement pass.
+      (let mts (.mem.ts (thunk)))
+      (push idx 'success (ns t1) (ns t2) (ns t3)
+        (kb (at mts 'peak-live-bytes)) (kb (at mts 'result-bytes))))
     (fn [e] (push CURIDX 'error 0 0 0 0 0)))))
 
 ;; ---- load parameters -----------------------------------------------------
@@ -66,6 +73,7 @@
 ;; timings and (b) leave symbol columns in the enumerated on-disk form. This
 ;; keeps the comparison a true in-memory one across all engines.
 (set dbdir (.os.getenv "RAY_DBDIR"))
+(set layout (.os.getenv "RAY_LAYOUT"))
 (let tl (timeit (do
   (set trade (.db.splayed.get (concat dbdir "/trade")))
   (set quote (.db.splayed.get (concat dbdir "/quote")))
@@ -74,18 +82,25 @@
 (push 0 'success (ns tl) (ns tl) (ns tl)
   (kb (+ (count (ser trade)) (count (ser quote)))) 0)
 
-(let ts (timeit (do
-  (set trade (xasc trade ['sym 'time]))
-  (set quote (xasc quote ['sym 'time])))))
+(let ts (timeit
+  (if (== layout "parted")
+    (do
+      ;; Multi-key xasc stamps the leading sym column with Rayforce's
+      ;; contiguous part index, the analogue of q's p# attribute.
+      (set trade (xasc trade ['sym 'time]))
+      (set quote (xasc quote ['sym 'time])))
+    (do
+      (set trade (xasc trade 'time))
+      (set quote (xasc quote 'time))))))
 (push -2 'success (ns ts) (ns ts) (ns ts) 0 0)
 
-;; ---- INDEX (idx -3): grouped sym index with preserved row order metadata ---
+;; ---- INDEX (idx -3): grouped hash index or verified contiguous part index ---
 (let ti (timeit (do
   (set trade (table (key trade)
-    (map (fn [c] (if (== c 'sym) (.attr.set 'grouped (at trade c)) (at trade c)))
+    (map (fn [c] (if (== c 'sym) (.attr.set (if (== layout "parted") 'parted 'grouped) (at trade c)) (at trade c)))
          (key trade))))
   (set quote (table (key quote)
-    (map (fn [c] (if (== c 'sym) (.attr.set 'grouped (at quote c)) (at quote c)))
+    (map (fn [c] (if (== c 'sym) (.attr.set (if (== layout "parted") 'parted 'grouped) (at quote c)) (at quote c)))
          (key quote)))))))
 (push -3 'success (ns ti) (ns ti) (ns ti) 0 0)
 

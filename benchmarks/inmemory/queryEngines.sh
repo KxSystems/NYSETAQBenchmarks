@@ -93,11 +93,17 @@ function execute_queries () {
             # single-core pool.
             RAYCORES=$(( s > 1 ? s : 1 ))
             $(get_numa_config) bash ./src/rayforce/runRayforce.sh \
-                --db-dir ${DB_DIR} --param-dir ${PARAM_DIR} --date $DATE --cores ${RAYCORES} \
+                --db-dir ${DB_DIR} --param-dir ${PARAM_DIR} --date $DATE --cores ${RAYCORES} --layout grouped \
                 --queryfile ./artifacts/queries/inmemory/rayforce.psv \
                 --result ${RESULT_DIR}/rayforce_${s}Threads.psv \
                 ${IDX_PARAM:+--idx ${IDX_PARAM#-idx }}
             add_nickname ${RESULT_DIR}/rayforce_${s}Threads.psv "rayforce"
+            $(get_numa_config) bash ./src/rayforce/runRayforce.sh \
+                --db-dir ${DB_DIR} --param-dir ${PARAM_DIR} --date $DATE --cores ${RAYCORES} --layout parted \
+                --queryfile ./artifacts/queries/inmemory/rayforce.psv \
+                --result ${RESULT_DIR}/rayforceParted_${s}Threads.psv \
+                ${IDX_PARAM:+--idx ${IDX_PARAM#-idx }}
+            add_nickname ${RESULT_DIR}/rayforceParted_${s}Threads.psv "rayforceParted"
         fi
     done
 }
