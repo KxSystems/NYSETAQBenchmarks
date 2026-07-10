@@ -144,7 +144,7 @@ writeRes: {[h; (storagebackend:`C; compparm:`C; engine:`s; format:`s; sortcols:`
     io: 4#io];
   runner: "KDB-X";
   engineversion: string[.z.K], ",", string .z.k;
-  h ,[;"\n"] SEP sv (storagebackend; compparm; string system "s"; "KDB-X"; string engine; string lower format; "," sv string sortcols; attrib; engineversion; idx; "," sv tags; query; status), string (`long$ts), (memusage div 1000), (1 _ deltas io), ressize div 1024;
+  h ,[;"\n"] SEP sv (storagebackend; compparm; string 1|system "s"; "KDB-X"; string engine; string lower format; "," sv string sortcols; attrib; engineversion; idx; "," sv tags; query; status), string (`long$ts), (memusage div 1000), (1 _ deltas io), ressize div 1024;
   }
 
 loadParquetDB: {[db: `C; rowgroup: `b; device: `C; writerFN]

@@ -110,10 +110,11 @@ function get_table_stats () {
     local TEMPRES=$(mktemp)
     local COMMONPARAMS="-date $DATE -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM} -result ${TEMPRES}"
     echo "Getting table stats..."
-    mkdir -p ${STATS_DIR}/{kdb,kdbParted,kdbxsql,duckdb,duckdbSymTimeSort,duckdbIndex,polars,pykx,pandas}
+    mkdir -p ${STATS_DIR}/{kdb,kdbParted,kdbManualOpt,kdbxsql,duckdb,duckdbSymTimeSort,duckdbIndex,polars,pykx,pandas}
     if engine_enabled kdb; then
         /usr/bin/time -v q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols time -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -tags none -tableStatsDir ${STATS_DIR}/kdb -q 2> ${STATS_DIR}/kdb/os.txt
         /usr/bin/time -v q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols "sym,time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -tags none -tableStatsDir ${STATS_DIR}/kdbParted -q 2> ${STATS_DIR}/kdbParted/os.txt
+        /usr/bin/time -v q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb_manualopt.psv -tags none -tableStatsDir ${STATS_DIR}/kdbManualOpt -q 2> ${STATS_DIR}/kdbManualOpt/os.txt
     fi
     if engine_enabled kdbxsql; then # same as kdb+ inmemory grouped
         /usr/bin/time -v q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols time -indexon "sym" -queryfile ./artifacts/queries/inmemory/sql.psv -tags none -tableStatsDir ${STATS_DIR}/kdbxsql -q 2> ${STATS_DIR}/kdbxsql/os.txt
