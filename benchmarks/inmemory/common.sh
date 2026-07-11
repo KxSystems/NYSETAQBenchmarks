@@ -33,7 +33,7 @@ function query_output_param() {
 # Validate DATE, create the scratch result directory, and point FLUSH at the
 # no-op script (in-memory data needs no cache flush). Call after parsing args.
 function init_benchmark () {
-    check_date $DATE
+    check_date $DATADATE
 
     # Per-engine result PSVs are written to a scratch directory and then merged
     # into RESULTS_FILE; the scratch directory is removed on exit.
@@ -47,6 +47,7 @@ function init_benchmark () {
 # Write a YAML snapshot of the run parameters, environment and host system to a file.
 function save_environment () {
     local out=$1
+    mkdir -p "$(dirname "${out}")"
 
     local cpu_model cpu_arch sockets cores_per_socket threads_per_core
     if [[ $(uname) == "Linux" ]]; then
@@ -63,10 +64,11 @@ function save_environment () {
     cpu_arch=$(arch)
 
     cat > "${out}" <<EOF
-test time: "$(date)"
+test date: "$(date +%Y-%m-%d)"
+test time: "$(date +%H:%M:%S)"
 parameters:
   db-dir: "${DB_DIR}"
-  date: "${DATE}"
+  datadate: "${DATADATE}"
 envvars:
   NUMANODE: "${NUMANODE:-}"
 system:
@@ -130,6 +132,7 @@ function run_suite () {
     local start_time end_time
     start_time=$(date +%s)
 
+    save_environment $(dirname "${RESULTS_FILE}")/environment.yaml
     execute_queries
     merge_results
     [[ -n "${STATS_DIR:-}" ]] && get_table_stats

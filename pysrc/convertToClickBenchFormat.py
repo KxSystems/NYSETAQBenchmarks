@@ -1,34 +1,36 @@
 #!/usr/bin/env python3
 """Convert NYSE TAQ benchmark results into a ClickBench-like result layout.
 
-Given a benchmark result directory (e.g. results/inmemory/small/20260709) that
-contains:
+The input directory must end in ``<SIZE>/<TESTDATE>`` (e.g.
+``results/inmemory/small/20260711``), where SIZE is one of small, medium,
+large or full. It must contain:
 
-  * queryengines.psv   - the query/engine timing results (pipe separated)
+  * queryengines.psv      - the query/engine timing results (pipe separated)
   * <solution>/stats.yaml - per-solution table statistics
-  * environment.yaml   - machine / test-run environment
+  * environment.yaml      - machine / test-run environment
 
-this produces, under the output directory, one JSON file per
-(solution, threadcount) pair:
+For each solution this produces one JSON file at:
 
-  <output>/<solution>/<threadcount>/<machine>.json
+  <output>/<solution>/<datadate>/<SIZE>/<machine>/<TESTDATE>.json
 
-where <machine> is the mapping of system.cpu.model taken from
-results/mappings.yaml. The JSON mirrors the ClickBench result format
-(see https://github.com/ClickHouse/ClickBench) with these differences:
+where <datadate> is parameters.datadate from environment.yaml and <machine>
+is the mapping of system.cpu.model taken from mappings.yaml. The JSON mirrors
+the ClickBench result format (https://github.com/ClickHouse/ClickBench) with
+these differences:
 
   * dropped keys : cluster_size, concurrent_qps, concurrent_error_ratio
-  * added key    : threadcount (the run's thread count)
   * system       : the solution name
-  * date         : date part of environment.yaml "test time"
+  * date         : environment.yaml "test date"
   * machine      : mappings.yaml["machines"][cpu.model]
   * proprietary  : from the solution's stats.yaml
   * hardware     : "cpu" (GPUs are not supported yet)
   * tuned        : "no"
   * tags         : []
-  * load_time    : sum of run1timeNS over rows tagged "load"
+  * load_time    : {load phase -> thread count -> run1timeNS} for the load
+                   phases present ("load a partition into memory", "transform",
+                   "sort", "index")
   * data_size    : sum of "size (MB)" over tables in stats.yaml
-  * result       : list of [run1timeNS, run2timeNS, run3timeNS] per query
+  * result       : {thread count -> [[run1, run2, run3], ...]} per query
 """
 
 import argparse
@@ -40,34 +42,15 @@ from pathlib import Path
 
 import yaml
 
-MONTHS = {
-    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
-    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
-}
+VALID_SIZES = ("small", "medium", "large", "full")
 
 
 def normalize(name: str) -> str:
     """Loose key for matching solution names to stats directories.
 
-    e.g. the PSV solution ``duckdbIndex`` matches the directory ``duckdb_index``.
+    e.g. the PSV solution ``duckdbIndex`` matches a directory ``duckdb_index``.
     """
     return re.sub(r"[^a-z0-9]", "", name.lower())
-
-
-def parse_test_date(test_time: str) -> str:
-    """Extract the ISO date (YYYY-MM-DD) from a ctime-style "test time" string.
-
-    Example input: ``Thu Jul  9 11:53:40 PM PDT 2026`` -> ``2026-07-09``.
-    The timezone token is not parsed (strptime %Z is unreliable), so we read
-    the fixed positional fields instead.
-    """
-    parts = test_time.split()
-    if len(parts) < 3 or parts[1] not in MONTHS:
-        raise ValueError(f"Unrecognized test time format: {test_time!r}")
-    month = MONTHS[parts[1]]
-    day = int(parts[2])
-    year = int(parts[-1])
-    return f"{year:04d}-{month:02d}-{day:02d}"
 
 
 def find_mappings(input_dir: Path) -> Path:
@@ -141,6 +124,7 @@ def load_psv(psv_path: Path):
             tags = fields[col["tags"]].split(",")
             row = {
                 "idx": int(fields[col["idx"]]),
+                "desc": fields[col["query"]],
                 "run1": to_int(fields[col["run1timeNS"]]),
                 "run2": to_int(fields[col["run2timeNS"]]),
                 "run3": to_int(fields[col["run3timeNS"]]),
@@ -155,23 +139,50 @@ def load_psv(psv_path: Path):
     return grouped, solutions
 
 
-def build_entry(solution, threadcount, rows, date, machine, proprietary, data_size):
-    load_time = sum(r["run1"] for r in rows["load"] if r["run1"] is not None)
-    query_rows = sorted(rows["query"], key=lambda r: r["idx"])
-    result = [[r["run1"], r["run2"], r["run3"]] for r in query_rows]
+def build_load_time(solution, threadcounts, grouped):
+    """load_time as {load phase -> {thread count -> run1timeNS}}.
 
+    Phases are ordered by their PSV idx descending (0, -1, -2, -3), i.e. the
+    natural pipeline order: load a partition into memory, transform, sort, index.
+    """
+    # phase description -> representative idx (for ordering)
+    phase_idx = {}
+    # thread count -> {phase description -> run1timeNS}
+    per_tc = {tc: {} for tc in threadcounts}
+    for tc in threadcounts:
+        for row in grouped[(solution, tc)]["load"]:
+            per_tc[tc][row["desc"]] = row["run1"]
+            phase_idx.setdefault(row["desc"], row["idx"])
+
+    load_time = OrderedDict()
+    for desc in sorted(phase_idx, key=lambda d: phase_idx[d], reverse=True):
+        load_time[desc] = OrderedDict(
+            (str(tc), per_tc[tc][desc]) for tc in threadcounts if desc in per_tc[tc]
+        )
+    return load_time
+
+
+def build_result(solution, threadcounts, grouped):
+    """result as {thread count -> [[run1, run2, run3], ...]} ordered by query idx."""
+    result = OrderedDict()
+    for tc in threadcounts:
+        query_rows = sorted(grouped[(solution, tc)]["query"], key=lambda r: r["idx"])
+        result[str(tc)] = [[r["run1"], r["run2"], r["run3"]] for r in query_rows]
+    return result
+
+
+def build_entry(solution, threadcounts, grouped, date, machine, proprietary, data_size):
     return OrderedDict([
         ("system", solution),
         ("date", date),
         ("machine", machine),
-        ("threadcount", threadcount),
         ("proprietary", proprietary),
         ("hardware", "cpu"),
         ("tuned", "no"),
         ("tags", []),
-        ("load_time", load_time),
+        ("load_time", build_load_time(solution, threadcounts, grouped)),
         ("data_size", data_size),
-        ("result", result),
+        ("result", build_result(solution, threadcounts, grouped)),
     ])
 
 
@@ -179,21 +190,37 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("input_dir", type=Path,
-                        help="Benchmark result directory (e.g. results/inmemory/small/20260709)")
+                        help="Benchmark result directory ending in <SIZE>/<TESTDATE> "
+                             "(e.g. results/inmemory/small/20260711)")
     parser.add_argument("output_dir", type=Path,
                         help="Directory to write the ClickBench-like output into")
     parser.add_argument("--mappings", type=Path, default=None,
                         help="Path to mappings.yaml (default: search parents of input_dir)")
     args = parser.parse_args()
 
-    input_dir = args.input_dir
+    input_dir = args.input_dir.resolve()
     if not input_dir.is_dir():
         parser.error(f"Input directory does not exist: {input_dir}")
 
-    # Environment: date + machine.
+    # The input path must end in <SIZE>/<TESTDATE>.
+    testdate = input_dir.name
+    size = input_dir.parent.name
+    if size not in VALID_SIZES:
+        parser.error(
+            f"Input directory must end in <SIZE>/<TESTDATE> with SIZE in "
+            f"{VALID_SIZES}; got size segment {size!r} from {input_dir}"
+        )
+
+    # Environment: test date, datadate, machine.
     env = yaml.safe_load((input_dir / "environment.yaml").read_text())
-    date = parse_test_date(env["test time"])
+    date = str(env["test date"])
+    datadate = str(env["parameters"]["datadate"])
     cpu_model = env["system"]["cpu"]["model"]
+
+    # The directory TESTDATE should agree with the environment's test date.
+    if re.sub(r"\D", "", testdate) != re.sub(r"\D", "", date):
+        print(f"warning: input directory TESTDATE {testdate!r} does not match "
+              f"environment.yaml test date {date!r}", file=sys.stderr)
 
     mappings_path = args.mappings or find_mappings(input_dir)
     mappings = yaml.safe_load(mappings_path.read_text())
@@ -222,19 +249,17 @@ def main():
             proprietary, data_size = parse_stats(stats_dir / "stats.yaml")
 
         threadcounts = sorted({tc for (sol, tc) in grouped if sol == solution})
-        for threadcount in threadcounts:
-            rows = grouped[(solution, threadcount)]
-            entry = build_entry(solution, threadcount, rows, date, machine,
-                                 proprietary, data_size)
+        entry = build_entry(solution, threadcounts, grouped, date, machine,
+                            proprietary, data_size)
 
-            out_dir = args.output_dir / solution / str(threadcount)
-            out_dir.mkdir(parents=True, exist_ok=True)
-            out_path = out_dir / f"{machine}.json"
-            with out_path.open("w") as fh:
-                json.dump(entry, fh, indent=4)
-                fh.write("\n")
-            written += 1
-            print(f"wrote {out_path}")
+        out_dir = args.output_dir / solution / datadate / size / machine
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{testdate}.json"
+        with out_path.open("w") as fh:
+            json.dump(entry, fh, indent=4)
+            fh.write("\n")
+        written += 1
+        print(f"wrote {out_path}")
 
     print(f"\nDone: {written} result file(s) for {len(solutions)} solution(s) "
           f"on machine {machine!r}.")

@@ -1,7 +1,7 @@
 idx|tags|query|parameter
 1||select from quote where time<0D8|
 2||select from trade where seq=0i|
-3||select from trade where 0i<seq, 0e < price, time within 0D 1D, size < 0Wi|
+3||select from trade where 0i<seq, 0e < price, time within 0D 1D, size < 2147483647e|
 4||select from trade where time within 0D10:00:00 0D10:00:10|
 5||select from quote where sym = anInfreqInstr, time within 0D08:30 0D16:30|
 6||select from quote where sym in hundredInstrs, time within 0D08:30 0D08:35|
@@ -24,7 +24,7 @@ idx|tags|query|parameter
 23||select avgWeightedSpread: sizes wavg spread, devSpread: dev spread, maxSpread: max spread, minSpread: min spread by exnames ex from (select ex, sizes: asize + bsize, spread: ask - bid from quote where sym=mostFreqInstr)|
 24||select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid by sym, exnames ex from quote where sym in hundredInstrs|
 25||select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid by exnames ex from quote where shortSaleRestrictionIndicator="0"|
-26||select distinct sym, ex from trade where size > 700000i|
+26||select distinct sym, ex from trade where size > 700000e|
 27||select weightedBidPrice: bsize wavg bid, weightedOfferPrice: asize wavg ask by sym from quote where sym in twentyInstrs|
 28||select time, 20 mavg price from trade where sym = mostFreqInstr|
 29||ungroup select time, movingLiqWMid: 5 mavg ((bsize * bid) + asize * ask) % bsize + asize, movingsize: 5 mavg asize + bsize by sym from quote where sym in twentyInstrs|
