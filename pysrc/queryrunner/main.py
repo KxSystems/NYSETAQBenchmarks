@@ -188,7 +188,7 @@ def main(args: argparse.Namespace) -> None:
             from executors.inmemory.pykx import QueryExecutorPyKXInMemory
             import pykx as kx
             runner = QueryExecutorPyKXInMemory(params, sort_cols=args.sortcols, index_on=args.indexon)
-            threadnr = kx.q.system.num_threads
+            threadnr = max(1, kx.q.system.num_threads)
             engineversion = kx.__version__
         elif engine == "pandas":
             if len(args.indexon) > 0:

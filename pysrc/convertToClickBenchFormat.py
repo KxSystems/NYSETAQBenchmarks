@@ -28,7 +28,9 @@ entry mirrors the ClickBench result format with these differences:
 
   * dropped keys : cluster_size, serverless, concurrent_qps, concurrent_error_ratio
   * solution     : corresponds to ClickBench's "system" key
-  * date         : environment.yaml "test date"
+  * datadate     : the data date (parameters.datadate), ISO-formatted (replaces
+                   ClickBench's "date"); the environment "test date" is used
+                   only to pick the latest run per triple
   * machine      : mappings.yaml["machines"][cpu.model]
   * proprietary  : from the solution's stats.yaml
   * hardware     : "cpu" (GPUs are not supported yet)
@@ -174,7 +176,7 @@ def build_result(solution, threadcounts, grouped):
 def build_entry(solution, threadcounts, grouped, date, machine, proprietary, data_size):
     return OrderedDict([
         ("solution", solution),
-        ("date", date),
+        ("datadate", date),
         ("machine", machine),
         ("proprietary", proprietary),
         ("hardware", "cpu"),
@@ -195,6 +197,10 @@ def process_run(run_dir: Path, machines: dict, mappings_path: Path):
     env = yaml.safe_load((run_dir / "environment.yaml").read_text())
     date = str(env["test date"])
     datadate = str(env["parameters"]["datadate"])
+    # ISO-format an 8-digit datadate (20260401 -> 2026-04-01) for the entry's
+    # "date" field; leave any other format untouched.
+    datadate_iso = (f"{datadate[:4]}-{datadate[4:6]}-{datadate[6:8]}"
+                    if re.fullmatch(r"\d{8}", datadate) else datadate)
     cpu_model = env["system"]["cpu"]["model"]
 
     # The directory TESTDATE should agree with the environment's test date.
@@ -226,7 +232,7 @@ def process_run(run_dir: Path, machines: dict, mappings_path: Path):
             proprietary, data_size = parse_stats(stats_dir / "stats.yaml")
 
         threadcounts = sorted({tc for (sol, tc) in grouped if sol == solution})
-        entry = build_entry(solution, threadcounts, grouped, date, machine,
+        entry = build_entry(solution, threadcounts, grouped, datadate_iso, machine,
                             proprietary, data_size)
         yield datadate, machine, solution, date, entry
 
