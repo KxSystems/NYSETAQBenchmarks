@@ -15,7 +15,7 @@ Usage: $(basename "$0") [OPTIONS]
 Options:
   --db-dir           Directory where databases will be generated
   -p, --param-dir    Directory of the query parameters
-  -d, --date         Target date
+  -d, --datadate     Data date
   -t, --threads      Space-separated list of thread counts, e.g., "1 4 16", (default: "1 4")
   -e, --engines      Comma-separated list of engines to test (default: "kdb,kdbxsql,duckdb,polars,pykx,pandas")
   -s, --stats-dir    (optional) Directory to save table and environment statistics
@@ -31,7 +31,7 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --db-dir)        DB_DIR="$2"; shift 2 ;;
         -p|--param-dir)  PARAM_DIR="$2"; shift 2 ;;
-        -d|--date)       DATE="$2"; shift 2 ;;
+        -d|--datadate)   DATADATE="$2"; shift 2 ;;
         -t|--threads)    read -ra THREAD_NRS <<< "$2"; shift 2 ;;
         -e|--engines)    ENGINES="$2"; shift 2 ;;
         -s|--stats-dir)  STATS_DIR="$2"; shift 2 ;;
@@ -53,7 +53,7 @@ init_benchmark
 function execute_queries () {
     mkdir -p ${RESULT_DIR}
     echo "Running Queries..."
-    local COMMONPARAMS="-date $DATE -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM}"
+    local COMMONPARAMS="-date $DATADATE -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM}"
     for s in "${THREAD_NRS[@]}"; do
         echo "--> Running with $s threads"
 
@@ -108,7 +108,7 @@ function execute_queries () {
 
 function get_table_stats () {
     local TEMPRES=$(mktemp)
-    local COMMONPARAMS="-date $DATE -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM} -result ${TEMPRES}"
+    local COMMONPARAMS="-date $DATADATE -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM} -result ${TEMPRES}"
     echo "Getting table stats..."
     mkdir -p ${STATS_DIR}/{kdb,kdbParted,kdbManualOpt,kdbxsql,duckdb,duckdbSymTimeSort,duckdbIndex,polars,pykx,pandas}
     if engine_enabled kdb; then
@@ -135,7 +135,6 @@ function get_table_stats () {
     fi
 
     rm ${TEMPRES}
-    save_environment ${STATS_DIR}/environment.yaml
 }
 
 function merge_results () {

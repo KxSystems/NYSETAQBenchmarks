@@ -1,7 +1,7 @@
 idx|tags|query|parameter
 1||quote.select(where=kx.Column('time') <  timedelta(hours=8))|
 2||trade.select(where=kx.Column('seq') == kx.IntAtom(0))|
-3||trade.select(where=(kx.Column('seq') > kx.IntAtom(0)) & (kx.Column('price') > kx.RealAtom(0)) & kx.Column('time').within(timedelta(), timedelta(days=1)) & (kx.Column('size') < kx.IntAtom.inf))|
+3||trade.select(where=(kx.Column('seq') > kx.IntAtom(0)) & (kx.Column('price') > kx.RealAtom(0)) & kx.Column('time').within(timedelta(), timedelta(days=1)) & (kx.Column('size') < kx.RealAtom(2147483647)))|
 4||trade.select(where=kx.Column('time').within(timedelta(hours=10), timedelta(hours=10, seconds=10)))|
 5||quote.select(where=(kx.Column('sym') == anInfreqInstr) & kx.Column('time').within(timedelta(hours=8, minutes=30), timedelta(hours=16, minutes=30)))|
 6||quote.select(where=(kx.Column('sym').isin(hundredInstrs)) & kx.Column('time').within(timedelta(hours=8, minutes=30), timedelta(hours=8, minutes=35)))|
@@ -24,7 +24,7 @@ idx|tags|query|parameter
 23||quote.select(columns=kx.Column('ex') & (kx.Column('asize') + kx.Column('bsize')).name("sizes") & (kx.Column('ask') - kx.Column('bid')).name('spread'), where=kx.Column('sym') == mostFreqInstr).select(columns=kx.Column('sizes').wavg(kx.Column('spread')).name('avgWeightedSpread') & kx.Column('spread').dev().name('devSpread') & kx.Column('spread').max().name('maxSpread') & kx.Column('spread').min().name('minSpread'), by=kx.Column('ex').call('exnames'))| |
 24||quote.select(columns=(kx.Column('asize') + kx.Column('bsize')).wavg(kx.Column('ask') - kx.Column('bid')).name('avgWeightedSpread') & (kx.Column('ask') - kx.Column('bid')).dev().name('devSpread') & (kx.Column('ask') - kx.Column('bid')).max().name('maxSpread') & (kx.Column('ask') - kx.Column('bid')).min().name('minSpread'), where=kx.Column('sym').isin(hundredInstrs), by=kx.Column('sym') & kx.Column('ex').call('exnames'))|
 25||quote.select(columns=(kx.Column('asize') + kx.Column('bsize')).wavg(kx.Column('ask') - kx.Column('bid')).name('avgWeightedSpread') & (kx.Column('ask') - kx.Column('bid')).dev().name('devSpread') & (kx.Column('ask') - kx.Column('bid')).max().name('maxSpread') & (kx.Column('ask') - kx.Column('bid')).min().name('minSpread'), where=kx.Column('shortSaleRestrictionIndicator')==b'0', by=kx.Column('ex').call('exnames'))|
-26||trade.select(columns=['sym', 'ex'], where=kx.Column('size') > kx.IntAtom(700000)).drop_duplicates()|
+26||trade.select(columns=['sym', 'ex'], where=kx.Column('size') > kx.RealAtom(700000)).drop_duplicates()|
 27||quote.select(columns=kx.Column('bsize').wavg(kx.Column('bid')).name('weightedBidPrice') & kx.Column('asize').wavg(kx.Column('ask')).name('weightedOfferPrice'), where=kx.Column('sym').isin(twentyInstrs), by='sym')|
 28||trade.select(columns=kx.Column('time') & kx.Column('price').mavg(20), where=kx.Column('sym') == mostFreqInstr)|
 29||quote.select(columns=kx.Column('time') & ((kx.Column('asize') * kx.Column('ask') + kx.Column('bsize') * kx.Column('bid')) / (kx.Column('asize') + kx.Column('bsize'))).mavg(5).name('movingLiqWMid') & (kx.Column('asize') + kx.Column('bsize')).mavg(5).name('movingsize'), where=kx.Column('sym').isin(twentyInstrs), by='sym').ungroup()|

@@ -1,7 +1,7 @@
 idx|tags|query|parameter
 1||normalize EACHPEACH[{select from x where time<0D8}; quote]|
 2||normalize EACHPEACH[{select from x where seq=0i}; trade]|
-3||normalize EACHPEACH[{select from x where 0i<seq, 0e < price, time within 0D 1D, size < 0Wi}; trade]|
+3||normalize EACHPEACH[{select from x where 0i<seq, 0e < price, time within 0D 1D, size < 2147483647e}; trade]|
 4||normalize EACHPEACH[{select from x where time within 0D10:00:00 0D10:00:10}; trade]|
 5||update sym: anInfreqInstr from select from quote[anInfreqInstr] where time within 0D08:30 0D16:30|
 6||normalize EACHPEACH[{select from x where time within 0D08:30 0D08:35}; hundredInstrs#quote]|
@@ -24,7 +24,7 @@ idx|tags|query|parameter
 23||select avgWeightedSpread: sizes wavg spread, devSpread: dev spread, maxSpread: max spread, minSpread: min spread by exnames ex from (select ex, sizes: asize + bsize, spread: ask - bid from quote mostFreqInstr)|
 24||normalize EACHPEACH[{0!select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid by exnames ex from x}; (hundredInstrs inter key quote)#quote]|
 25||select avgWeightedSpread: size wavg spread, devSpread: dev spread, maxSpread: max spread, minSpread: min spread by ex from normalize EACHPEACH[{select exnames ex, spread: ask - bid, size: asize + bsize from x where shortSaleRestrictionIndicator="0"}; quote]|
-26||normalize EACHPEACH[{select distinct ex from x where size > 700000i}; trade]|
+26||normalize EACHPEACH[{select distinct ex from x where size > 700000e}; trade]|
 27||normalize EACHPEACH[{select weightedBidPrice: bsize wavg bid, weightedOfferPrice: asize wavg ask from x}; twentyInstrs#quote]|
 28||select time, 20 mavg price from trade mostFreqInstr|
 29||normalize EACHPEACH[{select time, movingLiqWMid: 5 mavg ((bsize * bid) + asize * ask) % bsize + asize, movingsize: 5 mavg asize + bsize from x}; twentyInstrs#quote]|

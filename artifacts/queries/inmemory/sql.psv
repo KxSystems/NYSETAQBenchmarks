@@ -1,7 +1,7 @@
 idx|tags|query|parameter
 1||SELECT * FROM quote WHERE time<'0D8'|
 2||SELECT * FROM trade WHERE seq=CAST(0 AS INTEGER)|
-3||SELECT * FROM trade WHERE CAST(0 AS INTEGER) < seq AND 0e < price AND time BETWEEN '0D0' AND '1D0' AND size <= 2147483646|
+3||SELECT * FROM trade WHERE CAST(0 AS INTEGER) < seq AND 0e < price AND time BETWEEN '0D0' AND '1D0' AND size < 2147483647e|
 4||SELECT * FROM trade WHERE time BETWEEN '0D10:00:00' AND '0D10:00:10'|
 5||SELECT * FROM quote WHERE sym = $1 AND time BETWEEN '0D08:30' AND '0D16:30'|anInfreqInstr
 6||SELECT * FROM quote WHERE sym IN $1 AND time BETWEEN '0D08:30' AND '0D08:35'|hundredInstrs
@@ -24,7 +24,7 @@ idx|tags|query|parameter
 23||SELECT weighted_avg(sizes, spread) AS avgWeightedSpread, STDDEV_POP(spread) AS devSpread, MAX(spread) AS maxSpread, MIN(spread) AS minSpread FROM (SELECT ex, asize + bsize AS sizes, ask - bid AS spread FROM quote WHERE sym=$1) GROUP BY exnames(ex)|mostFreqInstr
 24||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread, STDDEV_POP(ask - bid) AS devSpread, MAX(ask - bid) AS maxSpread, MIN(ask - bid) AS minSpread FROM quote WHERE sym IN $1 GROUP BY sym, exnames(ex)|hundredInstrs
 25||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread, STDDEV_POP(ask - bid) AS devSpread, MAX(ask - bid) AS maxSpread, MIN(ask - bid) AS minSpread FROM quote WHERE shortSaleRestrictionIndicator='0' GROUP BY exnames(ex)|
-26||SELECT DISTINCT sym, ex FROM trade WHERE size>CAST(700000 AS INTEGER)|
+26||SELECT DISTINCT sym, ex FROM trade WHERE size>CAST(700000 AS REAL)|
 27||SELECT weighted_avg(bsize, bid) AS weightedBidPrice, weighted_avg(asize, ask) AS weightedOfferPrice FROM quote WHERE sym IN $1 GROUP BY sym|twentyInstrs
 28|||
 29|||

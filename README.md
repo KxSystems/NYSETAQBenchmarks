@@ -4,7 +4,7 @@
 
 To run the in-memory query engine benchmark on a `medium`-sized dataset, execute
 the following from the repository root. See the numbered steps below for details,
-prerequisites (KDB-X, `uv`), and other data sizes/benchmarks.
+prerequisites (KDB-X, [logging and printf](https://github.com/KxSystems/taq/blob/main/docs/install.md) modules, `uv`), and other data sizes/benchmarks.
 
 ```bash
 # Fetch the taq submodule used to download the data
@@ -18,14 +18,14 @@ export DATADATE=$(curl -s https://ftp.nyse.com/Historical%20Data%20Samples/DAILY
 # Step 2: download and prepare the PSV files
 ./external/kx/taq/scripts/getPSVs.sh --csvdir ${NYSEBENCHMARKDIR}/${SIZE}/psv --dates ${DATADATE} --size ${SIZE}
 
-# Step 3: generate the binary databases (kdb+ for kdb/sql/pykx, Parquet for duckdb/polars/pandas)
+# Step 3: generate the binary databases (kdb+ for kdb/kdbxsql/pykx, Parquet for duckdb/polars/pandas)
 DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATADATE}
 SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATADATE}
 
 # Step 4: run the benchmark
 export NUMANODE=0
 TESTDATE=$(date +%Y%m%d)
-./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATADATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/${TESTDATE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}/queryengines
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/${TESTDATE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}
 ```
 
 Results are written to `./results/inmemory/${SIZE}/${TESTDATE}/queryengines.psv` (one row per
@@ -151,16 +151,16 @@ Query engines read data into memory from Hive-partitioned Parquet or kdb+ format
 | Engine (`--engines` value) | Description | Required data format |
 | --- | --- | --- |
 | `kdb` | KDB-X (q-sql) | kdb+ |
-| `sql` | KDB-X SQL | kdb+ |
+| `kdbxsql` | KDB-X SQL | kdb+ |
 | `pykx` | KDB-X Python (`pykx`) | kdb+ |
 | `duckdb` | DuckDB | Parquet |
 | `polars` | Polars | Parquet |
 | `pandas` | Pandas | Parquet |
 
-So you only need the kdb+ database if you restrict the run to `kdb`/`sql`/`pykx` (e.g. `--engines kdb,sql`), and only the Parquet database if you restrict it to `duckdb`/`polars`/`pandas`. Convert the TAQ PSV files to the format(s) you need using `./generateDB.sh`:
+So you only need the kdb+ database if you restrict the run to `kdb`/`kdbxsql`/`pykx` (e.g. `--engines kdb,kdbxsql`), and only the Parquet database if you restrict it to `duckdb`/`polars`/`pandas`. Convert the TAQ PSV files to the format(s) you need using `./generateDB.sh`:
 
 ```bash
-# kdb+ format — needed for the kdb, sql, and pykx engines
+# kdb+ format — needed for the kdb, kdbxsql, and pykx engines
 DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATADATE}
 # Hive-partitioned Parquet — needed for the duckdb, polars, and pandas engines
 SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATADATE}
@@ -171,7 +171,7 @@ Once the on-disk data has been generated, you can start the benchmark. Python li
 ```bash
 export NUMANODE=0
 TESTDATE=$(date +%Y%m%d)
-./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATADATE}  --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/${TESTDATE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE}  --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/${TESTDATE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}
 ```
 
 The script accepts the following mandatory parameters:
@@ -180,14 +180,14 @@ The script accepts the following mandatory parameters:
 | --- | --- |
 | `--db-dir` | Directory containing the generated databases. The script expects the `kdb` and `parquet/rowgroup` subdirectories created by `./generateDB.sh`. |
 | `-p`, `--param-dir` | Directory of the query parameters (e.g. `./artifacts/parameters/${SIZE}`). |
-| `-d`, `--date` | Target date to query, in the same format as `${DATADATE}`. |
+| `-d`, `--datadate` | Target date to query, in the same format as `${DATADATE}`. |
 
 And the following optional parameters:
 
 | Parameter | Description |
 | --- | --- |
 | `-t`, `--threads` | Space-separated list of secondary-thread counts to test, e.g. `"0 4 16 64"`. Each engine runs once per value. Default: `"1 4"`. |
-| `-e`, `--engines` | Comma-separated subset of engines to run. Valid values: `kdb`, `sql`, `duckdb`, `polars`, `pykx`, `pandas`. Default: all of them. |
+| `-e`, `--engines` | Comma-separated subset of engines to run. Valid values: `kdb`, `kdbxsql`, `duckdb`, `polars`, `pykx`, `pandas`. Default: all of them. |
 | `-s`, `--stats-dir` | Directory to save per-table statistics (one YAML file per table, plus OS `time -v` output). Default: `./results/inmemory/queryengines`. |
 | `-i`, `--idx` | Filter queries by index: single (`42`), comma-separated list (`32,42,50`), or range (`40-44`). Default: run all queries. |
 | `--results` | Single PSV file that all per-engine results are merged into. The individual per-engine files are written to a temporary directory and removed afterwards. Default: `./results/inmemory/queryengines.psv`. |
@@ -262,7 +262,7 @@ Once the on-disk data has been generated, you can start the benchmark. To test w
 ```bash
 export NUMANODE=0
 TESTDATE=$(date +%Y%m%d)
-./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --date ${DATADATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/${TESTDATE}/kdbattr.psv --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}
+./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/${TESTDATE}/kdbattr.psv --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}
 ```
 
 #### Results
@@ -400,7 +400,7 @@ To check this, persist each engine's query outputs and compare them:
    [Adding a New Engine](#adding-a-new-python-based-in-memory-query-engine)).
 
    ```bash
-   ./benchmarks/inmemory/queryEngines.sh --db-dir ... --param-dir ... --date ... \
+   ./benchmarks/inmemory/queryEngines.sh --db-dir ... --param-dir ... --datadate ... \
        --query-output-dir ./results/inmemory/output
    ```
 
