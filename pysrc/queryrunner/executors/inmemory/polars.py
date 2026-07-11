@@ -78,7 +78,7 @@ class QueryExecutorPolarsInMemory:
         return int(df.estimated_size("kb"))
 
     def get_table_stats(self) -> dict[str, Any]:
-        table_stats_dict = {}
+        table_stats_dict = {"proprietary": "no"}
         for t_name in ["master", "trade", "quote"]:
             df = self.eval_context[t_name]
             table_stats = {

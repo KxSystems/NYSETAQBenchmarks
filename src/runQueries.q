@@ -144,7 +144,7 @@ writeRes: {[h; (storagebackend:`C; compparm:`C; engine:`s; format:`s; sortcols:`
     io: 4#io];
   runner: "KDB-X";
   engineversion: string[.z.K], ",", string .z.k;
-  h ,[;"\n"] SEP sv (storagebackend; compparm; string system "s"; "KDB-X"; string engine; string lower format; "," sv string sortcols; attrib; engineversion; idx; "," sv tags; query; status), string (`long$ts), (memusage div 1000), (1 _ deltas io), ressize div 1024;
+  h ,[;"\n"] SEP sv (storagebackend; compparm; string 1|system "s"; "KDB-X"; string engine; string lower format; "," sv string sortcols; attrib; engineversion; idx; "," sv tags; query; status), string (`long$ts), (memusage div 1000), (1 _ deltas io), ressize div 1024;
   }
 
 loadParquetDB: {[db: `C; rowgroup: `b; device: `C; writerFN]
@@ -168,23 +168,25 @@ loadParquetDB: {[db: `C; rowgroup: `b; device: `C; writerFN]
 
 /////////////////// functions for in-memory tests ///////////////////
 
-captureTableStats: {[tableStatsDir:`s; tName]
-  tableStatsFile: .Q.dd[tableStatsDir; `$string[tName], ".yaml"];
+captureTableStats: {[tableStatsDir:`s]
+  tableStatsFile: .Q.dd[tableStatsDir; `$"stats.yaml"];
   if[not ()~key tableStatsFile; hdel tableStatsFile];
 
   h: hopen tableStatsFile;
-  h "name: ", (string tName), "\n";
-  h "size (MB): ", (string floor .mem.objsize[value tName] % 1024*1024), "\n";
-  h "rowCount: ", (string count value tName), "\n";
-  h "columnCount: ", (string count cols tName), "\n";
-  h "columns: \n";
-  {[h;tName;c]
-    / enums stored as 'symbol'
-    t: $[0h ~ type tName c; `string; "s" ~ .Q.ty tName c; `symbol; key tName c];
-    h "  - name: ", (string c), "\n";
-    h "    type: ", (string t), "\n";
-    h "    attr: ", (string meta[tName][c;`a]), "\n";
-    }[h; tName] each cols tName;
+  h "proprietary: 'yes'\n";
+  h {[h; tName]
+    h "name: ", (string tName), "\n";
+    h "size (MB): ", (string floor .mem.objsize[value tName] % 1024*1024), "\n";
+    h "rowCount: ", (string count value tName), "\n";
+    h "columnCount: ", (string count cols tName), "\n";
+    h "columns: \n";
+    {[h;tName;c]
+      / enums stored as 'symbol'
+      t: $[0h ~ type tName c; `string; "s" ~ .Q.ty tName c; `symbol; key tName c];
+      h "  - name: ", (string c), "\n";
+      h "    type: ", (string t), "\n";
+      h "    attr: ", (string meta[tName][c;`a]), "\n";
+      }[h; tName] each cols tName}' `master`trade`quote;
   hclose h
   }
 
@@ -353,7 +355,7 @@ runQuery: {[db: `C; device: `C; writerFN; tags; idx:`C; querytags; query:`C; par
   .log.info "[", idx, "]   Collecting garbage";
   .Q.gc[];
   .log.info "[", idx, "] Running query third time";
-  threadcount: system "s";
+  threadcount: 1|system "s";
   $[threadcount < 2; [ / we can get memory usage only in single-threaded mode, otherwise set it to null
     s: .z.p;
     res: .[.Q.ts; (executor; enlist query); ::];
@@ -414,7 +416,7 @@ $[STORAGE_BACKEND ~ "memory"; [
     ]; [.log.error "Unknown format ", FORMAT; exit 1]]]];
 
 if[not FORMAT ~ `INMEMORYTABLEDICT;
-  if[`tableStatsDir in ko; captureTableStats[hsym `$o `tableStatsDir] each `master`trade`quote]];
+  if[`tableStatsDir in ko; captureTableStats hsym `$o `tableStatsDir]];
 
 .log.info "Loading parameters from ", 1_string PARAMDIR
 system "l src/getQueryParameters.q"

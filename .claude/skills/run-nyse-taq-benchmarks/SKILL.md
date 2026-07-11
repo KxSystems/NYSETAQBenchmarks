@@ -226,7 +226,7 @@ Both scripts emit one merged **pipe-separated (PSV)** file (`--results`): a
 header row, one row per query, plus setup rows. Key columns:
 
 - `runner` / `engine` — harness and engine (e.g. `KDB-X`/`kdb`, `Python`/`duckdb_con`).
-- `nickname` — distinguishes runs of the same engine with different sort/index
+- `solution` — distinguishes runs of the same engine with different sort/index
   options (e.g. `kdb`, `kdbParted`, `kdbTimeSorted`, `kdbTableDict`).
 - `sortcols` / `indexon` — sort columns and applied attribute (`sym`, `time`, …).
 - `threadcount` — secondary threads used (`0` = none).
