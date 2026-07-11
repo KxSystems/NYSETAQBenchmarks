@@ -3,20 +3,22 @@
 // comma-separated CSV files that Rayforce can ingest with (read-csv ...).
 //
 // Rayforce ingests via CSV, so this script bridges from the generated on-disk
-// database: it loads one partition into memory and writes only the columns the
-// benchmark queries touch. The `time` column is emitted as I64 nanoseconds
-// since midnight so Rayforce can do unambiguous integer comparisons /xbar.
+// database: it loads one partition into memory and writes the complete trade
+// and quote schemas. Timespan columns are emitted as I64 nanoseconds so
+// Rayforce can do unambiguous integer comparisons /xbar without losing the
+// source precision.
 //
-// usage: q src/rayforce/exportRayCSV.q -db DB -date DATE -dst DSTDIR
+// usage: q src/rayforce/exportRayCSV.q -db DB -date DATE -dst DSTDIR -batchrows N
 //   -db   DB       database root (e.g. ${DB_DIR}/kdb)
 //   -date DATE     partition date, e.g. 2026.04.01 or 20260401
 //   -dst  DSTDIR   directory to write trade.csv and quote.csv into
+//   -batchrows N    maximum rows serialized in one CSV object
 //
 
 if[(5.0>.z.K); -2 "5.0 runtime is required"; exit 1];
 
 ko: key o: first each .Q.opt .z.x;
-MANDATORY: `db`date`dst;
+MANDATORY: `db`date`dst`batchrows;
 if[count missing: MANDATORY except ko;
   -2 "Missing mandatory parameter(s): ", ", " sv string missing; exit 1];
 
@@ -30,29 +32,45 @@ system "mkdir -p ", DST;
 // This also makes `trade`/`quote` date-partitioned tables with a virtual `date`.
 system "l ", 1_string DB;
 
-// Columns each Rayforce query needs (superset across all 52 queries).
-TRADECOLS: `sym`time`price`size`stop`cond`ex`source`seq`corr;
-QUOTECOLS: `sym`time`bid`ask`bsize`asize`cond`ex`source`seq`corr`shortSaleRestrictionIndicator;
+// q's default display precision is not round-trip safe for 32-bit floats.
+// CSV serialization honors `P`, so use full precision to keep distinct trade
+// prices distinct after Rayforce parses the bridge files.
+system "P 17";
+
+// Complete source schemas, excluding the virtual partition column `date.
+// Keeping source order also makes `select from ...` outputs line up naturally
+// with the other adapters.
+TRADECOLS: `time`ex`sym`cond`size`price`stop`corr`seq`tradeId`source`tradeReportingFacility`participantTimestamp`tradeReportingFacilityTRFTimestamp`tradeThroughExemptIndicator;
+QUOTECOLS: `time`ex`sym`bid`bsize`ask`asize`cond`seq`nationalBBOIndicator`finraBBOIndicator`finraADFMpidIndicator`corr`source`retailInterestIndicator`shortSaleRestrictionIndicator`LULDBBOIndicator`SIPGeneratedMessageIdentifier`nationalBBOLULDIndicator`participantTimestamp`FINRAADFTimestamp`FINRAADFMarketParticipantQuoteIndicator`securityStatusIndicator;
+TIMESPANCOLS: `time`participantTimestamp`tradeReportingFacilityTRFTimestamp`FINRAADFTimestamp;
 
 loadPartition: {[db; d; tbl; keepCols]
   // functional select of the wanted columns from the partition for date d
   ?[tbl; enlist (=; `date; d); 0b; keepCols!keepCols] }
 
 // `csv 0:` writes the char/string columns (ex, cond, stop, source, ssr) as
-// plain text fields; Rayforce reads those columns back as SYMBOL. Only `time`
-// (a timespan = nanoseconds within the day) needs coercing to a long so it
-// lands as an I64 column in the CSV.
+// plain text fields; Rayforce reads those columns back as SYMBOL. Timespans
+// are coerced to long so they land as nanosecond I64 columns in the CSV.
 prepForCsv: {[t]
-  if[`time in cols t; t: ![t; (); 0b; (enlist `time)!enlist (`long$; `time)]];
+  if[`time in cols t;
+    t: ![t; (); 0b; (enlist `time)!enlist (`long$; `time)]];
+  if[`participantTimestamp in cols t;
+    t: ![t; (); 0b; (enlist `participantTimestamp)!enlist (`long$; `participantTimestamp)]];
+  if[`tradeReportingFacilityTRFTimestamp in cols t;
+    t: ![t; (); 0b; (enlist `tradeReportingFacilityTRFTimestamp)!enlist (`long$; `tradeReportingFacilityTRFTimestamp)]];
+  if[`FINRAADFTimestamp in cols t;
+    t: ![t; (); 0b; (enlist `FINRAADFTimestamp)!enlist (`long$; `FINRAADFTimestamp)]];
   t }
 
 // Stream the CSV out in row-batches. Building the whole CSV in memory with a
 // single `csv 0: t` blows the workspace on the 268M-row quote table, so we
 // serialize `bs` rows at a time and drop the repeated header after the first
 // batch.
-// The `csv 0:` output object is capped at ~1GB; a 12-column batch of 6M rows
-// serializes to ~370MB, comfortably under the limit.
-BATCHROWS: 6000000;
+// The caller supplies the batch size because CSV row width and available q
+// workspace vary by dataset. It affects only export chunking, never database
+// contents or measured query execution.
+BATCHROWS: "J"$o `batchrows;
+if[BATCHROWS < 1; -2 "batchrows must be positive"; exit 1];
 save1: {[db; d; tbl; keepCols; dst; outname]
   -1 "Loading ", string tbl;
   t: prepForCsv loadPartition[db; d; tbl; keepCols];

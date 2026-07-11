@@ -20,11 +20,11 @@
 
 ;; Column type schemas — order matches src/rayforce/exportRayCSV.q. The CSV
 ;; carries a header row, so column names are taken from it automatically.
-(.csv.splayed [SYMBOL I64 F64 F64 SYMBOL SYMBOL SYMBOL SYMBOL I64 I64]
+(.csv.splayed [I64 SYMBOL SYMBOL SYMBOL F32 F32 SYMBOL I16 I32 I64 SYMBOL SYMBOL I64 I64 B8]
               (concat csvdir "/trade.csv") (concat dbdir "/trade"))
 (println "trade -> splayed done")
 
-(.csv.splayed [SYMBOL I64 F64 F64 I64 I64 SYMBOL SYMBOL SYMBOL I64 I64 SYMBOL]
+(.csv.splayed [I64 SYMBOL SYMBOL F32 I32 F32 I32 SYMBOL I32 SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL I64 I64 SYMBOL SYMBOL]
               (concat csvdir "/quote.csv") (concat dbdir "/quote"))
 (println "quote -> splayed done")
 

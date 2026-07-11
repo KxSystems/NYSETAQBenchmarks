@@ -15,6 +15,40 @@
    "The Investors' Exchange" "Chicago Broad Options Exchange" "NASDAQ OMX PSX"
    "Cboe BYX Exchange" "Cboe BZX Exchange"]))
 
+;; q dictionary lookup returns an empty string for exchange codes absent from
+;; exnames.  Keep that behavior in the translated grouped queries so unknown
+;; codes collapse into the same group rather than appearing as separate codes.
+(set exname (fn [ex]
+  (cond
+    ((== ex 'A) "NYSE American")
+    ((== ex 'B) "NASDAQ OMX BX")
+    ((== ex 'C) "NYSE National")
+    ((== ex 'D) "FINRA Alternative Display Facility")
+    ((== ex 'I) "International Securities Exchange")
+    ((== ex 'J) "Cboe EDGA Exchange")
+    ((== ex 'K) "Cboe EDGX Exchange")
+    ((== ex 'L) "Long-Term Stock Exchange")
+    ((== ex 'M) "Chicago Stock Exchange")
+    ((== ex 'N) "New York Stock Exchange")
+    ((== ex 'P) "NYSE Arca")
+    ((== ex 'S) "Consolidated Tape System")
+    ((== ex 'T) "NASDAQ Stock Market")
+    ((== ex 'Q) "NASDAQ Stock Exchange")
+    ((== ex 'V) "The Investors' Exchange")
+    ((== ex 'W) "Chicago Broad Options Exchange")
+    ((== ex 'X) "NASDAQ OMX PSX")
+    ((== ex 'Y) "Cboe BYX Exchange")
+    ((== ex 'Z) "Cboe BZX Exchange")
+    (else ""))))
+
+;; Group by the original exchange code where it has a name, and by one shared
+;; sentinel otherwise.  The sentinel is translated to the empty string by
+;; exname after aggregation, matching q's missing-key dictionary semantics.
+(set exkey (fn [ex]
+  (if (in ex ['A 'B 'C 'D 'I 'J 'K 'L 'M 'N 'P 'S 'T 'Q 'V 'W 'X 'Y 'Z])
+    ex
+    '__missing)))
+
 ;; Nanosecond time-of-day constants (Rayforce stores `time` as I64 ns).
 (set NS_SEC   1000000000)
 (set NS_MIN   60000000000)

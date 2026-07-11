@@ -34,8 +34,8 @@
 
 ;; timeit returns milliseconds (f64, derived from a ns clock) -> integer ns
 (set ns (fn [ms] (as 'I64 (round (* ms 1000000.0)))))
-(set membytes (fn [] (at (.sys.mem) 'bytes-allocated)))
 (set kb (fn [b] (as 'I64 (div (if (> b 0) b 0) 1024))))
+(set QOUT (.os.getenv "RAY_QUERY_OUTPUT_DIR"))
 
 ;; ---- one benchmark query -------------------------------------------------
 ;; thunk is (fn [] <query>) returning a table. run1 is the cold first eval;
@@ -49,19 +49,36 @@
   (set CURIDX idx)
   (try
     (do
+      (set CURSTAGE 'run1)
       (.sys.gc)
       (let t1 (timeit (thunk)))
+      (set CURSTAGE 'run2)
       (.sys.gc)
       (let t2 (timeit (thunk)))
+      (set CURSTAGE 'run3)
       (.sys.gc)
       (let t3 (timeit (thunk)))
+      (set CURSTAGE 'measure)
       (.sys.gc)
       ;; Keep memory instrumentation out of the three performance timings.
       ;; The fourth execution mirrors q's .Q.ts-style measurement pass.
       (let mts (.mem.ts (thunk)))
+      ;; Optional correctness output is a fifth, untimed execution.
+      (set CURSTAGE 'output)
+      (if (!= QOUT "")
+        (.csv.write (thunk)
+          (concat QOUT
+            (concat "/queryoutput_" (concat (as 'STR idx) ".csv"))))
+        null)
+      (set CURSTAGE 'record)
       (push idx 'success (ns t1) (ns t2) (ns t3)
         (kb (at mts 'peak-live-bytes)) (kb (at mts 'result-bytes))))
-    (fn [e] (push CURIDX 'error 0 0 0 0 0)))))
+    (fn [e]
+      (do
+        (println (concat "Rayforce query failed: " (as 'STR CURIDX)))
+        (println (concat "stage: " (as 'STR CURSTAGE)))
+        (println e)
+        (push CURIDX 'error 0 0 0 0 0))))))
 
 ;; ---- load parameters -----------------------------------------------------
 (load (.os.getenv "RAY_PARAMS"))

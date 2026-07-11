@@ -28,12 +28,15 @@ elif [[ ${DATAFORMAT} == "rayforce" ]]; then
   RAYCSV="$(mktemp -d)"
   trap 'rm -rf "${RAYCSV}"' EXIT
   echo "Exporting trade/quote to CSV for Rayforce..."
+  RAY_EXPORT_BATCH_ROWS="${RAY_EXPORT_BATCH_ROWS:-6000000}"
   QPATH="${QPATH:-}:${script_dir}/external:$(dirname "$(command -v q)")/../mod" \
-    q ./src/rayforce/exportRayCSV.q -db "${SRCDB}" -date "$DATE" -dst "${RAYCSV}" -q
+    q ./src/rayforce/exportRayCSV.q -db "${SRCDB}" -date "$DATE" -dst "${RAYCSV}" \
+      -batchrows "${RAY_EXPORT_BATCH_ROWS}" -q
   echo "Building Rayforce splayed DB..."
-  RAY_CSVDIR="${RAYCSV}" RAY_DBDIR="${DST}" "${RAYFORCE_BIN}" -c 4 ./src/rayforce/buildRayforceDB.rfl
+  RAYFORCE_BUILD_CORES="${RAYFORCE_BUILD_CORES:-1}"
+  RAY_CSVDIR="${RAYCSV}" RAY_DBDIR="${DST}" \
+    "${RAYFORCE_BIN}" -c "${RAYFORCE_BUILD_CORES}" ./src/rayforce/buildRayforceDB.rfl
 else
   echo "Generating kdb+ data (aka. HDB)..."
   QPATH="${QPATH:-}:${script_dir}/external:$(dirname "$(command -v q)")/../mod" q ./src/taqToKDB.q -date "$DATE" -src "$CSVDIR" -dst "$DST" -letters "$LETTERS" -s 4 -q
 fi
-

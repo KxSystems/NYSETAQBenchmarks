@@ -92,16 +92,22 @@ function execute_queries () {
             # memory. -c is the worker-pool size, so 0 secondary threads maps to a
             # single-core pool.
             RAYCORES=$(( s > 1 ? s : 1 ))
+            RAY_OUTPUT_ARGS=()
+            if [[ -n "${QUERY_OUTPUT_DIR}" ]]; then
+                RAY_OUTPUT_ARGS=(--query-output-dir "${QUERY_OUTPUT_DIR}/rayforce")
+            fi
             $(get_numa_config) bash ./src/rayforce/runRayforce.sh \
-                --db-dir ${DB_DIR} --param-dir ${PARAM_DIR} --date $DATE --cores ${RAYCORES} --layout grouped \
+                --db-dir ${DB_DIR} --param-dir ${PARAM_DIR} --date $DATE --cores ${RAYCORES} --thread-label ${s} --layout grouped \
                 --queryfile ./artifacts/queries/inmemory/rayforce.psv \
                 --result ${RESULT_DIR}/rayforce_${s}Threads.psv \
+                "${RAY_OUTPUT_ARGS[@]}" \
                 ${IDX_PARAM:+--idx ${IDX_PARAM#-idx }}
             add_nickname ${RESULT_DIR}/rayforce_${s}Threads.psv "rayforce"
             $(get_numa_config) bash ./src/rayforce/runRayforce.sh \
-                --db-dir ${DB_DIR} --param-dir ${PARAM_DIR} --date $DATE --cores ${RAYCORES} --layout parted \
+                --db-dir ${DB_DIR} --param-dir ${PARAM_DIR} --date $DATE --cores ${RAYCORES} --thread-label ${s} --layout parted \
                 --queryfile ./artifacts/queries/inmemory/rayforce.psv \
                 --result ${RESULT_DIR}/rayforceParted_${s}Threads.psv \
+                "${RAY_OUTPUT_ARGS[@]}" \
                 ${IDX_PARAM:+--idx ${IDX_PARAM#-idx }}
             add_nickname ${RESULT_DIR}/rayforceParted_${s}Threads.psv "rayforceParted"
         fi
