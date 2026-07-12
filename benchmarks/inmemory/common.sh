@@ -19,17 +19,6 @@ THREAD_NRS=(1 4)
 IDX_PARAM=""
 QUERY_OUTPUT_DIR=""
 
-# Emit the -queryOutputDir flag for the per-engine subdirectory $1, or nothing
-# when query output persistence is disabled (no -q/--query-output-dir given).
-# The subdirectory is created here because runQueries.q writes into it without
-# creating it (main.py does mkdir, but the q engines rely on it existing).
-function query_output_param() {
-    if [[ -n "${QUERY_OUTPUT_DIR}" ]]; then
-        mkdir -p "${QUERY_OUTPUT_DIR}/$1"
-        echo "-queryOutputDir ${QUERY_OUTPUT_DIR}/$1"
-    fi
-}
-
 # Validate DATE, create the scratch result directory, and point FLUSH at the
 # no-op script (in-memory data needs no cache flush). Call after parsing args.
 function init_benchmark () {
@@ -104,6 +93,27 @@ function add_nickname () {
     [[ -f "${file}" ]] || return 0
     awk -v sol="${sol}" 'BEGIN{FS=OFS="|"} {print (NR==1 ? "solution" : sol), $0}' "${file}" > "${file}.tmp"
     mv "${file}.tmp" "${file}"
+}
+
+# Run one named solution's query command: compute its per-solution result
+# path, append -queryOutputDir/-result to the command given in $2..., run it,
+# then label the resulting PSV via add_nickname. Relies on $s (thread count)
+# and $RESULT_DIR from the enclosing loop in execute_queries.
+function run_solution () {
+    local solution="$1"
+    shift
+    local safe=$(echo "${solution}" | sed -E 's/[^a-zA-Z0-9._-]+/_/g')
+    local result=${RESULT_DIR}/${safe}_${s}Threads.psv
+    local query_output_param=""
+    if [[ -n "${QUERY_OUTPUT_DIR}" ]]; then
+        # The subdirectory is created here because runQueries.q writes into it
+        # without creating it (main.py does mkdir, but the q engines rely on
+        # it existing).
+        mkdir -p "${QUERY_OUTPUT_DIR}/${safe}"
+        query_output_param="-queryOutputDir ${QUERY_OUTPUT_DIR}/${safe}"
+    fi
+    $(get_numa_config) "$@" ${query_output_param} -result ${result}
+    add_nickname ${result} "${solution}"
 }
 
 function merge_results () {
