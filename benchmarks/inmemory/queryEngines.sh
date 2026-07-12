@@ -58,50 +58,30 @@ function execute_queries () {
         echo "--> Running with $s threads"
 
         if engine_enabled kdb; then
-            solution="kdb"
-            $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/kdb -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv -s ${s}
-            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv "$solution"
+            run_solution "KDB-X" q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -s ${s}
 
-            solution="kdbParted"
-            $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/kdb -sortcols "sym,time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv -s ${s}
-            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
+            run_solution "KDB-X (Parted)" q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols "sym,time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb.psv -s ${s}
 
-            solution="kdbManualOpt"
-            $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/kdb -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb_manualopt.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv -s ${s}
-            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
+            run_solution "KDB-X (Manual Opt)" q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdb_manualopt.psv -s ${s}
         fi
         if engine_enabled kdbxsql; then
-            solution="kdbxsql"
-            $(get_numa_config) q ./src/runQueries.q ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/kdb -engine sql -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/sql.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv -s ${s}
-            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
+            run_solution "KDB-X SQL" q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -engine sql -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/sql.psv -s ${s}
         fi
         if engine_enabled duckdb; then
-            solution="duckdb"
-            DUCKDB_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -queryfile ./artifacts/queries/inmemory/duckdb.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv
-            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
+            run_solution "DuckDB (No index)" env DUCKDB_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -queryfile ./artifacts/queries/inmemory/duckdb.psv
 
-            solution="duckdbSymTimeSort"
-            DUCKDB_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "sym,time" -queryfile ./artifacts/queries/inmemory/duckdb.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv
-            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
+            run_solution "DuckDB (Sym, Time Sort)" env DUCKDB_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "sym,time" -queryfile ./artifacts/queries/inmemory/duckdb.psv
 
-            solution="duckdbIndex"
-            DUCKDB_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/duckdb.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv
-            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
+            run_solution "DuckDB (Index)" env DUCKDB_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/duckdb.psv
         fi
         if engine_enabled polars; then
-            solution="polars"
-            POLARS_MAX_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/parquet/rowgroup -engine polars -sortcols "time" -queryfile ./artifacts/queries/inmemory/polars.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv
-            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
+            run_solution "Polars" env POLARS_MAX_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine polars -sortcols "time" -queryfile ./artifacts/queries/inmemory/polars.psv
         fi
         if engine_enabled pykx; then
-            solution="pykx"
-            QARGS="-s ${s}" $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/kdb -engine pykx -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/pykx.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv
-            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
+            run_solution "PyKX" env QARGS="-s ${s}" uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/kdb -engine pykx -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/pykx.psv
         fi
         if engine_enabled pandas; then
-            solution="pandas"
-            OMP_NUM_THREADS=$(( s > 1 ? s : 1 )) NUMEXPR_NUM_THREADS=$(( s > 1 ? s : 1 )) MKL_NUM_THREADS=$(( s > 1 ? s : 1 )) $(get_numa_config) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} $(query_output_param $solution) -db ${DB_DIR}/parquet/rowgroup -engine pandas -sortcols "time" -queryfile ./artifacts/queries/inmemory/pandas.psv -result ${RESULT_DIR}/${solution}_${s}Threads.psv
-            add_nickname ${RESULT_DIR}/${solution}_${s}Threads.psv $solution
+            run_solution "Pandas" env OMP_NUM_THREADS=$(( s > 1 ? s : 1 )) NUMEXPR_NUM_THREADS=$(( s > 1 ? s : 1 )) MKL_NUM_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine pandas -sortcols "time" -queryfile ./artifacts/queries/inmemory/pandas.psv
         fi
     done
 }
