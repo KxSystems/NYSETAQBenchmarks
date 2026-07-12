@@ -3,52 +3,83 @@ idx|tags|query|parameter
 2||SELECT * FROM trade WHERE seq=CAST(0 AS INTEGER)|
 3||SELECT * FROM trade WHERE CAST(0 AS INTEGER) < seq AND 0e < price AND time BETWEEN '0D0' AND '1D0' AND size < 2147483647e|
 4||SELECT * FROM trade WHERE time BETWEEN '0D10:00:00' AND '0D10:00:10'|
-5||SELECT * FROM quote WHERE sym = $1 AND time BETWEEN '0D08:30' AND '0D16:30'|anInfreqInstr
-6||SELECT * FROM quote WHERE sym IN $1 AND time BETWEEN '0D08:30' AND '0D08:35'|hundredInstrs
-7||SELECT sym, time, price, size, stop, cond, ex FROM trade WHERE source = 'N'|
-8||SELECT time, (bid + ask) / 2 AS mid FROM quote WHERE sym = $1|mostFreqInstr
-9||SELECT time, (bid + ask) / 2 AS mid FROM (SELECT * FROM quote WHERE sym = $1)|mostFreqInstr
-10||SELECT time, (bid + ask) / 2 AS mid FROM quote WHERE sym = $1 ORDER BY mid DESC|mostFreqInstr
-11||SELECT sym, time, bid, ask, bsize, asize, cond, ex FROM quote WHERE sym = $1|aFreqInstr
-12||SELECT sym, time, bid, ask, bsize, asize, cond, ex FROM quote WHERE sym IN $1 AND CAST(2000 AS INTEGER)<bsize+asize|fivehundredInfreqInstrs
-13||SELECT AVG((bsize * bid + asize * ask) / (bsize + asize)) AS avgLiqWMid FROM quote WHERE sym = $1|anInfreqInstr
-14||SELECT xbar('0D00:10', time), AVG((bsize * bid + asize * ask) / (bsize + asize)) AS avgLiqWMid, ex FROM quote WHERE sym = $1 GROUP BY xbar('0D00:10', time), ex|anInfreqInstr
-15|||
-16|||
-17|||
-18||SELECT xbar('0D00:10', time), AVG(ask - bid) AS avgSpread FROM quote WHERE sym = $1 GROUP BY xbar('0D00:10', time)|aFreqInstr
-19||SELECT sym, xbar('0D00:10', time), AVG(ask - bid) AS avgSpread FROM quote WHERE sym IN $1 GROUP BY sym, xbar('0D00:10', time)|hundredInstrs
-20||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread FROM quote WHERE sym=$1|anInfreqInstr
-21||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread, STDDEV_POP(ask - bid) AS devSpread, MAX(ask - bid) AS maxSpread, MIN(ask - bid) AS minSpread FROM quote WHERE time BETWEEN '0D08:30' AND '0D08:35'|
-22||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread, STDDEV_POP(ask - bid) AS devSpread, MAX(ask - bid) AS maxSpread, MIN(ask - bid) AS minSpread FROM quote WHERE sym=$1 GROUP BY exnames(ex)|mostFreqInstr
-23||SELECT weighted_avg(sizes, spread) AS avgWeightedSpread, STDDEV_POP(spread) AS devSpread, MAX(spread) AS maxSpread, MIN(spread) AS minSpread FROM (SELECT ex, asize + bsize AS sizes, ask - bid AS spread FROM quote WHERE sym=$1) GROUP BY exnames(ex)|mostFreqInstr
-24||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread, STDDEV_POP(ask - bid) AS devSpread, MAX(ask - bid) AS maxSpread, MIN(ask - bid) AS minSpread FROM quote WHERE sym IN $1 GROUP BY sym, exnames(ex)|hundredInstrs
-25||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread, STDDEV_POP(ask - bid) AS devSpread, MAX(ask - bid) AS maxSpread, MIN(ask - bid) AS minSpread FROM quote WHERE shortSaleRestrictionIndicator='0' GROUP BY exnames(ex)|
-26||SELECT DISTINCT sym, ex FROM trade WHERE size>CAST(700000 AS REAL)|
-27||SELECT weighted_avg(bsize, bid) AS weightedBidPrice, weighted_avg(asize, ask) AS weightedOfferPrice FROM quote WHERE sym IN $1 GROUP BY sym|twentyInstrs
+5||SELECT * FROM quote WHERE sym = $1 AND time BETWEEN '0D08:30' AND '0D16:30'|infreqInstr
+6||SELECT * FROM quote WHERE sym = $1 AND time BETWEEN '0D08:30' AND '0D16:30'|freqInstr
+7||SELECT * FROM quote WHERE sym IN $1 AND time BETWEEN '0D08:30' AND '0D08:35'|fiftyInstrs
+8||SELECT * FROM quote WHERE sym IN $1 AND time BETWEEN '0D08:30' AND '0D08:35'|thousandInfreqInstrs
+9||SELECT sym, time, price, size, stop, cond, ex FROM trade WHERE source = 'N'|
+10||SELECT time, (bid + ask) / 2 AS mid FROM quote WHERE sym = $1|infreqInstr
+11||SELECT time, (bid + ask) / 2 AS mid FROM quote WHERE sym = $1|freqInstr
+12||SELECT time, (bid + ask) / 2 AS mid FROM (SELECT * FROM quote WHERE sym = $1)|infreqInstr
+13||SELECT time, (bid + ask) / 2 AS mid FROM (SELECT * FROM quote WHERE sym = $1)|freqInstr
+14||SELECT time, (bid + ask) / 2 AS mid FROM quote WHERE sym = $1 ORDER BY mid DESC|infreqInstr
+15||SELECT time, (bid + ask) / 2 AS mid FROM quote WHERE sym = $1 ORDER BY mid DESC|freqInstr
+16||SELECT sym, time, bid, ask, bsize, asize, cond, ex FROM quote WHERE sym = $1|infreqInstr
+17||SELECT sym, time, bid, ask, bsize, asize, cond, ex FROM quote WHERE sym = $1|freqInstr
+18||SELECT sym, time, bid, ask, bsize, asize, cond, ex FROM quote WHERE sym IN $1 AND CAST(2000 AS INTEGER)<bsize+asize|fiftyInstrs
+19||SELECT sym, time, bid, ask, bsize, asize, cond, ex FROM quote WHERE sym IN $1 AND CAST(2000 AS INTEGER)<bsize+asize|thousandInfreqInstrs
+20||SELECT AVG((bsize * bid + asize * ask) / (bsize + asize)) AS avgLiqWMid FROM quote WHERE sym = $1|infreqInstr
+21||SELECT AVG((bsize * bid + asize * ask) / (bsize + asize)) AS avgLiqWMid FROM quote WHERE sym = $1|freqInstr
+22||SELECT xbar('0D00:10', time), AVG((bsize * bid + asize * ask) / (bsize + asize)) AS avgLiqWMid, ex FROM quote WHERE sym = $1 GROUP BY xbar('0D00:10', time), ex|infreqInstr
+23||SELECT xbar('0D00:10', time), AVG((bsize * bid + asize * ask) / (bsize + asize)) AS avgLiqWMid, ex FROM quote WHERE sym = $1 GROUP BY xbar('0D00:10', time), ex|freqInstr
+24|||
+25|||
+26|||
+27|||
 28|||
 29|||
-30|||
-31|||
-32|||
-33|||
-34||SELECT time, ex, sym, cond, size, price, stop, corr, seq, tradeId, source, tradeReportingFacility, participantTimestamp, tradeReportingFacilityTRFTimestamp, tradeThroughExemptIndicator FROM (SELECT *, MAX(size) OVER (PARTITION BY ex) AS max_size FROM trade) WHERE size = max_size|
-35||SELECT time, ex, sym, bid, bsize, ask, asize, cond, seq, nationalBBOInd, finraBBOIndicator, finraADFMPIDIndicator, corr, source, retailInterestIndicator, shortSaleRestrictionIndicator, LULDBBOIndicator, SIPGeneratedMessageIdentifier, nationalBBOLULDIndicator, participantTimestamp, FINRAADFTimestamp, FINRAADFMarketParticipantQuoteIndicator, securityStatusIndicator, tag FROM SELECT *, 'maxbid' AS tag FROM ( SELECT *, MIN(time) OVER (PARTITION BY ex) AS min_time FROM (SELECT *, MAX(bid) OVER (PARTITION BY ex) AS max_bid FROM quote WHERE sym=$1) WHERE bid = max_bid) WHERE time = min_time UNION ALL SELECT *, 'minask' AS tag FROM ( SELECT *, MIN(time) OVER (PARTITION BY ex) AS min_time FROM (SELECT *, MIN(ask) OVER (PARTITION BY ex) AS min_ask FROM quote WHERE sym=$1) WHERE ask = min_ask) WHERE time = min_time ORDER BY tag, time|mostFreqInstr
-36||SELECT time, ex, sym, cond, size, price, stop, corr, seq, tradeId, source, tradeReportingFacility, participantTimestamp, tradeReportingFacilityTRFTimestamp, tradeThroughExemptIndicator FROM (SELECT *, MIN(size) OVER (PARTITION BY ex, sym) AS min_size FROM trade) WHERE size = min_size|
-37||SELECT time, ex, sym, cond, size, price, stop, corr, seq, tradeId, source, tradeReportingFacility, participantTimestamp, tradeReportingFacilityTRFTimestamp, tradeThroughExemptIndicator FROM (SELECT *, MIN(size) OVER (PARTITION BY ex, sym) AS min_size FROM trade) WHERE size = min_size|
-38||SELECT t2.sym, t2.seq AS seqDecr FROM ( SELECT *, ROW_NUMBER() OVER (PARTITION BY sym ORDER BY time) AS rn FROM trade) AS t1 JOIN ( SELECT *, ROW_NUMBER() OVER (PARTITION BY sym ORDER BY time) AS rn FROM trade) AS t2 ON t1.sym = t2.sym AND t1.rn = t2.rn - 1 WHERE t2.seq - t1.seq < 0 ORDER BY t2.sym|
-39||WITH tb AS (SELECT bucket, bound, ROW_NUMBER() OVER () AS rn FROM timeBuckets) SELECT ex, FIRST(bucket) AS timeBucket, COUNT(*) AS cnt, SUM(size) AS size FROM trade t ASOF JOIN tb ON t.time >= tb.bound GROUP BY ex, rn|
-40||SELECT sym, timebucketsstep(time), COUNT(*) AS cnt, SUM(size) FROM trade WHERE NOT corr=CAST(0 AS SMALLINT) GROUP BY sym, timebucketsstep(time)|
-41||SELECT sym, xbar('0D00:05', time), FIRST(price) AS o, MAX(price) AS h, MIN(price) AS l, LAST(price) AS c, SUM(size) AS s FROM trade WHERE sym IN $1 AND stop IS NOT NULL GROUP BY sym, xbar('0D00:05', time)|hundredInstrs
-42||SELECT *, (CAST(bsize - asize as float)) / (bsize + asize) AS inbal FROM (SELECT xbar('0D00:01', time), first(asize), first(bsize) FROM quote WHERE sym = $1 GROUP BY xbar('0D00:01', time))|anInfreqInstr
-43||SELECT weighted_sum(asize, ask) AS wsumAsk, weighted_sum(bsize, bid) AS wsumBid, STDDEV(asize) AS sdevasksize, STDDEV(bid) AS sdevbid, CORR(ask, bid) AS corPrice, CORR(asize, bsize) AS corSize FROM quote WHERE sym IN $1 GROUP BY sym|fivehundredInfreqInstrs
-44||SELECT time, ex, sym, cond, size, price, stop, corr, seq, tradeId, source, tradeReportingFacility, participantTimestamp, tradeReportingFacilityTRFTimestamp, tradeThroughExemptIndicator FROM (SELECT *, MIN(price) OVER (PARTITION BY sym) AS min_price FROM trade) WHERE price = min_price|
-45|||
-46|||
+30||SELECT xbar('0D00:10', time), AVG(ask - bid) AS avgSpread FROM quote WHERE sym = $1 GROUP BY xbar('0D00:10', time)|infreqInstr
+31||SELECT xbar('0D00:10', time), AVG(ask - bid) AS avgSpread FROM quote WHERE sym = $1 GROUP BY xbar('0D00:10', time)|freqInstr
+32||SELECT sym, xbar('0D00:10', time), AVG(ask - bid) AS avgSpread FROM quote WHERE sym IN $1 GROUP BY sym, xbar('0D00:10', time)|fiftyInstrs
+33||SELECT sym, xbar('0D00:10', time), AVG(ask - bid) AS avgSpread FROM quote WHERE sym IN $1 GROUP BY sym, xbar('0D00:10', time)|thousandInfreqInstrs
+34||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread FROM quote WHERE sym=$1|infreqInstr
+35||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread FROM quote WHERE sym=$1|freqInstr
+36||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread, STDDEV_POP(ask - bid) AS devSpread, MAX(ask - bid) AS maxSpread, MIN(ask - bid) AS minSpread FROM quote WHERE time BETWEEN '0D08:30' AND '0D08:35'|
+37||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread, STDDEV_POP(ask - bid) AS devSpread, MAX(ask - bid) AS maxSpread, MIN(ask - bid) AS minSpread FROM quote WHERE sym=$1 GROUP BY exnames(ex)|infreqInstr
+38||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread, STDDEV_POP(ask - bid) AS devSpread, MAX(ask - bid) AS maxSpread, MIN(ask - bid) AS minSpread FROM quote WHERE sym=$1 GROUP BY exnames(ex)|freqInstr
+39||SELECT weighted_avg(sizes, spread) AS avgWeightedSpread, STDDEV_POP(spread) AS devSpread, MAX(spread) AS maxSpread, MIN(spread) AS minSpread FROM (SELECT ex, asize + bsize AS sizes, ask - bid AS spread FROM quote WHERE sym=$1) GROUP BY exnames(ex)|infreqInstr
+40||SELECT weighted_avg(sizes, spread) AS avgWeightedSpread, STDDEV_POP(spread) AS devSpread, MAX(spread) AS maxSpread, MIN(spread) AS minSpread FROM (SELECT ex, asize + bsize AS sizes, ask - bid AS spread FROM quote WHERE sym=$1) GROUP BY exnames(ex)|freqInstr
+41||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread, STDDEV_POP(ask - bid) AS devSpread, MAX(ask - bid) AS maxSpread, MIN(ask - bid) AS minSpread FROM quote WHERE sym IN $1 GROUP BY sym, exnames(ex)|fiftyInstrs
+42||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread, STDDEV_POP(ask - bid) AS devSpread, MAX(ask - bid) AS maxSpread, MIN(ask - bid) AS minSpread FROM quote WHERE sym IN $1 GROUP BY sym, exnames(ex)|thousandInfreqInstrs
+43||SELECT weighted_avg(asize + bsize, ask - bid) AS avgWeightedSpread, STDDEV_POP(ask - bid) AS devSpread, MAX(ask - bid) AS maxSpread, MIN(ask - bid) AS minSpread FROM quote WHERE shortSaleRestrictionIndicator='0' GROUP BY exnames(ex)|
+44||SELECT DISTINCT sym, ex FROM trade WHERE size>CAST(700000 AS REAL)|
+45||SELECT weighted_avg(bsize, bid) AS weightedBidPrice, weighted_avg(asize, ask) AS weightedOfferPrice FROM quote WHERE sym IN $1 GROUP BY sym|fiftyInstrs
+46||SELECT weighted_avg(bsize, bid) AS weightedBidPrice, weighted_avg(asize, ask) AS weightedOfferPrice FROM quote WHERE sym IN $1 GROUP BY sym|thousandInfreqInstrs
 47|||
-48||SELECT MEDIAN(bsize + asize) AS medMidSize FROM quote WHERE sym=$1|anInfreqInstr
-49||SELECT MEDIAN(size) AS medSize FROM trade GROUP BY ex|
-50||SELECT * FROM (SELECT sym, time, price, size, stop, cond, ex from trade WHERE sym IN $1) AS t ASOF JOIN (SELECT sym AS quoteSym, time, bid, ask, bsize, asize, cond AS quotecond, ex AS quoteex from quote) AS q ON t.sym=q.quoteSym AND t.time>=q.time|twentyInstrs
-51||SELECT * FROM (SELECT time, price, size, stop, cond, ex from trade WHERE sym = $1) AS t ASOF JOIN (SELECT time AS quotetime, bid, ask, bsize, asize, cond AS quotecond, ex AS quoteex from quote WHERE sym=$1) AS q ON t.time>=q.quotetime|aFreqInstr
-52||SELECT * FROM (SELECT sym, time, price, size, stop, cond, ex from trade WHERE size>500000) AS t ASOF JOIN (SELECT sym AS quoteSym, time, bid, ask, bsize, asize, cond AS quotecond, ex AS quoteex from quote) AS q ON t.sym=q.quoteSym AND t.ex=q.quoteex AND t.time>=q.time|
-53||SELECT * FROM (SELECT sym, time, price, size, stop, cond, ex from trade WHERE time BETWEEN '0D16:20' AND '0D16:30') AS t ASOF JOIN (SELECT sym AS quoteSym, time, bid, ask, bsize, asize, cond AS quotecond, ex AS quoteex from quote) AS q ON t.sym=q.quoteSym AND t.time>=q.time|
+48|||
+49|||
+50|||
+51|||
+52|||
+53|||
+54|||
+55|||
+56||SELECT time, ex, sym, cond, size, price, stop, corr, seq, tradeId, source, tradeReportingFacility, participantTimestamp, tradeReportingFacilityTRFTimestamp, tradeThroughExemptIndicator FROM (SELECT *, MAX(size) OVER (PARTITION BY ex) AS max_size FROM trade) WHERE size = max_size|
+57||SELECT time, ex, sym, bid, bsize, ask, asize, cond, seq, nationalBBOIndicator, finraBBOIndicator, finraADFMPIDIndicator, corr, source, retailInterestIndicator, shortSaleRestrictionIndicator, LULDBBOIndicator, SIPGeneratedMessageIdentifier, nationalBBOLULDIndicator, participantTimestamp, FINRAADFTimestamp, FINRAADFMarketParticipantQuoteIndicator, securityStatusIndicator, tag FROM (SELECT *, 'maxbid' AS tag FROM ( SELECT *, MIN(time) OVER (PARTITION BY ex) AS min_time FROM (SELECT *, MAX(bid) OVER (PARTITION BY ex) AS max_bid FROM quote WHERE sym=$1) WHERE bid = max_bid) WHERE time = min_time UNION ALL SELECT *, 'minask' AS tag FROM ( SELECT *, MIN(time) OVER (PARTITION BY ex) AS min_time FROM (SELECT *, MIN(ask) OVER (PARTITION BY ex) AS min_ask FROM quote WHERE sym=$1) WHERE ask = min_ask) WHERE time = min_time ORDER BY tag, time)|infreqInstr
+58||SELECT time, ex, sym, bid, bsize, ask, asize, cond, seq, nationalBBOIndicator, finraBBOIndicator, finraADFMPIDIndicator, corr, source, retailInterestIndicator, shortSaleRestrictionIndicator, LULDBBOIndicator, SIPGeneratedMessageIdentifier, nationalBBOLULDIndicator, participantTimestamp, FINRAADFTimestamp, FINRAADFMarketParticipantQuoteIndicator, securityStatusIndicator, tag FROM (SELECT *, 'maxbid' AS tag FROM ( SELECT *, MIN(time) OVER (PARTITION BY ex) AS min_time FROM (SELECT *, MAX(bid) OVER (PARTITION BY ex) AS max_bid FROM quote WHERE sym=$1) WHERE bid = max_bid) WHERE time = min_time UNION ALL SELECT *, 'minask' AS tag FROM ( SELECT *, MIN(time) OVER (PARTITION BY ex) AS min_time FROM (SELECT *, MIN(ask) OVER (PARTITION BY ex) AS min_ask FROM quote WHERE sym=$1) WHERE ask = min_ask) WHERE time = min_time ORDER BY tag, time)|freqInstr
+59||SELECT time, ex, sym, cond, size, price, stop, corr, seq, tradeId, source, tradeReportingFacility, participantTimestamp, tradeReportingFacilityTRFTimestamp, tradeThroughExemptIndicator FROM (SELECT *, MIN(size) OVER (PARTITION BY ex, sym) AS min_size FROM trade) WHERE size = min_size|
+60||SELECT time, ex, sym, cond, size, price, stop, corr, seq, tradeId, source, tradeReportingFacility, participantTimestamp, tradeReportingFacilityTRFTimestamp, tradeThroughExemptIndicator FROM (SELECT *, MIN(size) OVER (PARTITION BY ex, sym) AS min_size FROM trade) WHERE size = min_size|
+61||SELECT t2.sym, t2.seq AS seqDecr FROM ( SELECT *, ROW_NUMBER() OVER (PARTITION BY sym ORDER BY time) AS rn FROM trade) AS t1 JOIN ( SELECT *, ROW_NUMBER() OVER (PARTITION BY sym ORDER BY time) AS rn FROM trade) AS t2 ON t1.sym = t2.sym AND t1.rn = t2.rn - 1 WHERE t2.seq - t1.seq < 0 ORDER BY t2.sym|
+62||WITH tb AS (SELECT bucket, bound, ROW_NUMBER() OVER () AS rn FROM timeBuckets) SELECT ex, FIRST(bucket) AS timeBucket, COUNT(*) AS cnt, SUM(size) AS size FROM trade t ASOF JOIN tb ON t.time >= tb.bound GROUP BY ex, rn|
+63||SELECT sym, timebucketsstep(time), COUNT(*) AS cnt, SUM(size) FROM trade WHERE NOT corr=CAST(0 AS SMALLINT) GROUP BY sym, timebucketsstep(time)|
+64||SELECT sym, xbar('0D00:05', time), FIRST(price) AS o, MAX(price) AS h, MIN(price) AS l, LAST(price) AS c, SUM(size) AS s FROM trade WHERE sym IN $1 AND stop IS NOT NULL GROUP BY sym, xbar('0D00:05', time)|fiftyInstrs
+65||SELECT sym, xbar('0D00:05', time), FIRST(price) AS o, MAX(price) AS h, MIN(price) AS l, LAST(price) AS c, SUM(size) AS s FROM trade WHERE sym IN $1 AND stop IS NOT NULL GROUP BY sym, xbar('0D00:05', time)|thousandInfreqInstrs
+66||SELECT *, (CAST(bsize - asize as float)) / (bsize + asize) AS inbal FROM (SELECT xbar('0D00:01', time), first(asize), first(bsize) FROM quote WHERE sym = $1 GROUP BY xbar('0D00:01', time))|infreqInstr
+67||SELECT *, (CAST(bsize - asize as float)) / (bsize + asize) AS inbal FROM (SELECT xbar('0D00:01', time), first(asize), first(bsize) FROM quote WHERE sym = $1 GROUP BY xbar('0D00:01', time))|freqInstr
+68||SELECT weighted_sum(asize, ask) AS wsumAsk, weighted_sum(bsize, bid) AS wsumBid, STDDEV(asize) AS sdevasksize, STDDEV(bid) AS sdevbid, CORR(ask, bid) AS corPrice, CORR(asize, bsize) AS corSize FROM quote WHERE sym IN $1 GROUP BY sym|fiftyInstrs
+69||SELECT weighted_sum(asize, ask) AS wsumAsk, weighted_sum(bsize, bid) AS wsumBid, STDDEV(asize) AS sdevasksize, STDDEV(bid) AS sdevbid, CORR(ask, bid) AS corPrice, CORR(asize, bsize) AS corSize FROM quote WHERE sym IN $1 GROUP BY sym|thousandInfreqInstrs
+70||SELECT time, ex, sym, cond, size, price, stop, corr, seq, tradeId, source, tradeReportingFacility, participantTimestamp, tradeReportingFacilityTRFTimestamp, tradeThroughExemptIndicator FROM (SELECT *, MIN(price) OVER (PARTITION BY sym) AS min_price FROM trade) WHERE price = min_price|
+71|||
+72|||
+73|||
+74|||
+75|||
+76||SELECT MEDIAN(bsize + asize) AS medMidSize FROM quote WHERE sym=$1|infreqInstr
+77||SELECT MEDIAN(bsize + asize) AS medMidSize FROM quote WHERE sym=$1|freqInstr
+78||SELECT MEDIAN(size) AS medSize FROM trade GROUP BY ex|
+79||SELECT * FROM (SELECT sym, time, price, size, stop, cond, ex from trade WHERE sym IN $1) AS t ASOF JOIN (SELECT sym AS quoteSym, time, bid, ask, bsize, asize, cond AS quotecond, ex AS quoteex from quote) AS q ON t.sym=q.quoteSym AND t.time>=q.time|fiftyInstrs
+80||SELECT * FROM (SELECT sym, time, price, size, stop, cond, ex from trade WHERE sym IN $1) AS t ASOF JOIN (SELECT sym AS quoteSym, time, bid, ask, bsize, asize, cond AS quotecond, ex AS quoteex from quote) AS q ON t.sym=q.quoteSym AND t.time>=q.time|thousandInfreqInstrs
+81||SELECT * FROM (SELECT time, price, size, stop, cond, ex from trade WHERE sym = $1) AS t ASOF JOIN (SELECT time AS quotetime, bid, ask, bsize, asize, cond AS quotecond, ex AS quoteex from quote WHERE sym=$1) AS q ON t.time>=q.quotetime|infreqInstr
+82||SELECT * FROM (SELECT time, price, size, stop, cond, ex from trade WHERE sym = $1) AS t ASOF JOIN (SELECT time AS quotetime, bid, ask, bsize, asize, cond AS quotecond, ex AS quoteex from quote WHERE sym=$1) AS q ON t.time>=q.quotetime|freqInstr
+83||SELECT * FROM (SELECT sym, time, price, size, stop, cond, ex from trade WHERE size>500000) AS t ASOF JOIN (SELECT sym AS quoteSym, time, bid, ask, bsize, asize, cond AS quotecond, ex AS quoteex from quote) AS q ON t.sym=q.quoteSym AND t.ex=q.quoteex AND t.time>=q.time|
+84||SELECT * FROM (SELECT sym, time, price, size, stop, cond, ex from trade WHERE time BETWEEN '0D16:20' AND '0D16:30') AS t ASOF JOIN (SELECT sym AS quoteSym, time, bid, ask, bsize, asize, cond AS quotecond, ex AS quoteex from quote) AS q ON t.sym=q.quoteSym AND t.time>=q.time|

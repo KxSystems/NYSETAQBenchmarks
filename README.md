@@ -233,9 +233,8 @@ The file starts with a header row. The columns are:
 | `indexon` | Columns an index/attribute was applied to, e.g. `sym`. Empty if none. |
 | `engineversion` | Version string of the engine library, e.g. `1.5.4`. |
 | `idx` | Query index. Positive integers are benchmark queries; non-positive values are setup steps: `0` = load a partition into memory, `-1` = transform, `-2` = sort, `-3` = index. |
-| `tags` | Comma-separated category tags for the query (e.g. `timefilter,groupby,advanced`). Setup rows are tagged `load`. |
 | `query` | The query text that was executed (or a short description for setup rows). |
-| `status` | Outcome: `success`, `error` (query raised an exception), `idxfiltered` (skipped by the `--idx` filter), or `tagfiltered` (skipped by the `--tags` filter). |
+| `status` | Outcome: `success`, `error` (query raised an exception), `idxfiltered` (skipped by the `--idx` filter), `tagfiltered` (skipped by the `--tags` filter), or `instrumentfiltered` (skipped by the `--instrument` filter). |
 | `run1timeNS` | Execution time of run 1 (cold) in nanoseconds. Setup rows record their elapsed time here. |
 | `run2timeNS` | Execution time of run 2 (warm) in nanoseconds. |
 | `run3timeNS` | Execution time of run 3 (warm) in nanoseconds. |
@@ -343,9 +342,21 @@ has the columns:
 | `parameter` | Comma-separated names of parameters injected into the query (e.g. `datadate`, `aFreqInstr`, `twentyInstrs`, `timeBuckets`). Empty if the query takes none. |
 
 Engine-independent metadata lives in `artifacts/queries/inmemory/querymeta.psv`
-(`idx|tags|description|comment`). At runtime the runners join each query to its
-meta row by `idx` and **abort on any index mismatch** between a query file and
-`querymeta.psv` (see the checks in [main.py](./pysrc/queryrunner/main.py) and
+(`idx|tags|instrument|description|sortby|comment`). The `instrument` column is
+**mandatory** and states how many instruments the query works on: `single`,
+`multi`, or `all` (no instrument filter). Single-instrument queries are further
+split by instrument frequency into `single:infrequent` and `single:frequent`
+(using the `infreqInstr` and `freqInstr` parameters), and multi-instrument
+queries by instrument-set size into `multi:50` and `multi:1000infreq` (using the
+`fiftyInstrs` and `thousandInfreqInstrs` parameters), so each single and multi
+query appears twice. Both runners accept an optional `-instrument`
+parameter that runs only the queries with that scope; a base scope like `single`
+or `multi` also matches its variants, or you can select one exactly with e.g.
+`single:frequent` or `multi:50` (others are reported as `instrumentfiltered`). At
+runtime the runners join each query to its meta row by `idx` and **abort on any
+index mismatch** between a query file and `querymeta.psv` or on a
+missing/invalid `instrument` value (see the checks in
+[main.py](./pysrc/queryrunner/main.py) and
 [src/runQueries.q](./src/runQueries.q)). Consequently, every query you add must
 appear — at the same row position and with the same index — in all engine files
 you want to benchmark **and** in `querymeta.psv`.

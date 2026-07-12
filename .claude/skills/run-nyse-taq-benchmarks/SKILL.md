@@ -246,9 +246,7 @@ header row, one row per query, plus setup rows. Key columns:
 - `threadcount` — secondary threads used (`0` = none).
 - `idx` — query index. Positive = a benchmark query; non-positive = setup:
   `0` load partition, `-1` transform, `-2` sort, `-3` index.
-- `tags` — query category tags (e.g. `timefilter,groupby,advanced`); setup rows
-  are tagged `load`.
-- `status` — `success`, `error`, `idxfiltered`, or `tagfiltered`.
+- `status` — `success`, `error`, `idxfiltered`, `tagfiltered`, or `instrumentfiltered`.
 - `run1timeNS` (cold) / `run2timeNS`, `run3timeNS` (warm) — each query runs
   3×; `run3memKB` is peak memory of run 3; `ressizeKB` is result size.
   IO columns should be ~0 for these in-memory benchmarks.

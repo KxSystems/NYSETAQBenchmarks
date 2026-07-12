@@ -125,7 +125,8 @@ def parse_and_convert(file_path: Path, schema: pa.Schema, convs: list) -> pa.Tab
 
 def persist_rowgroup_per_symbol(table: pa.Table, table_output_path: Path,
                               parquet_options: dict[str, str | int],
-                              minrowgroupsize: int, maxrowgroupsize: int) -> None:
+                              minrowgroupsize: int, maxrowgroupsize: int,
+                              part_idx: int = 0) -> None:
     """Persists a Pyarrow table to a date-partitioned (following Hive format) Parquet dataset
     in which each row group belong to a Symbol
     Args:
@@ -144,7 +145,7 @@ def persist_rowgroup_per_symbol(table: pa.Table, table_output_path: Path,
     table = table.drop(['date'])
     date_partition_dir = table_output_path / f"date={date}"
     date_partition_dir.mkdir(parents=True, exist_ok=True)
-    with pq.ParquetWriter(date_partition_dir / "part-0.parquet", table.schema,
+    with pq.ParquetWriter(date_partition_dir / f"part-{part_idx}.parquet", table.schema,
                           **parquet_options) as writer:
         start_idx = 0
         current_symbol = symbols[0]
@@ -281,11 +282,13 @@ def main(date: datetime, src: Path, dst: Path, letters: str, includetestsymbols:
     parquet_options_quote = get_write_options(QUOTE_SCHEMA.get_field_index('Time'))
 
     if symbolstoredas is None or symbolstoredas.upper() == "ROWGROUP":
-        if quote_files:
-            quote_tables = [parse_and_convert(file_path, QUOTE_SCHEMA, quote_conv) for file_path in quote_files]
-            quote = pa.concat_tables(quote_tables)
-            del quote_tables
-            persist_rowgroup_per_symbol(quote, dst / 'quote', parquet_options_quote, minrowgroupsize, maxrowgroupsize)
+        # Each quote file is split by first letter, so a symbol never spans files.
+        # Process one file at a time and write it to its own part file to keep peak
+        # memory to a single file rather than all files plus a concatenated copy.
+        for part_idx, file_path in enumerate(quote_files):
+            quote = parse_and_convert(file_path, QUOTE_SCHEMA, quote_conv)
+            persist_rowgroup_per_symbol(quote, dst / 'quote', parquet_options_quote,
+                                        minrowgroupsize, maxrowgroupsize, part_idx)
             del quote
     else:
         for file_path in quote_files:
