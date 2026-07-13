@@ -187,11 +187,12 @@ captureTableStats: {[tableStatsDir:`s]
   h: hopen tableStatsFile;
   h "proprietary: 'yes'\n";
   h {[h; tName]
-    h "name: ", (string tName), "\n";
-    h "size (MB): ", (string floor .mem.objsize[value tName] % 1024*1024), "\n";
-    h "rowCount: ", (string count value tName), "\n";
-    h "columnCount: ", (string count cols tName), "\n";
-    h "columns: \n";
+    h (string tName), ":\n";
+    h "  name: ", (string tName), "\n";
+    h "  size (MB): ", (string floor .mem.objsize[value tName] % 1024*1024), "\n";
+    h "  rowCount: ", (string count value tName), "\n";
+    h "  columnCount: ", (string count cols tName), "\n";
+    h "  columns: \n";
     {[h;tName;c]
       / enums stored as 'symbol'
       t: $[0h ~ type tName c; `string; "s" ~ .Q.ty tName c; `symbol; key tName c];
