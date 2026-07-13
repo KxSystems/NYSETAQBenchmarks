@@ -170,8 +170,7 @@ Once the on-disk data has been generated, you can start the benchmark. Python li
 
 ```bash
 export NUMANODE=0
-TESTTIME="$(date +%Y%m%d_%H:%M)"
-./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE}  --threads "0 4 16 64" --result-dir ./results/inmemory/${SIZE}/${TESTTIME}
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE}  --threads "0 4 16 64" --result-dir ./results/inmemory/${SIZE}/$(date +%Y%m%d_%H:%M)
 ```
 
 The script accepts the following mandatory parameters:
@@ -259,8 +258,7 @@ Once the on-disk data has been generated, you can start the benchmark. To test w
 
 ```bash
 export NUMANODE=0
-TESTTIME="$(date +%Y%m%d_%H%M)"
-./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE} --threads "0 4 16 64" --result-dir ./results/inmemory/${SIZE}/${TESTTIME}
+./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE} --threads "0 4 16 64" --result-dir ./results/inmemory/${SIZE}/$(date +%Y%m%d_%H%M)
 ```
 
 #### Results
