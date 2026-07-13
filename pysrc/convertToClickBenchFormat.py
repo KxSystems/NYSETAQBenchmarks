@@ -5,15 +5,18 @@ The input directory is a <SIZE> directory (SIZE is one of small, medium, large
 or full), e.g. ``results/inmemory/small``. It is scanned recursively for
 benchmark runs; a run is any directory that contains both:
 
-  * queryengines.psv      - the query/engine timing results (pipe separated)
+  * results.psv           - the query/engine timing results (pipe separated)
   * environment.yaml      - machine / test-run environment
 
-alongside per-solution ``<solution>/stats.yaml`` table statistics. The run
-directory's name is its TESTDATE.
+alongside per-solution ``<solution>/stats.yaml`` table statistics. The run's
+"test date" is taken from environment.yaml; directory names carry no meaning.
 
-Every run contributes one entry per solution, keyed by the
-(datadate, machine, solution) triple. When several runs share a triple, only
-the entry from the run with the latest "test date" is kept.
+Entries are keyed by the (datadate, machine, solution) triple. A triple's
+measurements may be split across several run directories (e.g. one directory
+per thread count); all their thread counts are merged into a single entry.
+When the same thread count of a triple appears in several runs, only the run
+with the latest "test date" is kept; proprietary and data_size come from the
+latest run overall.
 
 The kept entries are written to a single JavaScript file in the style of
 https://github.com/ClickHouse/ClickBench/blob/main/data.generated.js :
@@ -160,39 +163,40 @@ def load_psv(psv_path: Path):
     return grouped, solutions
 
 
-def build_load_time(solution, threadcounts, grouped):
+def build_load_time(runs):
     """load_time as {load phase -> {thread count -> run1timeNS}}.
 
-    Phases are ordered by their PSV idx descending (0, -1, -2, -3), i.e. the
-    natural pipeline order: load a partition into memory, transform, sort, index.
+    ``runs`` maps thread count -> {"load": rows, "query": rows}. Phases are
+    ordered by their PSV idx descending (0, -1, -2, -3), i.e. the natural
+    pipeline order: load a partition into memory, transform, sort, index.
     """
     # phase description -> representative idx (for ordering)
     phase_idx = {}
     # thread count -> {phase description -> run1timeNS}
-    per_tc = {tc: {} for tc in threadcounts}
-    for tc in threadcounts:
-        for row in grouped[(solution, tc)]["load"]:
+    per_tc = {tc: {} for tc in runs}
+    for tc, rows in runs.items():
+        for row in rows["load"]:
             per_tc[tc][row["desc"]] = row["run1"]
             phase_idx.setdefault(row["desc"], row["idx"])
 
     load_time = OrderedDict()
     for desc in sorted(phase_idx, key=lambda d: phase_idx[d], reverse=True):
         load_time[desc] = OrderedDict(
-            (str(tc), per_tc[tc][desc]) for tc in threadcounts if desc in per_tc[tc]
+            (str(tc), per_tc[tc][desc]) for tc in sorted(runs) if desc in per_tc[tc]
         )
     return load_time
 
 
-def build_result(solution, threadcounts, grouped):
+def build_result(runs):
     """result as {thread count -> [[run1, run2, run3], ...]} ordered by query idx."""
     result = OrderedDict()
-    for tc in threadcounts:
-        query_rows = sorted(grouped[(solution, tc)]["query"], key=lambda r: r["idx"])
+    for tc in sorted(runs):
+        query_rows = sorted(runs[tc]["query"], key=lambda r: r["idx"])
         result[str(tc)] = [[r["run1"], r["run2"], r["run3"]] for r in query_rows]
     return result
 
 
-def build_entry(solution, threadcounts, grouped, date, machine, proprietary, data_size):
+def build_entry(solution, runs, date, machine, proprietary, data_size):
     return OrderedDict([
         ("solution", solution),
         ("datadate", date),
@@ -201,31 +205,27 @@ def build_entry(solution, threadcounts, grouped, date, machine, proprietary, dat
         ("hardware", "cpu"),
         ("tuned", "no"),
         ("tags", []),
-        ("load_time", build_load_time(solution, threadcounts, grouped)),
+        ("load_time", build_load_time(runs)),
         ("data_size", data_size),
-        ("result", build_result(solution, threadcounts, grouped)),
+        ("result", build_result(runs)),
     ])
 
 
 def process_run(run_dir: Path, machines: dict, mappings_path: Path):
-    """Build one entry per solution for a single benchmark run directory.
+    """Extract per-(solution, thread count) measurements from one run directory.
 
-    Yields (datadate, machine, solution, date, entry) tuples.
+    Yields (datadate, machine, solution, threadcount, date, payload) tuples,
+    where payload holds the load/query rows for that thread count plus the
+    solution's proprietary/data_size stats.
     """
-    testdate = run_dir.name
     env = yaml.safe_load((run_dir / "environment.yaml").read_text())
     date = str(env["test date"])
     datadate = str(env["parameters"]["datadate"])
-    # ISO-format an 8-digit datadate (20260401 -> 2026-04-01) for the entry's
-    # "date" field; leave any other format untouched.
-    datadate_iso = (f"{datadate[:4]}-{datadate[4:6]}-{datadate[6:8]}"
-                    if re.fullmatch(r"\d{8}", datadate) else datadate)
+    # ISO-format an 8-digit datadate (20260401 -> 2026-04-01); leave any other
+    # format untouched.
+    datadate = (f"{datadate[:4]}-{datadate[4:6]}-{datadate[6:8]}"
+                if re.fullmatch(r"\d{8}", datadate) else datadate)
     cpu_model = env["system"]["cpu"]["model"]
-
-    # The directory TESTDATE should agree with the environment's test date.
-    if re.sub(r"\D", "", testdate) != re.sub(r"\D", "", date):
-        print(f"warning: run directory TESTDATE {testdate!r} does not match "
-              f"environment.yaml test date {date!r} in {run_dir}", file=sys.stderr)
 
     if cpu_model not in machines:
         raise SystemExit(
@@ -234,11 +234,21 @@ def process_run(run_dir: Path, machines: dict, mappings_path: Path):
         )
     machine = machines[cpu_model]
 
-    # Per-solution stats (proprietary + data_size), keyed by directory name.
-    stats_dirs = {p.name: p for p in run_dir.iterdir()
-                  if p.is_dir() and (p / "stats.yaml").is_file()}
+    # Per-solution stats (proprietary + data_size). Newer runs sanitise the
+    # solution name for the directory ("DuckDB (Index)" -> "DuckDB_Index_")
+    # but record the real name on the stats.yaml "solution" line, so key by
+    # that when present and fall back to the directory name for older runs.
+    stats_dirs = {}
+    for p in run_dir.iterdir():
+        if not (p.is_dir() and (p / "stats.yaml").is_file()):
+            continue
+        stats_dirs.setdefault(p.name, p)
+        sol_match = re.search(r"^solution\s*:\s*(.+?)\s*$",
+                              (p / "stats.yaml").read_text(), re.MULTILINE)
+        if sol_match:
+            stats_dirs[sol_match.group(1).strip().strip("'\"")] = p
 
-    grouped, solutions = load_psv(run_dir / "queryengines.psv")
+    grouped, solutions = load_psv(run_dir / "results.psv")
 
     for solution in solutions:
         stats_dir = stats_dirs.get(solution)
@@ -250,10 +260,10 @@ def process_run(run_dir: Path, machines: dict, mappings_path: Path):
         else:
             proprietary, data_size = parse_stats(stats_dir / "stats.yaml")
 
-        threadcounts = sorted({tc for (sol, tc) in grouped if sol == solution})
-        entry = build_entry(solution, threadcounts, grouped, datadate_iso, machine,
-                            proprietary, data_size)
-        yield datadate, machine, solution, date, entry
+        for tc in sorted({tc for (sol, tc) in grouped if sol == solution}):
+            payload = dict(grouped[(solution, tc)],
+                           proprietary=proprietary, data_size=data_size)
+            yield datadate, machine, solution, tc, date, payload
 
 
 def main():
@@ -280,23 +290,36 @@ def main():
     mappings_path = args.mappings or find_mappings(input_dir)
     machines = yaml.safe_load(mappings_path.read_text()).get("machines", {})
 
-    # Discover runs: any directory holding both environment.yaml and queryengines.psv.
+    # Discover runs: any directory holding both environment.yaml and results.psv.
     run_dirs = sorted({env.parent for env in input_dir.rglob("environment.yaml")
-                       if (env.parent / "queryengines.psv").is_file()})
+                       if (env.parent / "results.psv").is_file()})
     if not run_dirs:
-        parser.error(f"No benchmark runs (environment.yaml + queryengines.psv) "
+        parser.error(f"No benchmark runs (environment.yaml + results.psv) "
                      f"found under {input_dir}")
 
-    # Keep only the latest-dated entry per (datadate, machine, solution) triple.
+    # Keep the latest-dated measurement per (datadate, machine, solution,
+    # threadcount); a triple's thread counts may be spread over several runs.
     latest = {}
     for run_dir in run_dirs:
-        for datadate, machine, solution, date, entry in process_run(
+        for datadate, machine, solution, tc, date, payload in process_run(
                 run_dir, machines, mappings_path):
-            key = (datadate, machine, solution)
+            key = (datadate, machine, solution, tc)
             if key not in latest or date > latest[key][0]:
-                latest[key] = (date, entry)
+                latest[key] = (date, payload)
 
-    entries = [latest[key][1] for key in sorted(latest)]
+    # Merge the thread counts of each triple into a single entry.
+    by_triple = defaultdict(dict)
+    for (datadate, machine, solution, tc), dated_payload in latest.items():
+        by_triple[(datadate, machine, solution)][tc] = dated_payload
+
+    entries = []
+    for (datadate, machine, solution) in sorted(by_triple):
+        runs = by_triple[(datadate, machine, solution)]
+        # proprietary/data_size from the latest-dated measurement of the triple
+        _, newest = max(runs.values(), key=lambda dated: dated[0])
+        entries.append(build_entry(
+            solution, {tc: payload for tc, (_, payload) in runs.items()},
+            datadate, machine, newest["proprietary"], newest["data_size"]))
 
     # Match ClickBench data.generated.js: leading commas on every entry except
     # the first (a leading comma on the first line would create an array hole),
