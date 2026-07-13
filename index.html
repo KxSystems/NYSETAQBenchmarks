@@ -330,16 +330,16 @@
             color: var(--link-hover-color);
         }
 
-        #details {
+        #details, #load_times {
             padding-bottom: 1rem;
         }
 
-        #details th {
+        #details th, #load_times th {
             vertical-align: bottom;
             white-space: pre;
         }
 
-        #details td {
+        #details td, #load_times td {
             white-space: pre;
             font-family: monospace;
             text-align: right;
@@ -439,7 +439,7 @@
             filter: contrast(10%);
         }
     </style>
-    <script type="text/javascript" src="results/inmemory/small/data.generated.js"></script>
+    <script type="text/javascript" src="results/inmemory/data.generated.js"></script>
     <!-- Fallback copy of querymeta.psv for when the page is opened via file:// and fetch() is blocked.
          Refreshed by pysrc/convertToClickBenchFormat.py -->
     <script type="text/javascript" src="artifacts/queries/inmemory/querymeta.generated.js"></script>
@@ -521,6 +521,11 @@
         <td id="selectors_instrument">
         </td>
     </tr>
+    <tr id="complexity-row" title="How involved the query logic is; only queries of the selected complexities are compared.">
+        <th>Complexity filter: </th>
+        <td id="selectors_complexity">
+        </td>
+    </tr>
     <tr id="tag-include-row" title="Only queries carrying at least one of the selected tags are compared. Nothing selected = all queries.">
         <th>Include tags: </th>
         <td id="selectors_tag_include">
@@ -574,6 +579,19 @@
     </tbody>
 </table>
 
+<div class="stick-left comparison" id="load-times-heading">
+    <h2>Load Times</h2>
+</div>
+
+<table id="load_times">
+    <thead>
+        <tr id="load_times_head">
+        </tr>
+    </thead>
+    <tbody id="load_times_body">
+    </tbody>
+</table>
+
 <script type="text/javascript">
 
 const constant_time_add = 0.01;
@@ -588,6 +606,7 @@ const load_phase_order = ['load a partition into memory', 'transform', 'sort', '
 let queries = [];
 let query_tags = [];
 let query_instrument = [];
+let query_complexity = [];
 
 /// Values of the mandatory `instrument` column of querymeta.psv, with their selector labels.
 /// They get their own "Instrument filter" selector instead of the generic tag filters.
@@ -608,6 +627,14 @@ const instrument_multi_values = {
     '1000infreq': '1000 infreq',
 };
 
+/// Values of the complexity:<value> tags in querymeta.psv, with their selector labels.
+/// They get their own "Complexity filter" selector instead of the generic tag filters.
+const complexity_values = {
+    'simple': 'simple',
+    'advanced': 'advanced',
+    'complex': 'complex',
+};
+
 let selectors = {
     "solution": {},
     "machine": null,
@@ -619,6 +646,7 @@ let selectors = {
     "tuned": {"no": true, "yes": false},
     "metric": "hot",
     "instrument": {},
+    "complexity": {},
     "tag_include": {},
     "tag_exclude": {},
     "queries": [],
@@ -650,6 +678,7 @@ let dates = document.getElementById('selectors_date');
 let threads = document.getElementById('selectors_threads');
 let baselines = document.getElementById('selectors_baseline');
 let instruments = document.getElementById('selectors_instrument');
+let complexities = document.getElementById('selectors_complexity');
 let tag_includes = document.getElementById('selectors_tag_include');
 let tag_excludes = document.getElementById('selectors_tag_exclude');
 
@@ -790,7 +819,12 @@ async function loadQueryMeta() {
             const fields = line.split('|');
             const comment = (fields[idx_comment] ?? '').trim();
             queries.push(fields[idx_description] + (comment ? ` (${comment})` : ''));
-            query_tags.push((fields[idx_tags] ?? '').split(',').map(t => t.trim()).filter(t => t !== ''));
+            const tags = (fields[idx_tags] ?? '').split(',').map(t => t.trim()).filter(t => t !== '');
+            /// complexity:<value> tags feed the dedicated "Complexity filter" selector,
+            /// so they are kept out of the generic include/exclude tag lists.
+            const complexity_tag = tags.find(t => t.startsWith('complexity:'));
+            query_complexity.push(complexity_tag ? complexity_tag.split(':')[1] : '');
+            query_tags.push(tags.filter(t => !t.startsWith('complexity:')));
             query_instrument.push((fields[idx_instrument] ?? '').trim());
         });
     }
@@ -798,6 +832,7 @@ async function loadQueryMeta() {
     const all_tags = [...new Set(query_tags.flat())].sort();
     if (query_tags.length == 0) {
         document.getElementById('instrument-row').style.display = 'none';
+        document.getElementById('complexity-row').style.display = 'none';
         document.getElementById('tag-include-row').style.display = 'none';
         document.getElementById('tag-exclude-row').style.display = 'none';
         return;
@@ -833,6 +868,16 @@ async function loadQueryMeta() {
         });
     });
 
+    Object.entries(complexity_values).forEach(([value, label]) => {
+        let selector = document.createElement('a');
+        selector.className = 'selector selector-active';
+        selector.appendChild(document.createTextNode(label));
+        selector.dataset.tag = value;
+        complexities.appendChild(selector);
+        selectors.complexity[value] = true;
+        selector.addEventListener('click', e => toggle(e, value, 'complexity'));
+    });
+
     [[tag_includes, 'tag_include'], [tag_excludes, 'tag_exclude']].forEach(([container, selectors_key]) => {
         all_tags.forEach(tag => {
             let selector = document.createElement('a');
@@ -845,9 +890,9 @@ async function loadQueryMeta() {
     });
 }
 
-/// A query takes part in the comparison when its instrument scope is selected, it carries
-/// at least one of the included tags (no included tags = no restriction) and none of the
-/// excluded ones.
+/// A query takes part in the comparison when its instrument scope and complexity are
+/// selected, it carries at least one of the included tags (no included tags = no
+/// restriction) and none of the excluded ones.
 function queryPassesTagFilters(query_num) {
     const tags = query_tags[query_num] ?? [];
     const instrument = query_instrument[query_num];
@@ -858,7 +903,9 @@ function queryPassesTagFilters(query_num) {
     const [base, sub] = (instrument || '').split(':');
     const instrument_ok = !instrument ||
         (selectors.instrument[base] !== false && (!sub || selectors.instrument[sub] !== false));
-    return instrument_ok &&
+    const complexity = query_complexity[query_num];
+    const complexity_ok = !complexity || selectors.complexity[complexity] !== false;
+    return instrument_ok && complexity_ok &&
         (!include_active || tags.some(tag => selectors.tag_include[tag])) &&
         !tags.some(tag => selectors.tag_exclude[tag]);
 }
@@ -973,6 +1020,8 @@ function updateSelectors() {
     [...instruments.querySelectorAll('a')].map(elem => {
         elem.className = selectors.instrument[elem.dataset.tag] ? 'selector selector-active' : 'selector' });
     refreshInstrumentFreqEnabled();
+    [...complexities.querySelectorAll('a')].map(elem => {
+        elem.className = selectors.complexity[elem.dataset.tag] ? 'selector selector-active' : 'selector' });
     [...tag_includes.querySelectorAll('a')].map(elem => {
         elem.className = selectors.tag_include[elem.innerText] ? 'selector selector-active' : 'selector' });
     [...tag_excludes.querySelectorAll('a')].map(elem => {
@@ -1275,9 +1324,13 @@ function colorize(elem, ratio) {
 function render() {
     let details_head = document.getElementById('details_head');
     let details_body = document.getElementById('details_body');
+    let load_times_head = document.getElementById('load_times_head');
+    let load_times_body = document.getElementById('load_times_body');
 
     clearElement(details_head);
     clearElement(details_body);
+    clearElement(load_times_head);
+    clearElement(load_times_body);
 
     reconcile();
 
@@ -1345,16 +1398,30 @@ function render() {
         details_head.appendChild(th);
     });
 
-    /// Load times, one row per load phase
-    load_phase_order.filter(phase =>
-        filtered_data.some(elem => elem.load_time?.[phase]?.[selectors.threads] != null)
-    ).forEach(phase => {
+    /// Load times, one row per load phase, in their own table at the bottom of the page
+    const load_phases = load_phase_order.filter(phase =>
+        filtered_data.some(elem => elem.load_time?.[phase]?.[selectors.threads] != null));
+
+    document.getElementById('load-times-heading').style.display = load_phases.length ? '' : 'none';
+
+    if (load_phases.length) {
+        load_times_head.appendChild(document.createElement('th'));
+        sorted_indices.map(idx => {
+            const elem = filtered_data[idx];
+            let th = document.createElement('th');
+            th.appendChild(document.createTextNode(elem.solution));
+            th.className = 'th-entry';
+            th.dataset.solution = elem.solution;
+            load_times_head.appendChild(th);
+        });
+    }
+
+    load_phases.forEach(phase => {
         let tr = document.createElement('tr');
         tr.className = 'shadow';
 
         let td_title = document.createElement('td');
-        td_title.colSpan = 2;
-        td_title.appendChild(document.createTextNode(`Load time, ${phase}: `));
+        td_title.appendChild(document.createTextNode(`${phase}: `));
         tr.appendChild(td_title);
 
         const baseline_ns = baseline_entry.load_time?.[phase]?.[selectors.threads];
@@ -1372,7 +1439,7 @@ function render() {
             tr.appendChild(td);
         });
 
-        details_body.appendChild(tr);
+        load_times_body.appendChild(tr);
     });
 
     /// Data sizes
@@ -1564,6 +1631,10 @@ function applyStateDefaults() {
             [...Object.keys(instrument_values), ...Object.keys(instrument_freq_values),
              ...Object.keys(instrument_multi_values)]
                 .map(value => [value, true]));
+    }
+    if (!selectors.complexity) {
+        selectors.complexity = Object.fromEntries(
+            Object.keys(complexity_values).map(value => [value, true]));
     }
     if (!selectors.tag_include) {
         selectors.tag_include = allFalseTagMap();
