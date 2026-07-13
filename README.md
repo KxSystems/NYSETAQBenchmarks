@@ -24,11 +24,10 @@ SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/$
 
 # Step 4: run the benchmark
 export NUMANODE=0
-TESTDATE=$(date +%Y%m%d)
-./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/${TESTDATE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE} --threads "4 16" --result-dir ./results/inmemory/${SIZE}
 ```
 
-Results are written to `./results/inmemory/${SIZE}/${TESTDATE}/queryengines.psv` (one row per
+Results are written to `./results/inmemory/${SIZE}/results.psv` (one row per
 query, as a pipe-separated values file). See [Results](#results) for the column
 descriptions.
 
@@ -170,8 +169,8 @@ Once the on-disk data has been generated, you can start the benchmark. Python li
 
 ```bash
 export NUMANODE=0
-TESTDATE=$(date +%Y%m%d)
-./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE}  --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/${TESTDATE}/queryengines.psv --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}
+TESTTIME="$(date +%Y%m%d_%H:%M)"
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE}  --threads "0 4 16 64" --result-dir ./results/inmemory/${SIZE}/${TESTTIME}
 ```
 
 The script accepts the following mandatory parameters:
@@ -188,9 +187,8 @@ And the following optional parameters:
 | --- | --- |
 | `-t`, `--threads` | Space-separated list of secondary-thread counts to test, e.g. `"0 4 16 64"`. Each engine runs once per value. Default: `"1 4"`. |
 | `-e`, `--engines` | Comma-separated subset of engines to run. Valid values: `kdb`, `kdbxsql`, `duckdb`, `polars`, `pykx`, `pandas`. Default: all of them. |
-| `-s`, `--stats-dir` | Directory to save per-table statistics (one YAML file per table, plus OS `time -v` output). Default: `./results/inmemory/queryengines`. |
 | `-i`, `--idx` | Filter queries by index: single (`42`), comma-separated list (`32,42,50`), or range (`40-44`). Default: run all queries. |
-| `--results` | Single PSV file that all per-engine results are merged into. The individual per-engine files are written to a temporary directory and removed afterwards. Default: `./results/inmemory/queryengines.psv`. |
+| `-r`, `--result-dir` | Single PSV file that all per-engine results are merged into. The individual per-engine files are written to a temporary directory and removed afterwards. Default: `./results/inmemory`. |
 | `-q`, `--query-output-dir` | Directory to persist query outputs. Each engine writes its results as `queryoutput_<idx>.csv` into a per-engine subdirectory, for cross-engine correctness checks (see [Verifying Query Output Correctness](#verifying-query-output-correctness)). Default: outputs are not persisted. |
 | `-h`, `--help` | Show usage and exit. |
 
@@ -260,8 +258,8 @@ Once the on-disk data has been generated, you can start the benchmark. To test w
 
 ```bash
 export NUMANODE=0
-TESTDATE=$(date +%Y%m%d)
-./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE} --threads "0 4 16 64" --results ./results/inmemory/${SIZE}/${TESTDATE}/kdbattr.psv --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}
+TESTTIME="$(date +%Y%m%d_%H%M)"
+./benchmarks/inmemory/kdbAttributes.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE} --threads "0 4 16 64" --result-dir ./results/inmemory/${SIZE}/${TESTTIME}
 ```
 
 #### Results

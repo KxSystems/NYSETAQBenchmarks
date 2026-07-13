@@ -174,33 +174,31 @@ rm -rf ${NYSEBENCHMARKDIR}/${SIZE}/psv
 `--db-dir` is the per-size directory (`${NYSEBENCHMARKDIR}/${SIZE}`), **not** the
 `kdb`/`parquet` subdirectory — the scripts append those themselves.
 
-Results are written under a per-run `TESTDATE` subdirectory (`$(date +%Y%m%d)`)
-so successive runs don't overwrite each other. Set it once per run.
+Results are written under the directory given by `--result-dir`. Use a per-run
+subdirectory (e.g. a timestamp) so successive runs don't overwrite each other.
 
 ### Query-engine benchmark
 ```bash
 export NUMANODE=0   # optional: pins CPU+memory to NUMA node 0 via numactl
-TESTDATE=$(date +%Y%m%d)
+TESTTIME="$(date +%Y%m%d_%H%M)"
 ./benchmarks/inmemory/queryEngines.sh \
   --db-dir   ${NYSEBENCHMARKDIR}/${SIZE} \
   --param-dir ./artifacts/parameters/${SIZE} \
   --datadate ${DATADATE} \
   --threads  "0 4 16 64" \
-  --results  ./results/inmemory/${SIZE}/${TESTDATE}/queryengines.psv \
-  --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}
+  --result-dir ./results/inmemory/${SIZE}/${TESTTIME}
 ```
 
 ### Attribute / table-format benchmark
 ```bash
 export NUMANODE=0
-TESTDATE=$(date +%Y%m%d)
+TESTTIME="$(date +%Y%m%d_%H%M)"
 ./benchmarks/inmemory/kdbAttributes.sh \
   --db-dir   ${NYSEBENCHMARKDIR}/${SIZE} \
   --param-dir ./artifacts/parameters/${SIZE} \
   --datadate ${DATADATE} \
   --threads  "0 4 16 64" \
-  --results  ./results/inmemory/${SIZE}/${TESTDATE}/kdbattr.psv \
-  --stats-dir ./results/inmemory/${SIZE}/${TESTDATE}
+  --result-dir ./results/inmemory/${SIZE}/${TESTTIME}
 ```
 
 ### Arguments
@@ -212,10 +210,9 @@ Optional:
 | --- | --- | --- |
 | `-t`, `--threads` | space-separated secondary-thread counts to test; each engine runs once per value (`0` = no secondary threads) | `"1 4"` |
 | `-e`, `--engines` | (queryEngines only) comma-separated subset of `kdb,kdbxsql,duckdb,polars,pykx,pandas` | all |
-| `-s`, `--stats-dir` | per-table stats (one YAML per table + `time -v` output) | `./results/inmemory/<bench>` |
 | `-i`, `--idx` | run a subset of queries: `42`, `32,42,50`, or range `40-44` | all |
 | `-q`, `--query-output-dir` | persist each engine's query outputs as `queryoutput_<idx>.csv` (per-engine subdir) for cross-engine correctness checks | not persisted |
-| `-r`, `--results` | single merged output PSV | `./results/inmemory/<bench>.psv` |
+| `-r`, `--result-dir` | directory for the merged `results.psv`, plus per-solution stats (`<solution>/stats.yaml` + `os.txt`) and `environment.yaml` | `./results/inmemory` |
 | `-h`, `--help` | usage | — |
 
 Tips for narrowing a run while iterating:
@@ -236,8 +233,8 @@ Tips for narrowing a run while iterating:
 
 ## Reading the results
 
-Both scripts emit one merged **pipe-separated (PSV)** file (`--results`): a
-header row, one row per query, plus setup rows. Key columns:
+Both scripts emit one merged **pipe-separated (PSV)** file, `results.psv`, in the
+`--result-dir`: a header row, one row per query, plus setup rows. Key columns:
 
 - `runner` / `engine` — harness and engine (e.g. `KDB-X`/`kdb`, `Python`/`duckdb_con`).
 - `solution` — distinguishes runs of the same engine with different sort/index
@@ -252,8 +249,9 @@ header row, one row per query, plus setup rows. Key columns:
   IO columns should be ~0 for these in-memory benchmarks.
 
 When comparing engines, compare warm runs (`run2`/`run3`) at the same
-`threadcount` and `idx`. Per-table stats and OS `time -v` output land under
-`--stats-dir`.
+`threadcount` and `idx`. Per-table stats and OS `time -v` output land in
+per-solution subdirectories of `--result-dir` (`<solution>/stats.yaml` and
+`<solution>/os.txt`).
 
 ## Troubleshooting
 
@@ -268,4 +266,5 @@ When comparing engines, compare warm runs (`run2`/`run3`) at the same
 - **Out-of-memory on `medium`+ with Community Edition** — drop to `small`, or use
   a non-Community KDB-X license.
 - A single engine erroring shows up as `status=error` rows rather than aborting
-  the suite — inspect those rows and the `--stats-dir` `os.txt` for the cause.
+  the suite — inspect those rows and the per-solution `os.txt` under
+  `--result-dir` for the cause.

@@ -38,7 +38,7 @@ SIZE=full SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${TESTPSV} 
 rm -rf ${RESULTDIR}
 
 PARAM_DIR=./artifacts/parameters/test
-./benchmarks/inmemory/queryEngines.sh --db-dir ${TESTDB} --param-dir ${PARAM_DIR} --date ${TESTDBDATE} --threads "4 16" --results ${RESULTDIR}/queryengines.psv --stats-dir ${RESULTDIR}/queryengines
-./benchmarks/inmemory/kdbAttributes.sh --db-dir ${TESTDB} --param-dir ${PARAM_DIR} --date ${TESTDBDATE} --threads "4 16" --results ${RESULTDIR}/kdbattr.psv --stats-dir ${RESULTDIR}/kdbattr
+./benchmarks/inmemory/queryEngines.sh --db-dir ${TESTDB} --param-dir ${PARAM_DIR} --date ${TESTDBDATE} --threads "4 16" --result-dir ${RESULTDIR}
+./benchmarks/inmemory/kdbAttributes.sh --db-dir ${TESTDB} --param-dir ${PARAM_DIR} --date ${TESTDBDATE} --threads "4 16" --result-dir ${RESULTDIR}
 
 popd
