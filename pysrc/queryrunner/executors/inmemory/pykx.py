@@ -89,7 +89,7 @@ class QueryExecutorPyKXInMemory:
             table_stats = {
                 "name": t_name,
                 "size (MB)": (s / 1024 if (s := self.get_table_size(df)) is not None else None),
-                "rowCount": df.size.py(),
+                "rowCount": len(df),
                 "columnCount": df.shape[1].py(),
                 "columns": [{"name": n.py(), "type": t.py().decode()} for n, t in zip(df.dtypes["columns"], df.dtypes["datatypes"])],
             }

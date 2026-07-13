@@ -121,6 +121,36 @@ function run_solution () {
     add_solution_name "${solution}" ${result} ${RESULT_DIR}/${safe}/stats.yaml
 }
 
+# Check that every solution reports the same rowCount and columnCount for each
+# table (master, trade, quote) in its stats.yaml. A mismatch means an engine
+# loaded a different dataset, so its results would not be comparable.
+function check_table_stats () {
+    local files=()
+    while IFS= read -r f; do
+        files+=("$f")
+    done < <(find "${RESULT_DIR}" -mindepth 2 -maxdepth 2 -type f -name 'stats.yaml' | sort)
+
+    [[ ${#files[@]} -gt 0 ]] || return 0
+
+    echo "Checking table stats consistency across ${#files[@]} stats.yaml file(s)..."
+    awk '
+        /^solution: /       { sol = substr($0, 11) }
+        /^  name: /         { tbl = $2 }
+        /^  rowCount: /     { check("rowCount", $2) }
+        /^  columnCount: /  { check("columnCount", $2) }
+        function check(what, val,    key) {
+            key = tbl "/" what
+            if (!(key in ref)) {
+                ref[key] = val
+                refsol[key] = sol
+            } else if (ref[key] != val) {
+                printf "WARNING: %s MISMATCH for table %s: %s reports %s but %s reports %s\n", \
+                    toupper(what), tbl, sol, val, refsol[key], ref[key]
+            }
+        }
+    ' "${files[@]}"
+}
+
 function merge_results () {
     local RESULT_FILE="${RESULT_DIR}/results.psv"
     mkdir -p "${RESULT_DIR}"
@@ -152,6 +182,7 @@ function run_suite () {
     save_environment "${RESULT_DIR}/environment.yaml"
     execute_queries
     merge_results
+    check_table_stats
 
     echo "Benchmark suite complete."
     end_time=$(date +%s)

@@ -65,14 +65,15 @@ export SIZE=small
 * Only the corresponding trades are converted into the HDB (for example, only
   symbols whose names start with `Z`).
 
-The following statistics are based on data from 2025-01-02:
+The following statistics are based on data from 2026-04-01:
 
 | `SIZE` | Recommended for | Symbol first letters | HDB size (GB) | Nr of quote symbols | Nr of quotes |
 | --- | --- | --- | ---: | ---: | ---: |
-| `small` | A quick test to get familiar with the benchmark suite | Z | 1 | 94 | 4 607 158 |
-| `medium` | For KDB-X Community Edition users | I | 13 | 555 | 180 827 332 |
-| `large` | Users with an unlimited KDB-X license but limited memory | A–H | 52 | 4 849 | 707 738 295 |
-| `full` | The most thorough testing | A–Z | 233 | 11 155 | 2 313 872 956 |
+| `small` | A quick test to get familiar with the benchmark suite | Z | 1 | 259 | 9 422 051 |
+| `medium` | For KDB-X Community Edition users | X-Z | 9 | 909 | 143 336 607 |
+| `large` | Users with an unlimited KDB-X license but limited memory | T-Z | 39 | 4 018 | 588 006 863 |
+| `xlarge` | Users with an unlimited KDB-X license, lots of memory and limited time | O-Z | 85 | 9 614 | 1 212 311 903 |
+| `full` | The most thorough testing | A–Z | 186 | 26 396 | 2 860 612 301 |
 
 Use `medium` when running the benchmark with KDB-X Community Edition, which
 enforces a memory limit.
