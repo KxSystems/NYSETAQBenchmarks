@@ -43,6 +43,9 @@ entry mirrors the ClickBench result format with these differences:
                    phases present ("load a partition into memory", "transform",
                    "sort", "index")
   * data_size    : sum of "size (MB)" over tables in stats.yaml
+  * max_res_mem_kb : "Maximum resident set size (kbytes)" of the solution's
+                   process, from the per-solution os.txt (/usr/bin/time -v
+                   output)
   * result       : {thread count -> [[run1, run2, run3], ...]} per query
 
 Alongside the data file this also refreshes
@@ -117,6 +120,19 @@ def parse_stats(stats_path: Path):
         total = int(total)
 
     return proprietary, total
+
+
+def parse_max_res_mem(os_txt_path: Path):
+    """Return "Maximum resident set size (kbytes)" from a solution's os.txt.
+
+    The file is the ``/usr/bin/time -v`` output of the solution's benchmark
+    process; None when the file or the line is missing.
+    """
+    if not os_txt_path.is_file():
+        return None
+    match = re.search(r"Maximum resident set size \(kbytes\)\s*:\s*(\d+)",
+                      os_txt_path.read_text())
+    return int(match.group(1)) if match else None
 
 
 def to_int(value: str):
@@ -196,7 +212,7 @@ def build_result(runs):
     return result
 
 
-def build_entry(solution, runs, date, machine, proprietary, data_size):
+def build_entry(solution, runs, date, machine, proprietary, data_size, max_res_mem):
     return OrderedDict([
         ("solution", solution),
         ("datadate", date),
@@ -207,6 +223,7 @@ def build_entry(solution, runs, date, machine, proprietary, data_size):
         ("tags", []),
         ("load_time", build_load_time(runs)),
         ("data_size", data_size),
+        ("max_res_mem_kb", max_res_mem),
         ("result", build_result(runs)),
     ])
 
@@ -253,16 +270,18 @@ def process_run(run_dir: Path, machines: dict, mappings_path: Path):
     for solution in solutions:
         stats_dir = stats_dirs.get(solution)
         if stats_dir is None:
-            proprietary, data_size = None, None
+            proprietary, data_size, max_res_mem = None, None, None
             print(f"warning: no stats.yaml directory found for solution "
-                  f"{solution!r} in {run_dir}; proprietary/data_size set to null",
-                  file=sys.stderr)
+                  f"{solution!r} in {run_dir}; proprietary/data_size/"
+                  f"max_res_mem_kb set to null", file=sys.stderr)
         else:
             proprietary, data_size = parse_stats(stats_dir / "stats.yaml")
+            max_res_mem = parse_max_res_mem(stats_dir / "os.txt")
 
         for tc in sorted({tc for (sol, tc) in grouped if sol == solution}):
             payload = dict(grouped[(solution, tc)],
-                           proprietary=proprietary, data_size=data_size)
+                           proprietary=proprietary, data_size=data_size,
+                           max_res_mem=max_res_mem)
             yield datadate, machine, solution, tc, date, payload
 
 
@@ -315,11 +334,13 @@ def main():
     entries = []
     for (datadate, machine, solution) in sorted(by_triple):
         runs = by_triple[(datadate, machine, solution)]
-        # proprietary/data_size from the latest-dated measurement of the triple
+        # proprietary/data_size/max_res_mem from the latest-dated measurement
+        # of the triple
         _, newest = max(runs.values(), key=lambda dated: dated[0])
         entries.append(build_entry(
             solution, {tc: payload for tc, (_, payload) in runs.items()},
-            datadate, machine, newest["proprietary"], newest["data_size"]))
+            datadate, machine, newest["proprietary"], newest["data_size"],
+            newest["max_res_mem"]))
 
     # Match ClickBench data.generated.js: leading commas on every entry except
     # the first (a leading comma on the first line would create an array hole),

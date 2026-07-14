@@ -210,25 +210,40 @@
             min-width: 0;
         }
 
-        #winners-panel {
-            flex: 0 0 33%;
-            max-width: 33%;
+        .summary-charts {
+            display: flex;
+            align-items: flex-start;
+            gap: 2rem;
+            padding-top: 1.5rem;
+        }
+
+        #winners-panel, #memory-panel {
+            flex: 1 1 50%;
+            max-width: 50%;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
 
-        #winners-title {
+        #winners-title, #memory-title {
             font-weight: bold;
             text-align: center;
             padding-bottom: 0.5rem;
         }
 
-        #winners-hint {
+        #winners-hint, #memory-hint {
             font-weight: normal;
             font-size: 80%;
             filter: contrast(10%);
+        }
+
+        #memory-table {
+            width: 100%;
+        }
+
+        #memory-table tr:nth-child(odd) {
+            background: var(--summary-every-other-row-color);
         }
 
         #winners-pie {
@@ -555,12 +570,21 @@
         <tbody id="summary">
         </tbody>
     </table>
+</div>
+
+<div class="stick-left comparison summary-charts">
     <div id="winners-panel">
         <div id="winners-title">Wins per solution<br/>
             <span id="winners-hint">on how many of the compared queries the solution posts the fastest time</span>
         </div>
         <svg id="winners-pie" viewBox="-1.05 -1.05 2.1 2.1" role="img" aria-label="Pie chart of win counts per solution"></svg>
         <div id="winners-legend"></div>
+    </div>
+    <div id="memory-panel">
+        <div id="memory-title">Max Res Mem (kb)<br/>
+            <span id="memory-hint">maximum resident set size of the benchmark process; not affected by the query filters</span>
+        </div>
+        <table id="memory-table" aria-label="Bar chart of maximum resident memory per solution"></table>
     </div>
 </div>
 
@@ -1168,6 +1192,48 @@ function renderWinnersPie(filtered_data) {
     });
 }
 
+/// Bar chart of each solution's peak memory use (max_res_mem_kb). The value describes
+/// the whole benchmark run, so unlike the pie it is not affected by the query filters.
+function renderMemoryChart(filtered_data) {
+    const table = document.getElementById('memory-table');
+    clearElement(table);
+
+    const with_mem = filtered_data.filter(elem => elem.max_res_mem_kb != null);
+    document.getElementById('memory-panel').style.display = with_mem.length ? '' : 'none';
+    if (!with_mem.length) { return; }
+
+    const max_value = Math.max(...with_mem.map(elem => elem.max_res_mem_kb));
+    [...with_mem].sort((a, b) => a.max_res_mem_kb - b.max_res_mem_kb).forEach(elem => {
+        let tr = document.createElement('tr');
+        tr.title = `${elem.solution}: ${elem.max_res_mem_kb.toLocaleString('en-US')} kb maximum resident set size`;
+
+        let td_name = document.createElement('td');
+        td_name.className = 'summary-name';
+        let name = document.createElement('span');
+        name.style.color = solutionColor(elem.solution);
+        name.appendChild(document.createTextNode(elem.solution));
+        td_name.appendChild(name);
+        td_name.appendChild(document.createTextNode(': '));
+
+        let td_bar = document.createElement('td');
+        td_bar.className = 'summary-bar-cell';
+        let bar = document.createElement('div');
+        bar.className = 'summary-bar';
+        bar.style.width = `${elem.max_res_mem_kb / max_value * 100}%`;
+        bar.style.background = solutionColor(elem.solution);
+        td_bar.appendChild(bar);
+
+        let td_number = document.createElement('td');
+        td_number.className = 'summary-number';
+        td_number.appendChild(document.createTextNode(elem.max_res_mem_kb.toLocaleString('en-US')));
+
+        tr.appendChild(td_name);
+        tr.appendChild(td_bar);
+        tr.appendChild(td_number);
+        table.appendChild(tr);
+    });
+}
+
 function renderSummary(filtered_data, baseline_runs) {
     let table = document.getElementById('summary');
     clearElement(table);
@@ -1269,6 +1335,7 @@ function renderSummary(filtered_data, baseline_runs) {
     });
 
     renderWinnersPie(filtered_data);
+    renderMemoryChart(filtered_data);
 
     return sorted_indices;
 }
