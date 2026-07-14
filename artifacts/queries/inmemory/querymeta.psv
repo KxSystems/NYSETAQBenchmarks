@@ -1,5 +1,5 @@
 idx|tags|instrument|description|sortby|comment
-1|complexity:simple,rawcolumn,timefilter,originalorder|all|select all quotes before 8am|time,idx|
+1|complexity:simple,rawcolumn,timefilter|all|select all quotes before 8am|time,idx|
 2|complexity:simple,emptyresult,rawcolumn|all|query trade with a single filter that filters out everything|time,idx|
 3|complexity:simple,manydummyfilters,rawcolumn,timefilter|all|query contains multiple filters that do not filter out anything|time,idx|
 4|complexity:simple,rawcolumn,timefilter|all|filter trades within a 10-second window at 10:00am|time,idx|
@@ -26,8 +26,8 @@ idx|tags|instrument|description|sortby|comment
 25|complexity:advanced,pivot,groupby:2|single:frequent|pivot 10-minute average liquidity-weighted mid quote by exchange for an instrument|minute|
 26|complexity:advanced,pivot,groupby:2|multi:50|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments|minute|
 27|complexity:advanced,pivot,groupby:2|multi:1000infreq|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments|minute|
-28|complexity:advanced,pivot,fillforward,groupby:2|multi:50|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments with forward fill for missing values|minute|
-29|complexity:advanced,pivot,fillforward,groupby:2|multi:1000infreq|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments with forward fill for missing values|minute|
+28|complexity:advanced,pivot,groupby:2|multi:50|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments with forward fill for missing values|minute|
+29|complexity:advanced,pivot,groupby:2|multi:1000infreq|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments with forward fill for missing values|minute|
 30|complexity:simple,groupby:1|single:infrequent|calculate average bid-ask spread in 10-minute buckets for an instrument|minute|
 31|complexity:simple,groupby:1|single:frequent|calculate average bid-ask spread in 10-minute buckets for an instrument|minute|
 32|complexity:simple,groupby:2|multi:50|calculate average bid-ask spread in 10-minute buckets per instrument for a set of instruments|sym,minute|

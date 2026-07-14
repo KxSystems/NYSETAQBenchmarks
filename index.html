@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>NYSE TAQ Benchmark — In-Memory Query Engines</title>
+    <title>KX NYSE TAQ Benchmark — In-Memory Query Engines</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -226,23 +226,27 @@
             align-items: center;
         }
 
-        #winners-title, #memory-title {
+        #winners-title, #memory-title, #datasize-title {
             font-weight: bold;
             text-align: center;
             padding-bottom: 0.5rem;
         }
 
-        #winners-hint, #memory-hint {
+        #datasize-title {
+            padding-top: 1.5rem;
+        }
+
+        #winners-hint, #memory-hint, #datasize-hint {
             font-weight: normal;
             font-size: 80%;
             filter: contrast(10%);
         }
 
-        #memory-table {
+        #memory-table, #datasize-table {
             width: 100%;
         }
 
-        #memory-table tr:nth-child(odd) {
+        #memory-table tr:nth-child(odd), #datasize-table tr:nth-child(odd) {
             background: var(--summary-every-other-row-color);
         }
 
@@ -361,6 +365,15 @@
             padding: 0.1rem 0.5rem 0.1rem 0.5rem;
         }
 
+        /* Anchor for the per-cell engine query tooltips */
+        #details td {
+            position: relative;
+        }
+
+        #details td:hover > .tooltip-engine-query {
+            visibility: visible;
+        }
+
         .shadow:hover {
             box-shadow: 0 0 1rem var(--shadow-color);
             position: relative;
@@ -425,6 +438,33 @@
         .tooltip-query::after {
             left: 3rem;
             margin-left: 0.5rem;
+        }
+
+        /* The engine query of one result cell; anchored on the cell edge away
+           from the nearer side of the table so it stays on screen. */
+        .tooltip-engine-query {
+            right: 0;
+            width: max-content;
+            max-width: 44rem;
+            font-family: monospace;
+            font-size: 90%;
+            font-weight: normal;
+            white-space: pre;
+            text-align: left;
+        }
+
+        .tooltip-engine-query::after {
+            right: 1rem;
+        }
+
+        .tooltip-engine-query-left {
+            left: 0;
+            right: auto;
+        }
+
+        .tooltip-engine-query-left::after {
+            left: 1rem;
+            right: auto;
         }
 
         .nowrap {
@@ -585,6 +625,10 @@
             <span id="memory-hint">maximum resident set size of the benchmark process; not affected by the query filters</span>
         </div>
         <table id="memory-table" aria-label="Bar chart of maximum resident memory per solution"></table>
+        <div id="datasize-title">Data size (MB)<br/>
+            <span id="datasize-hint">in-memory size of the loaded tables; not affected by the query filters</span>
+        </div>
+        <table id="datasize-table" aria-label="Bar chart of in-memory data size per solution"></table>
     </div>
 </div>
 
@@ -914,6 +958,83 @@ async function loadQueryMeta() {
     });
 }
 
+const sql_clauses = ['ASOF LEFT JOIN', 'ASOF JOIN', 'LEFT JOIN', 'INNER JOIN', 'CROSS JOIN',
+    'FULL JOIN', 'GROUP BY', 'ORDER BY', 'PARTITION BY', 'FROM', 'WHERE', 'HAVING',
+    'QUALIFY', 'WINDOW', 'LIMIT', 'UNION', 'JOIN', 'ON'];
+
+/// Insert a line break before each keyword found outside string literals, indented
+/// two spaces per bracket depth (plus extra_indent levels). Shared by the SQL and
+/// q formatters; keywords must be uppercase, sources are matched case-insensitively.
+function breakBeforeKeywords(query, keywords, extra_indent, string_quotes) {
+    let out = '';
+    let depth = 0, quote = null, skip_until = 0;
+    for (let i = 0; i < query.length; ++i) {
+        const c = query[i];
+        if (quote) { out += c; if (c == quote) quote = null; continue; }
+        if (string_quotes.includes(c)) { quote = c; out += c; continue; }
+        if ('([{'.includes(c)) ++depth;
+        else if (')]}'.includes(c)) --depth;
+        else if (i >= Math.max(skip_until, 1) && /\s/.test(query[i - 1])) {
+            const kw = keywords.find(kw =>
+                query.substr(i, kw.length).toUpperCase() == kw &&
+                !/\w/.test(query[i + kw.length] ?? ' '));
+            if (kw) {
+                out = out.replace(/[ \t]+$/, '') + '\n' + '  '.repeat(Math.max(0, depth) + extra_indent);
+                skip_until = i + kw.length;
+            }
+        }
+        out += c;
+    }
+    return out;
+}
+
+/// Break a python query before each top-level `.`, turning `t.f(x).g(y)` into a
+/// method chain with one call per line. Dots inside brackets, strings and numbers stay.
+function breakMethodChain(query) {
+    let out = '';
+    let depth = 0, quote = null;
+    for (let i = 0; i < query.length; ++i) {
+        const c = query[i];
+        if (quote) { out += c; if (c == quote) quote = null; continue; }
+        if (c == "'" || c == '"') { quote = c; out += c; continue; }
+        if ('([{'.includes(c)) ++depth;
+        else if (')]}'.includes(c)) --depth;
+        else if (c == '.' && depth == 0 && i > 0 &&
+                 !(/\d/.test(query[i - 1]) && /\d/.test(query[i + 1] ?? ''))) {
+            out += '\n  ';
+        }
+        out += c;
+    }
+    return out;
+}
+
+/// Best-effort pretty-printer for the single-line queries recorded in each entry:
+/// SQL clauses, python method chain calls and q select clauses each get their own
+/// line. Short queries are left as they are. The engine comes from results.psv;
+/// for engines this page does not know yet, the language is guessed from the text.
+function formatEngineQuery(query, engine) {
+    engine = engine.toLowerCase();
+    if (query.length <= 60) { return query; }
+    if (engine == 'q-sql') {
+        return breakBeforeKeywords(query, ['BY', 'FROM', 'WHERE'], 1, '"');
+    }
+    if (engine == 'sql' || engine.startsWith('duckdb') || /^\s*(SELECT|WITH)\b/.test(query)) {
+        return breakBeforeKeywords(query, sql_clauses, 0, "'\"");
+    }
+    if (['pandas', 'polars', 'pykx'].includes(engine) || /^\s*\w+\./.test(query)) {
+        return breakMethodChain(query);
+    }
+    return breakBeforeKeywords(query, ['BY', 'FROM', 'WHERE'], 1, '"');
+}
+
+/// Pre-format the per-cell tooltip texts from the query texts and engine name
+/// recorded in each entry by pysrc/convertToClickBenchFormat.py.
+data.forEach(elem => {
+    if (elem.queries) {
+        elem.queries_tooltip = elem.queries.map(query => formatEngineQuery(query, elem.engine ?? ''));
+    }
+});
+
 /// A query takes part in the comparison when its instrument scope and complexity are
 /// selected, it carries at least one of the included tags (no included tags = no
 /// restriction) and none of the excluded ones.
@@ -1192,20 +1313,20 @@ function renderWinnersPie(filtered_data) {
     });
 }
 
-/// Bar chart of each solution's peak memory use (max_res_mem_kb). The value describes
-/// the whole benchmark run, so unlike the pie it is not affected by the query filters.
-function renderMemoryChart(filtered_data) {
-    const table = document.getElementById('memory-table');
+/// Horizontal bar chart of one per-solution value in the summary-table anatomy,
+/// smallest value first. Returns whether any of the entries carries the value.
+function renderBarChart(table_id, entries, value_of, format_value, tooltip_suffix) {
+    const table = document.getElementById(table_id);
     clearElement(table);
 
-    const with_mem = filtered_data.filter(elem => elem.max_res_mem_kb != null);
-    document.getElementById('memory-panel').style.display = with_mem.length ? '' : 'none';
-    if (!with_mem.length) { return; }
+    const with_value = entries.filter(elem => value_of(elem) != null);
+    if (!with_value.length) { return false; }
 
-    const max_value = Math.max(...with_mem.map(elem => elem.max_res_mem_kb));
-    [...with_mem].sort((a, b) => a.max_res_mem_kb - b.max_res_mem_kb).forEach(elem => {
+    const max_value = Math.max(...with_value.map(value_of));
+    [...with_value].sort((a, b) => value_of(a) - value_of(b)).forEach(elem => {
+        const value = value_of(elem);
         let tr = document.createElement('tr');
-        tr.title = `${elem.solution}: ${elem.max_res_mem_kb.toLocaleString('en-US')} kb maximum resident set size`;
+        tr.title = `${elem.solution}: ${format_value(value)} ${tooltip_suffix}`;
 
         let td_name = document.createElement('td');
         td_name.className = 'summary-name';
@@ -1219,19 +1340,37 @@ function renderMemoryChart(filtered_data) {
         td_bar.className = 'summary-bar-cell';
         let bar = document.createElement('div');
         bar.className = 'summary-bar';
-        bar.style.width = `${elem.max_res_mem_kb / max_value * 100}%`;
+        bar.style.width = `${value / max_value * 100}%`;
         bar.style.background = solutionColor(elem.solution);
         td_bar.appendChild(bar);
 
         let td_number = document.createElement('td');
         td_number.className = 'summary-number';
-        td_number.appendChild(document.createTextNode(elem.max_res_mem_kb.toLocaleString('en-US')));
+        td_number.appendChild(document.createTextNode(format_value(value)));
 
         tr.appendChild(td_name);
         tr.appendChild(td_bar);
         tr.appendChild(td_number);
         table.appendChild(tr);
     });
+    return true;
+}
+
+/// Bar charts of each solution's peak memory use (max_res_mem_kb) and in-memory data
+/// size. Both describe the whole benchmark run, so unlike the pie they are not
+/// affected by the query filters.
+function renderMemoryCharts(filtered_data) {
+    const has_mem = renderBarChart('memory-table', filtered_data,
+        elem => elem.max_res_mem_kb, value => value.toLocaleString('en-US'),
+        'kb maximum resident set size');
+    document.getElementById('memory-title').style.display = has_mem ? '' : 'none';
+
+    const has_size = renderBarChart('datasize-table', filtered_data,
+        elem => elem.data_size, value => Math.round(value).toLocaleString('en-US'),
+        'MB of loaded data');
+    document.getElementById('datasize-title').style.display = has_size ? '' : 'none';
+
+    document.getElementById('memory-panel').style.display = has_mem || has_size ? '' : 'none';
 }
 
 function renderSummary(filtered_data, baseline_runs) {
@@ -1335,31 +1474,47 @@ function renderSummary(filtered_data, baseline_runs) {
     });
 
     renderWinnersPie(filtered_data);
-    renderMemoryChart(filtered_data);
+    renderMemoryCharts(filtered_data);
 
     return sorted_indices;
 }
 
 function colorize(elem, ratio) {
-    let [r, g, b] = [0, 0, 0];
-
-    /// ratio less than 1 - green
-    /// ratio from 1 to 2 - green to yellow
+    /// ratio from 0.9 to 1.1 - neutral: no background, on-par with the baseline
+    /// ratio below 0.9 - green, the smaller the ratio the darker (mirrors the
+    ///                   slow side on the inverse ratio: pale green to green to
+    ///                   dark green to near-black green)
+    /// ratio from 1.1 to 2 - pale yellow to yellow
     /// ratio from 2 to 10 - yellow to red
     /// ratio from 10 to 1000 to infinity - red to brown to black
 
     /// Note: we are using RGB space without proper gamma correction. Read more: https://www.handprint.com/HP/WCL/color1.html
 
+    if (ratio !== null && ratio >= 0.9 && ratio <= 1.1) {
+        /// The best result is highlighted
+        if (ratio == 1) {
+            elem.style.fontWeight = 'bold';
+        }
+        return;
+    }
+
+    let [r, g, b] = [0, 0, 0];
+
     if (ratio !== null) {
-        if (ratio < 1) {
-            r = 232;
-            g = 255;
-            b = 232;
-        } else if (ratio <= 1) {
-            g = 255;
+        if (ratio < 0.9) {
+            const inv = 1 / ratio;
+            if (inv <= 2) {
+                g = 255;
+                r = b = (2 - inv) / (2 - 1 / 0.9) * 232;
+            } else if (inv <= 10) {
+                g = 100 + (10 - inv) / 8 * 155;
+            } else {
+                g = (1 - ((inv - 10) / ((inv - 10) + 1000))) * 100;
+            }
         } else if (ratio <= 2) {
+            r = 255;
             g = 255;
-            r = (ratio - 1) * 255;
+            b = (2 - ratio) / (2 - 1.1) * 232;
         } else if (ratio <= 10) {
             g = (10 - ratio) / 8 * 255;
             r = 255;
@@ -1375,16 +1530,11 @@ function colorize(elem, ratio) {
     }
 
     elem.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-    if (ratio === null || ratio > 10) {
+    if (ratio === null || ratio > 10 || ratio < 0.1) {
         /// This will look better on dark backgrounds
         elem.style.color = 'white';
     } else {
         elem.style.color = 'black';
-    }
-
-    /// The best result is highlighted
-    if (ratio == 1) {
-        elem.style.fontWeight = 'bold';
     }
 }
 
@@ -1509,32 +1659,6 @@ function render() {
         load_times_body.appendChild(tr);
     });
 
-    /// Data sizes
-    {
-        let tr = document.createElement('tr');
-        tr.className = 'shadow';
-
-        let td_title = document.createElement('td');
-        td_title.colSpan = 2;
-        td_title.appendChild(document.createTextNode('Data size: '));
-        tr.appendChild(td_title);
-
-        const baseline_size = baseline_entry.data_size;
-
-        sorted_indices.map(idx => {
-            const curr_size = filtered_data[idx].data_size;
-            const ratio = curr_size !== null && baseline_size ? curr_size / baseline_size : null;
-
-            let td = document.createElement('td');
-            td.appendChild(document.createTextNode(curr_size !== null ? `${Math.round(curr_size)} MB${ratio !== null ? ` (×${ratio.toFixed(2)})` : ''}` : '☠'));
-
-            colorize(td, ratio);
-            tr.appendChild(td);
-        });
-
-        details_body.appendChild(tr);
-    }
-
     /// Query runtimes
     const num_queries = filtered_data[0].runs.length;
 
@@ -1570,7 +1694,7 @@ function render() {
 
         tr.appendChild(td_query_num);
 
-        sorted_indices.map(idx => {
+        sorted_indices.map((idx, col) => {
             const curr_timing = selectRun(filtered_data[idx].runs[query_num], selectors.metric);
             const baseline_timing = selectRun(baseline_runs[query_num], selectors.metric);
             const ratio = curr_timing !== null && baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
@@ -1579,6 +1703,18 @@ function render() {
             td.appendChild(document.createTextNode(curr_timing !== null ? `${curr_timing.toFixed(3)}s${ratio !== null ? ` (×${ratio.toFixed(2)})` : ''}` : '☠'));
 
             colorize(td, ratio);
+
+            /// The query this solution's engine actually ran, shown on hover. Columns
+            /// in the left half of the table grow the tooltip rightwards and vice versa.
+            const engine_query = filtered_data[idx].queries_tooltip?.[query_num];
+            if (engine_query) {
+                let tooltip = document.createElement('span');
+                tooltip.className = 'tooltip tooltip-engine-query'
+                    + (col * 2 < sorted_indices.length ? ' tooltip-engine-query-left' : '');
+                tooltip.appendChild(document.createTextNode(engine_query));
+                td.appendChild(tooltip);
+            }
+
             tr.appendChild(td);
         });
 

@@ -172,7 +172,7 @@ QUOTERENAME: Dict = {
     'Offer_Size': 'asize',
     'Quote_Condition': 'cond',
     'Sequence_Number': 'seq',
-    'National_BBO_Ind': 'nationalBBOInd',
+    'National_BBO_Ind': 'nationalBBOIndicator',
     'FINRA_BBO_Indicator': 'finraBBOIndicator',
     'FINRA_ADF_MPID_Indicator': 'finraADFMPIDIndicator',
     'Quote_Cancel_Correction': 'corr',
