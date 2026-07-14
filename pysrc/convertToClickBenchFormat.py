@@ -46,6 +46,10 @@ entry mirrors the ClickBench result format with these differences:
   * max_res_mem_kb : "Maximum resident set size (kbytes)" of the solution's
                    process, from the per-solution os.txt (/usr/bin/time -v
                    output)
+  * engine       : the results.psv "engine" column (e.g. q-sql, duckdb_con),
+                   used by index.html to pick a query formatter
+  * queries      : the query texts the solution ran (results.psv "query"
+                   column), aligned with the result arrays
   * result       : {thread count -> [[run1, run2, run3], ...]} per query
 
 Alongside the data file this also refreshes
@@ -64,7 +68,7 @@ from pathlib import Path
 
 import yaml
 
-VALID_SIZES = ("small", "medium", "large", "full")
+VALID_SIZES = ("small", "medium", "large", "xlarge", "full")
 
 QUERYMETA_PSV = (Path(__file__).resolve().parent.parent
                  / "artifacts" / "queries" / "inmemory" / "querymeta.psv")
@@ -141,6 +145,13 @@ def to_int(value: str):
     return int(value) if value else None
 
 
+def unquote(field: str):
+    """Undo the CSV-style quoting of results.psv cells that contain quotes."""
+    if len(field) >= 2 and field.startswith('"') and field.endswith('"'):
+        return field[1:-1].replace('""', '"')
+    return field
+
+
 def load_psv(psv_path: Path):
     """Group PSV rows by (solution, threadcount).
 
@@ -163,7 +174,7 @@ def load_psv(psv_path: Path):
             threadcount = int(fields[col["threadcount"]])
             row = {
                 "idx": int(fields[col["idx"]]),
-                "desc": fields[col["query"]],
+                "desc": unquote(fields[col["query"]]),
                 "run1": to_int(fields[col["run1timeNS"]]),
                 "run2": to_int(fields[col["run2timeNS"]]),
                 "run3": to_int(fields[col["run3timeNS"]]),
@@ -171,6 +182,8 @@ def load_psv(psv_path: Path):
             # load phases are written with idx <= 0 (0, -1, -2, -3), queries start at 1
             kind = "load" if row["idx"] <= 0 else "query"
             grouped[(solution, threadcount)][kind].append(row)
+            if "engine" in col:
+                grouped[(solution, threadcount)]["engine"] = fields[col["engine"]]
 
             if solution not in seen:
                 seen.add(solution)
@@ -212,11 +225,22 @@ def build_result(runs):
     return result
 
 
+def build_queries(runs):
+    """The query texts the solution ran, aligned with the result arrays."""
+    texts = {}
+    for tc in sorted(runs):
+        for row in runs[tc]["query"]:
+            texts[row["idx"]] = row["desc"]
+    return [texts[idx] for idx in sorted(texts)]
+
+
 def build_entry(solution, runs, date, machine, proprietary, data_size, max_res_mem):
+    engines = {payload["engine"] for payload in runs.values() if "engine" in payload}
     return OrderedDict([
         ("solution", solution),
         ("datadate", date),
         ("machine", machine),
+        ("engine", engines.pop() if engines else None),
         ("proprietary", proprietary),
         ("hardware", "cpu"),
         ("tuned", "no"),
@@ -224,6 +248,7 @@ def build_entry(solution, runs, date, machine, proprietary, data_size, max_res_m
         ("load_time", build_load_time(runs)),
         ("data_size", data_size),
         ("max_res_mem_kb", max_res_mem),
+        ("queries", build_queries(runs)),
         ("result", build_result(runs)),
     ])
 
