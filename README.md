@@ -2,16 +2,16 @@
 
 ## QuickStart
 
-To run the in-memory query engine benchmark on a `medium`-sized dataset, execute
+To run the in-memory query engine benchmark on a `tiny`-sized dataset, execute
 the following from the repository root. See the numbered steps below for details,
-prerequisites (KDB-X, [logging and printf](https://github.com/KxSystems/taq/blob/main/docs/install.md) modules, `uv`), and other data sizes/benchmarks.
+prerequisites (KDB-X, [logging and printf](https://github.com/KxSystems/taq/blob/main/docs/install.md) modules, `uv`, `iostat` (from package `sysstat`)), and other data sizes/benchmarks.
 
 ```bash
 # Fetch the taq submodule used to download the data
 git submodule update --init --recursive
 
 # Configuration
-export SIZE=medium                    # ~13 GB HDB; suitable for KDB-X Community Edition
+export SIZE=tiny
 export NYSEBENCHMARKDIR=$PWD/DATA     # where downloads and generated databases live
 export DATADATE=$(curl -s https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/| grep -oE 'EQY_US_ALL_TRADE_2[0-9]{7}' | grep -oE '2[0-9]{7}'|head -1)
 
@@ -52,13 +52,13 @@ Running any benchmark involves four steps:
 ## Step 1: Selecting a Data Size
 
 A single day of NYSE TAQ data is substantial. To reduce execution time,
-you can limit ingestion to a subset of the BBO split CSV files (the source
+you can limit ingestion to a subset of the BBO split PSV files (the source
 of the `quote` table).
 
 Use the `SIZE` environment variable to balance execution time against data coverage:
 
 ```bash
-export SIZE=small
+export SIZE=tiny
 ```
 
 * In all modes except `full`, only a subset of the BBO split CSV files is downloaded.
@@ -67,15 +67,16 @@ export SIZE=small
 
 The following statistics are based on data from 2026-04-01:
 
-| `SIZE` | Recommended for | Symbol first letters | HDB size (GB) | Nr of quote symbols | Nr of quotes |
-| --- | --- | --- | ---: | ---: | ---: |
-| `small` | A quick test to get familiar with the benchmark suite | Z | 1 | 259 | 9 422 051 |
-| `medium` | For KDB-X Community Edition users | X-Z | 9 | 909 | 143 336 607 |
-| `large` | Users with an unlimited KDB-X license but limited memory | T-Z | 39 | 4 018 | 588 006 863 |
-| `xlarge` | Users with an unlimited KDB-X license, lots of memory and limited time | O-Z | 85 | 9 614 | 1 212 311 903 |
-| `full` | The most thorough testing | A–Z | 186 | 26 396 | 2 860 612 301 |
+| `SIZE` | Symbol first letters | Memory (GB) | Disk (GB) | Nr of quote symbols | Nr of quotes |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `tiny` | Z | 1 | 1 | 259 | 9,422,051 |
+| `small` | X-Z | 17 | 9 | 909 | 143,336,607 |
+| `medium` | T-Z | 70 | 39 | 4,018 | 588,006,863 |
+| `large` | P-Z | 142 | 83 | 8,964 | 1,283,196,520 |
+| `xlarge` | I-Z | 153 | 124 | 15,127 | 1,901,235,410 |
+| `full` | A-Z | 296 | 187 | 26,396 | 2,860,612,301 |
 
-Use `medium` when running the benchmark with KDB-X Community Edition, which
+Use `tiny` when running the benchmark with KDB-X Community Edition, which
 enforces a memory limit.
 
 ## Step 2: Obtaining the PSV Files
