@@ -1,54 +1,85 @@
 idx|tags|query|parameter
 1||select from quote where time<0D8|
 2||select from trade where seq=0i|
-3||select from trade where 0i<seq, 0e < price, time within 0D 1D, size < 0Wi|
+3||select from trade where 0i<seq, 0e < price, time within 0D 1D, size < 2147483647e|
 4||select from trade where time within 0D10:00:00 0D10:00:10|
-5||select from quote where sym = anInfreqInstr, time within 0D08:30 0D16:30|
-6||select from quote where sym in hundredInstrs, time within 0D08:30 0D08:35|
-7||select sym, time, price, size, stop, cond, ex from trade where source = "N"|
-8||select time, mid: (bid + ask) %2 from quote where sym = mostFreqInstr|
-9||select time, mid: (bid + ask) %2 from select from quote where sym = mostFreqInstr|
-10||`mid xdesc select time, mid: (bid + ask) %2 from quote where sym = mostFreqInstr|
-11||select sym, time, bid, ask, bsize, asize, cond, ex from quote where sym = aFreqInstr|
-12||select sym, time, bid, ask, bsize, asize, cond, ex from quote where sym in fivehundredInfreqInstrs, 2000i<bsize+asize|
-13||select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize from quote where sym = anInfreqInstr|
-14||select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize by 10 xbar time.minute, ex from quote where sym = anInfreqInstr|
-15||.pvt.pivot select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize by 10 xbar time.minute, ex from quote where sym = anInfreqInstr|
-16||.pvt.pivot 2!`minute xcols {cnt: count each y; ([] sym: x where cnt) ,' raze y}[fivehundredInfreqInstrs; {0!select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize by 10 xbar time.minute from quote where sym=x}peach fivehundredInfreqInstrs]|
-17||fills .pvt.pivot 2!`minute xcols {cnt: count each y; ([] sym: x where cnt) ,' raze y}[fivehundredInfreqInstrs; {0!select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize by 10 xbar time.minute from quote where sym=x}peach fivehundredInfreqInstrs]|
-18||select avgSpread: avg ask - bid by 10 xbar time.minute from quote where sym = aFreqInstr|
-19||2!{cnt: count each y; ([] sym: x where cnt) ,' raze y}[h;{0!select avgSpread: avg ask - bid by 10 xbar time.minute from quote where sym = x} peach h:asc hundredInstrs]|
-20||select avgWeightedSpread: (asize + bsize) wavg ask - bid from quote where sym = anInfreqInstr|
-21||select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid from quote where time within 0D08:30 0D08:35|
-22||select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid by exnames ex from quote where sym=mostFreqInstr|
-23||select avgWeightedSpread: sizes wavg spread, devSpread: dev spread, maxSpread: max spread, minSpread: min spread by exnames ex from (select ex, sizes: asize + bsize, spread: ask - bid from quote where sym=mostFreqInstr)|
-24||2!{cnt: count each y; ([] sym: x where cnt) ,' raze y}[h;{0!select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid by exnames ex from quote where sym =x} peach h:asc hundredInstrs]|
-25||select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid by exnames ex from quote where shortSaleRestrictionIndicator="0"|
-26||select distinct sym, ex from trade where size > 700000i|
-27||select weightedBidPrice: bsize wavg bid, weightedOfferPrice: asize wavg ask by sym from quote where sym in twentyInstrs|
-28||select time, 20 mavg price from trade where sym = mostFreqInstr|
-29||ungroup select time, movingLiqWMid: 5 mavg ((bsize * bid) + asize * ask) % bsize + asize, movingsize: 5 mavg asize + bsize by sym from quote where sym in twentyInstrs|
-30||select time, sums size from trade where sym = aFreqInstr|
-31||select time, sums size from trade where ex = "L"|
-32||update movingvwap:(sums price * size) % sums size by sym from select sym, time, price, size from trade where time within 0D08:00 0D08:15|
-33||select time, sums size from trade where ex = "T"|
-34||select from trade where size = (max;size) fby ex|
-35||(update tag:`maxbid from select from quote where sym=mostFreqInstr, bid=(max; bid) fby ex, time=(min;time) fby ex), update tag: `minask from select from quote where sym=mostFreqInstr, ask=(min; ask) fby ex, time=(min;time) fby ex|
-36||select from trade where size = (min;size) fby ([] ex;sym)|
-37||raze {select from trade where sym=x, size = (min;size) fby ex} peach exec asc distinct sym from trade|
-38||ungroup select from (select seqDecr: seq where (<) prior seq by sym from trade) where 0 < count each seqDecr|
-39||update key[timeBuckets] timeBucket from select cnt: count i, sum size by ex, timeBucket: value[timeBuckets] bin time from trade|
-40||select cnt: count i, sum size by sym, timeBucket: timeBucketsStep time from trade where not corr=0h|
-41||2!{cnt: count each y; ([] sym: x where cnt) ,' raze y}[h; {0!select o: first price, h: max price, l: min price, c: last price, s: sum size by 5 xbar time.minute from trade where sym =x, not null stop} peach h: asc hundredInstrs]|
-42||update inbal: (bsize - asize) % bsize + asize from select first asize, first bsize by time.minute from quote where sym = anInfreqInstr|
-43||select wsumAsk:asize wsum ask, wsumBid: bsize wsum bid, sdevasksize: sdev asize, sdevbid:sdev bid, corPrice:ask cor bid, corSize: asize cor bsize by sym from quote where sym in fivehundredInfreqInstrs|
-44||select from trade where price = (min;price) fby sym|
-45||select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by pricegroup: sums differ price from trade where sym=mostFreqInstr|
-46||select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by sym, pricegroup:(sums differ@;price) fby sym from trade where sym in hundredInstrs|
-47||select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by sym, pricegroup:(sums differ@;price) fby sym from trade where ex in "LM"|
-48||select medMidSize: med (bsize + asize) from quote where sym=anInfreqInstr|
-49||select medSize: med size by ex from trade|
-50||aj[`sym`time; select sym, time, price, size, stop, cond, ex from trade where sym in twentyInstrs; select sym, time, bid, ask, bsize, asize, quotecond: cond, quoteex: ex from quote]|
-51||aj[`time; select time, price, size, stop, cond, ex from trade where sym=aFreqInstr; select time, bid, ask, bsize, asize, quotecond: cond, quoteex: ex from quote where sym=aFreqInstr]|
-52||aj[`sym`ex`time; select sym, time, price, size, stop, cond, ex from trade where size>500000i; select sym, time, bid, ask, bsize, asize, quotecond: cond, ex from quote]|
-53||aj[`sym`time; select sym, time, price, size, stop, cond, ex from trade where time within 0D16:20 0D16:30; select sym, time, bid, ask, bsize, asize, quotecond: cond from quote]|
+5||select from quote where sym = infreqInstr, time within 0D08:30 0D16:30|
+6||select from quote where sym = freqInstr, time within 0D08:30 0D16:30|
+7||select from quote where sym in fiftyInstrs, time within 0D08:30 0D08:35|
+8||select from quote where sym in thousandInfreqInstrs, time within 0D08:30 0D08:35|
+9||select sym, time, price, size, stop, cond, ex from trade where source = "N"|
+10||select time, mid: (bid + ask) %2 from quote where sym = infreqInstr|
+11||select time, mid: (bid + ask) %2 from quote where sym = freqInstr|
+12||select time, mid: (bid + ask) %2 from select from quote where sym = infreqInstr|
+13||select time, mid: (bid + ask) %2 from select from quote where sym = freqInstr|
+14||`mid xdesc select time, mid: (bid + ask) %2 from quote where sym = infreqInstr|
+15||`mid xdesc select time, mid: (bid + ask) %2 from quote where sym = freqInstr|
+16||select sym, time, bid, ask, bsize, asize, cond, ex from quote where sym = infreqInstr|
+17||select sym, time, bid, ask, bsize, asize, cond, ex from quote where sym = freqInstr|
+18||select sym, time, bid, ask, bsize, asize, cond, ex from quote where sym in fiftyInstrs, 2000i<bsize+asize|
+19||select sym, time, bid, ask, bsize, asize, cond, ex from quote where sym in thousandInfreqInstrs, 2000i<bsize+asize|
+20||select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize from quote where sym = infreqInstr|
+21||select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize from quote where sym = freqInstr|
+22||select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize by 10 xbar time.minute, ex from quote where sym = infreqInstr|
+23||select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize by 10 xbar time.minute, ex from quote where sym = freqInstr|
+24||.pvt.pivot select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize by 10 xbar time.minute, ex from quote where sym = infreqInstr|
+25||.pvt.pivot select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize by 10 xbar time.minute, ex from quote where sym = freqInstr|
+26||.pvt.pivot 2!`minute xcols {cnt: count each y; ([] sym: x where cnt) ,' raze y}[fiftyInstrs; {0!select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize by 10 xbar time.minute from quote where sym=x}peach fiftyInstrs]|
+27||.pvt.pivot 2!`minute xcols {cnt: count each y; ([] sym: x where cnt) ,' raze y}[dti; {0!select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize by 10 xbar time.minute from quote where sym=x}peach dti: distinct thousandInfreqInstrs]|
+28||fills .pvt.pivot 2!`minute xcols {cnt: count each y; ([] sym: x where cnt) ,' raze y}[fiftyInstrs; {0!select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize by 10 xbar time.minute from quote where sym=x}peach fiftyInstrs]|
+29||fills .pvt.pivot 2!`minute xcols {cnt: count each y; ([] sym: x where cnt) ,' raze y}[dti; {0!select avgLiqWMid: avg ((bsize * bid) + asize * ask) % bsize + asize by 10 xbar time.minute from quote where sym=x}peach dti: distinct thousandInfreqInstrs]|
+30||select avgSpread: avg ask - bid by 10 xbar time.minute from quote where sym = infreqInstr|
+31||select avgSpread: avg ask - bid by 10 xbar time.minute from quote where sym = freqInstr|
+32||2!{cnt: count each y; ([] sym: x where cnt) ,' raze y}[h;{0!select avgSpread: avg ask - bid by 10 xbar time.minute from quote where sym = x} peach h:asc fiftyInstrs]|
+33||2!{cnt: count each y; ([] sym: x where cnt) ,' raze y}[h;{0!select avgSpread: avg ask - bid by 10 xbar time.minute from quote where sym = x} peach h:asc distinct thousandInfreqInstrs]|
+34||select avgWeightedSpread: (asize + bsize) wavg ask - bid from quote where sym = infreqInstr|
+35||select avgWeightedSpread: (asize + bsize) wavg ask - bid from quote where sym = freqInstr|
+36||select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid from quote where time within 0D08:30 0D08:35|
+37||select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid by exnames ex from quote where sym=infreqInstr|
+38||select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid by exnames ex from quote where sym=freqInstr|
+39||select avgWeightedSpread: sizes wavg spread, devSpread: dev spread, maxSpread: max spread, minSpread: min spread by exnames ex from (select ex, sizes: asize + bsize, spread: ask - bid from quote where sym=infreqInstr)|
+40||select avgWeightedSpread: sizes wavg spread, devSpread: dev spread, maxSpread: max spread, minSpread: min spread by exnames ex from (select ex, sizes: asize + bsize, spread: ask - bid from quote where sym=freqInstr)|
+41||2!{cnt: count each y; ([] sym: x where cnt) ,' raze y}[h;{0!select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid by exnames ex from quote where sym =x} peach h:asc fiftyInstrs]|
+42||2!{cnt: count each y; ([] sym: x where cnt) ,' raze y}[h;{0!select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid by exnames ex from quote where sym =x} peach h:asc distinct thousandInfreqInstrs]|
+43||select avgWeightedSpread: (asize + bsize) wavg ask - bid, devSpread: dev ask - bid, maxSpread: max ask - bid, minSpread: min ask - bid by exnames ex from quote where shortSaleRestrictionIndicator="0"|
+44||select distinct sym, ex from trade where size > 700000e|
+45||select weightedBidPrice: bsize wavg bid, weightedOfferPrice: asize wavg ask by sym from quote where sym in fiftyInstrs|
+46||select weightedBidPrice: bsize wavg bid, weightedOfferPrice: asize wavg ask by sym from quote where sym in thousandInfreqInstrs|
+47||select time, 20 mavg price from trade where sym = infreqInstr|
+48||select time, 20 mavg price from trade where sym = freqInstr|
+49||ungroup select time, movingLiqWMid: 5 mavg ((bsize * bid) + asize * ask) % bsize + asize, movingsize: 5 mavg asize + bsize by sym from quote where sym in fiftyInstrs|
+50||ungroup select time, movingLiqWMid: 5 mavg ((bsize * bid) + asize * ask) % bsize + asize, movingsize: 5 mavg asize + bsize by sym from quote where sym in thousandInfreqInstrs|
+51||select time, sums size from trade where sym = infreqInstr|
+52||select time, sums size from trade where sym = freqInstr|
+53||select time, sums size from trade where ex = "L"|
+54||update movingvwap:(sums price * size) % sums size by sym from select sym, time, price, size from trade where time within 0D08:00 0D08:15|
+55||select time, sums size from trade where ex = "T"|
+56||select from trade where size = (max;size) fby ex|
+57||(update tag:`maxbid from select from quote where sym=infreqInstr, bid=(max; bid) fby ex, time=(min;time) fby ex), update tag: `minask from select from quote where sym=infreqInstr, ask=(min; ask) fby ex, time=(min;time) fby ex|
+58||(update tag:`maxbid from select from quote where sym=freqInstr, bid=(max; bid) fby ex, time=(min;time) fby ex), update tag: `minask from select from quote where sym=freqInstr, ask=(min; ask) fby ex, time=(min;time) fby ex|
+59||select from trade where size = (min;size) fby ([] ex;sym)|
+60||raze {select from trade where sym=x, size = (min;size) fby ex} peach exec asc distinct sym from trade|
+61||ungroup select from (select seqDecr: seq where (<) prior seq by sym from trade) where 0 < count each seqDecr|
+62||update key[timeBuckets] timeBucket from select cnt: count i, sum size by ex, timeBucket: value[timeBuckets] bin time from trade|
+63||select cnt: count i, sum size by sym, timeBucket: timeBucketsStep time from trade where not corr=0h|
+64||2!{cnt: count each y; ([] sym: x where cnt) ,' raze y}[h; {0!select o: first price, h: max price, l: min price, c: last price, s: sum size by 5 xbar time.minute from trade where sym =x, not null stop} peach h: asc fiftyInstrs]|
+65||2!{cnt: count each y; ([] sym: x where cnt) ,' raze y}[h; {0!select o: first price, h: max price, l: min price, c: last price, s: sum size by 5 xbar time.minute from trade where sym =x, not null stop} peach h: asc thousandInfreqInstrs]|
+66||update inbal: (bsize - asize) % bsize + asize from select first asize, first bsize by time.minute from quote where sym = infreqInstr|
+67||update inbal: (bsize - asize) % bsize + asize from select first asize, first bsize by time.minute from quote where sym = freqInstr|
+68||select wsumAsk:asize wsum ask, wsumBid: bsize wsum bid, sdevasksize: sdev asize, sdevbid:sdev bid, corPrice:ask cor bid, corSize: asize cor bsize by sym from quote where sym in fiftyInstrs|
+69||select wsumAsk:asize wsum ask, wsumBid: bsize wsum bid, sdevasksize: sdev asize, sdevbid:sdev bid, corPrice:ask cor bid, corSize: asize cor bsize by sym from quote where sym in thousandInfreqInstrs|
+70||select from trade where price = (min;price) fby sym|
+71||select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by pricegroup: sums differ price from trade where sym=infreqInstr|
+72||select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by pricegroup: sums differ price from trade where sym=freqInstr|
+73||select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by sym, pricegroup:(sums differ@;price) fby sym from trade where sym in fiftyInstrs|
+74||select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by sym, pricegroup:(sums differ@;price) fby sym from trade where sym in thousandInfreqInstrs|
+75||select first price, FirstTime: first time, LastTime: last time, cnt: count size, sum size by sym, pricegroup:(sums differ@;price) fby sym from trade where ex in "LM"|
+76||select medMidSize: med (bsize + asize) from quote where sym=infreqInstr|
+77||select medMidSize: med (bsize + asize) from quote where sym=freqInstr|
+78||select medSize: med size by ex from trade|
+79||aj[`sym`time; select sym, time, price, size, stop, cond, ex from trade where sym in fiftyInstrs; select sym, time, bid, ask, bsize, asize, quotecond: cond, quoteex: ex from quote]|
+80||aj[`sym`time; select sym, time, price, size, stop, cond, ex from trade where sym in thousandInfreqInstrs; select sym, time, bid, ask, bsize, asize, quotecond: cond, quoteex: ex from quote]|
+81||aj[`time; select time, price, size, stop, cond, ex from trade where sym=infreqInstr; select time, bid, ask, bsize, asize, quotecond: cond, quoteex: ex from quote where sym=infreqInstr]|
+82||aj[`time; select time, price, size, stop, cond, ex from trade where sym=freqInstr; select time, bid, ask, bsize, asize, quotecond: cond, quoteex: ex from quote where sym=freqInstr]|
+83||aj[`sym`ex`time; select sym, time, price, size, stop, cond, ex from trade where size>500000i; select sym, time, bid, ask, bsize, asize, quotecond: cond, ex from quote]|
+84||aj[`sym`time; select sym, time, price, size, stop, cond, ex from trade where time within 0D16:20 0D16:30; select sym, time, bid, ask, bsize, asize, quotecond: cond from quote]|

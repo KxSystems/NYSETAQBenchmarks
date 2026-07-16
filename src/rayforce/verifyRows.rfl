@@ -3,15 +3,23 @@
 ;; result-shape equivalence against the bare-q reference. Errors print
 ;; "idx|ERROR". Mirrors the load/sort setup of runQueries.rfl but is untimed.
 ;;
-;; Env: RAY_DBDIR, RAY_PARAMS, RAY_DRIVER
+;; Env: RAY_DBDIR, RAY_PARAMS, RAY_DRIVER, RAY_LAYOUT
 
 (load (.os.getenv "RAY_PARAMS"))
 ;; Materialize into RAM (take) before sorting, matching runQueries.rfl.
 (set dbdir (.os.getenv "RAY_DBDIR"))
+(set master (.db.splayed.get (concat dbdir "/master")))
 (set trade (.db.splayed.get (concat dbdir "/trade")))
 (set quote (.db.splayed.get (concat dbdir "/quote")))
-(set trade (xasc (take trade (count trade)) 'time))
-(set quote (xasc (take quote (count quote)) 'time))
+(set master (take master (count master)))
+(set layout (.os.getenv "RAY_LAYOUT"))
+(if (== layout "parted")
+  (do
+    (set trade (xasc (take trade (count trade)) ['sym 'time]))
+    (set quote (xasc (take quote (count quote)) ['sym 'time])))
+  (do
+    (set trade (xasc (take trade (count trade)) 'time))
+    (set quote (xasc (take quote (count quote)) 'time))))
 
 ;; try handler lambdas do not capture enclosing params, so stash idx in a global.
 (set vq (fn [idx thunk]

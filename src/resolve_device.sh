@@ -68,18 +68,25 @@ case "$FSTYPE" in
 
         # Get the first physical device associated with the pool.
         # Note: This is a heuristic; ZFS pools can span multiple disks.
-        if ! ZFS_DEV=$(zpool list -vHP "$POOL_NAME" 2>/dev/null | tail -n 1 | awk '{print $2}'); then
+        if ! ZFS_DEV=$(zpool list -vHP "$POOL_NAME" 2>/dev/null | tail -n 1 | awk '{print $1}'); then
+             log_error "Could not resolve ZFS pool device."
+             exit "$EXIT_ERR_GENERIC"
+        fi
+        if [[ -z "$ZFS_DEV" ]]; then
              log_error "Could not resolve ZFS pool device."
              exit "$EXIT_ERR_GENERIC"
         fi
 
         # Return the ZFS device immediately
-        echo "$ZFS_DEV"
+        basename "$ZFS_DEV"
         exit "$EXIT_SUCCESS"
         ;;
     *)
         # Standard block devices (ext4, xfs, btrfs, etc.)
         MOUNT_SOURCE=$(findmnt -n -o SOURCE --target "$TARGET_PATH")
+        # A bind mount can be reported as /dev/sda1[/path/inside/fs].  lsblk
+        # accepts the device path, not findmnt's optional bracketed root.
+        MOUNT_SOURCE="${MOUNT_SOURCE%%\[*}"
         ;;
 esac
 
@@ -90,41 +97,51 @@ if [[ -z "${MOUNT_SOURCE:-}" ]]; then
     exit "$EXIT_ERR_GENERIC"
 fi
 
-# Handle LVM logical volumes. The filesystem on an LV reports as ext4/xfs/etc.,
-# so LVM is detected here from the device type rather than the FSTYPE case above.
-# An LV can be striped/mirrored across many physical volumes; we only resolve it
-# when it maps to a single underlying disk, and error otherwise.
-SOURCE_TYPE=$(lsblk -no TYPE "$MOUNT_SOURCE" 2>/dev/null | head -n 1 || true)
-if [[ "$SOURCE_TYPE" == "lvm" ]]; then
-    # Walk the inverse dependency tree (-s) to the whole disks backing the LV.
-    # KNAME avoids the tree-drawing characters added to the NAME column.
-    mapfile -t LVM_DISKS < <(lsblk -sno KNAME,TYPE "$MOUNT_SOURCE" 2>/dev/null \
-        | awk '$2 == "disk" { print $1 }' | sort -u)
-
-    if [[ "${#LVM_DISKS[@]}" -eq 0 ]]; then
-        log_error "Could not resolve any physical device for LVM volume '$MOUNT_SOURCE'."
-        exit "$EXIT_ERR_GENERIC"
-    elif [[ "${#LVM_DISKS[@]}" -gt 1 ]]; then
-        log_error "LVM volume '$MOUNT_SOURCE' spans multiple physical devices (${LVM_DISKS[*]}); cannot resolve a single device."
-        exit "$EXIT_ERR_UNSUPPORTED"
-    fi
-
-    echo "${LVM_DISKS[0]}"
-    exit "$EXIT_SUCCESS"
+# Resolve stable aliases such as /dev/root and /dev/disk/by-* before matching
+# the source against lsblk. Some container environments expose the kernel block
+# graph without device nodes, so retain the original path when it cannot be
+# canonicalized and let the KNAME fallback below handle its basename.
+if [[ "$MOUNT_SOURCE" == /dev/* && -e "$MOUNT_SOURCE" ]]; then
+    MOUNT_SOURCE=$(readlink -f -- "$MOUNT_SOURCE")
 fi
 
-# Resolve the parent kernel name (physical disk) from the partition or logical volume.
-# -d: don't print slaves (we want the parent)
-# -n: no headings
-# -o pkname: print parent kernel name
-PARENT_DEV=$(lsblk -no PKNAME "$MOUNT_SOURCE" 2>/dev/null | head -n 1 || true)
+# Walk from the filesystem source through partitions, device-mapper nodes, LVM,
+# RAID, and similar layers to the underlying whole disk.  Returning a made-up
+# basename when lsblk cannot resolve the source makes iostat silently monitor the
+# wrong device (for example, on tmpfs), so unresolved and multi-disk mappings are
+# explicit errors.
+SOURCE_ID=$(basename "$MOUNT_SOURCE")
+mapfile -t PHYSICAL_DISKS < <(lsblk -rno NAME,KNAME,TYPE,PKNAME 2>/dev/null \
+    | awk -v source="$SOURCE_ID" '
+        function climb(node, edge, pair) {
+            if (seen[node]++) return
+            if (type[node] == "disk") {
+                disks[node] = 1
+                return
+            }
+            for (edge in parent) {
+                split(edge, pair, SUBSEP)
+                if (pair[1] == node) climb(pair[2])
+            }
+        }
+        {
+            type[$2] = $3
+            if ($4 != "") parent[$2 SUBSEP $4] = 1
+            if ($1 == source || $2 == source) starts[$2] = 1
+        }
+        END {
+            for (node in starts) climb(node)
+            for (node in disks) print node
+        }' | sort -u)
 
-# If lsblk fails to find a parent (e.g., it is already the raw disk), default to the source name
-if [[ -n "$PARENT_DEV" ]]; then
-    echo "$PARENT_DEV"
-else
-    # Fallback: Just print the source (e.g., /dev/sda)
-    echo "$(basename "$MOUNT_SOURCE")"
+if [[ "${#PHYSICAL_DISKS[@]}" -eq 0 ]]; then
+    log_error "Could not resolve a physical block device for mount source '$MOUNT_SOURCE'."
+    exit "$EXIT_ERR_GENERIC"
+elif [[ "${#PHYSICAL_DISKS[@]}" -gt 1 ]]; then
+    log_error "Mount source '$MOUNT_SOURCE' spans multiple physical devices (${PHYSICAL_DISKS[*]}); cannot resolve a single device."
+    exit "$EXIT_ERR_UNSUPPORTED"
 fi
+
+echo "${PHYSICAL_DISKS[0]}"
 
 exit "$EXIT_SUCCESS"

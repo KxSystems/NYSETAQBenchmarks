@@ -2,8 +2,8 @@
 #
 # Smoke test for the in-memory benchmark suite. Generates a small kdb+ and
 # Parquet database from the TAQ submodule's test PSV files, then runs both
-# in-memory benchmark scripts against it. This only checks that the pipeline
-# runs end-to-end; it does not assert anything about the result PSVs
+# in-memory benchmark scripts against it. Set RAYFORCE_SMOKE=1 to generate the
+# date-specific Rayforce DB and include the opt-in Rayforce engine as well.
 
 set -euo pipefail
 
@@ -28,17 +28,38 @@ trap 'rm -rf "${TESTDB}" "${RESULTDIR}"' EXIT
 # SIZE=full (letters A-Z) is deliberate: the test data only ships BBO_Y and
 # BBO_Z files, and the test parameter files reference Y instruments (e.g. YXT,
 # YHGJ), so a smaller SIZE (e.g. small = Z-Z) would omit data those queries need.
-rm -rf ${TESTDB}/kdb
-rm -rf ${TESTDB}/parquet/rowgroup
+rm -rf "${TESTDB}/kdb"
+rm -rf "${TESTDB}/parquet/rowgroup"
 
-SIZE=full DATAFORMAT=kdb ./generateDB.sh ${TESTPSV} ${TESTDB}/kdb ${TESTDBDATE}
-SIZE=full SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${TESTPSV} ${TESTDB}/parquet/rowgroup ${TESTDBDATE}
+SIZE=full DATAFORMAT=kdb ./generateDB.sh "${TESTPSV}" "${TESTDB}/kdb" "${TESTDBDATE}"
+SIZE=full SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh "${TESTPSV}" "${TESTDB}/parquet/rowgroup" "${TESTDBDATE}"
+
+# Generate the current query-parameter contract from this exact database. This
+# avoids stale checked-in smoke fixtures when parameter names/query coverage
+# evolve and guarantees the selected symbols exist in the test data.
+PARAM_DIR=${TESTDB}/params
+rm -rf "${PARAM_DIR}"
+mkdir -p "${PARAM_DIR}"
+q ./artifacts/parameters/genParameters.q -db "${TESTDB}/kdb" -dst "${PARAM_DIR}" -q
+
+QUERY_ENGINE_ARGS=()
+if [[ "${RAYFORCE_SMOKE:-0}" == "1" ]]; then
+    RAYFORCE_BIN="${RAYFORCE_BIN:-$(cd .. && pwd)/rayforce/rayforce}"
+    [[ -x "${RAYFORCE_BIN}" ]] || {
+        echo "RAYFORCE_SMOKE=1 but Rayforce binary was not found: ${RAYFORCE_BIN}" >&2
+        exit 1
+    }
+    rm -rf "${TESTDB}/rayforce"
+    SIZE=full DATAFORMAT=rayforce RAYFORCE_BIN="${RAYFORCE_BIN}" \
+        ./generateDB.sh "${TESTPSV}" "${TESTDB}/rayforce" "${TESTDBDATE}"
+    export RAYFORCE_BIN
+    QUERY_ENGINE_ARGS=(--engines "kdb,kdbxsql,duckdb,polars,pykx,pandas,rayforce")
+fi
 
 # Run the benchmarks.
-rm -rf ${RESULTDIR}
+rm -rf "${RESULTDIR}"
 
-PARAM_DIR=./artifacts/parameters/test
-./benchmarks/inmemory/queryEngines.sh --db-dir ${TESTDB} --param-dir ${PARAM_DIR} --date ${TESTDBDATE} --threads "4 16" --results ${RESULTDIR}/queryengines.psv --stats-dir ${RESULTDIR}/queryengines
-./benchmarks/inmemory/kdbAttributes.sh --db-dir ${TESTDB} --param-dir ${PARAM_DIR} --date ${TESTDBDATE} --threads "4 16" --results ${RESULTDIR}/kdbattr.psv --stats-dir ${RESULTDIR}/kdbattr
+./benchmarks/inmemory/queryEngines.sh --db-dir "${TESTDB}" --param-dir "${PARAM_DIR}" --datadate "${TESTDBDATE}" --threads "4 16" --result-dir "${RESULTDIR}" "${QUERY_ENGINE_ARGS[@]}"
+./benchmarks/inmemory/kdbAttributes.sh --db-dir "${TESTDB}" --param-dir "${PARAM_DIR}" --datadate "${TESTDBDATE}" --threads "4 16" --result-dir "${RESULTDIR}"
 
 popd

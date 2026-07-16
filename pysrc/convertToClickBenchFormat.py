@@ -1,34 +1,62 @@
 #!/usr/bin/env python3
-"""Convert NYSE TAQ benchmark results into a ClickBench-like result layout.
+"""Convert NYSE TAQ benchmark results into a ClickBench-like data.js file.
 
-Given a benchmark result directory (e.g. results/inmemory/small/20260709) that
-contains:
+The input directory is a <SIZE> directory (SIZE is one of small, medium, large
+or full), e.g. ``results/inmemory/small``. It is scanned recursively for
+benchmark runs; a run is any directory that contains both:
 
-  * queryengines.psv   - the query/engine timing results (pipe separated)
-  * <solution>/stats.yaml - per-solution table statistics
-  * environment.yaml   - machine / test-run environment
+  * results.psv           - the query/engine timing results (pipe separated)
+  * environment.yaml      - machine / test-run environment
 
-this produces, under the output directory, one JSON file per
-(solution, threadcount) pair:
+alongside per-solution ``<solution>/stats.yaml`` table statistics. The run's
+"test date" is taken from environment.yaml; directory names carry no meaning.
 
-  <output>/<solution>/<threadcount>/<machine>.json
+Entries are keyed by the (datadate, machine, solution) triple. A triple's
+measurements may be split across several run directories (e.g. one directory
+per thread count); all their thread counts are merged into a single entry.
+When the same thread count of a triple appears in several runs, only the run
+with the latest "test date" is kept; proprietary and data_size come from the
+latest run overall.
 
-where <machine> is the mapping of system.cpu.model taken from
-results/mappings.yaml. The JSON mirrors the ClickBench result format
-(see https://github.com/ClickHouse/ClickBench) with these differences:
+The kept entries are written to a single JavaScript file in the style of
+https://github.com/ClickHouse/ClickBench/blob/main/data.generated.js :
 
-  * dropped keys : cluster_size, concurrent_qps, concurrent_error_ratio
-  * added key    : threadcount (the run's thread count)
-  * system       : the solution name
-  * date         : date part of environment.yaml "test time"
+  const data = [
+  ,{...}
+  ,{...}
+  ];
+
+where each ``{...}`` is one benchmark entry serialised on a single line. Each
+entry mirrors the ClickBench result format with these differences:
+
+  * dropped keys : cluster_size, serverless, concurrent_qps, concurrent_error_ratio
+  * solution     : corresponds to ClickBench's "system" key
+  * datadate     : the data date (parameters.datadate), ISO-formatted (replaces
+                   ClickBench's "date"); the environment "test date" is used
+                   only to pick the latest run per triple
   * machine      : mappings.yaml["machines"][cpu.model]
   * proprietary  : from the solution's stats.yaml
   * hardware     : "cpu" (GPUs are not supported yet)
   * tuned        : "no"
   * tags         : []
-  * load_time    : sum of run1timeNS over rows tagged "load"
+  * load_time    : {load phase -> thread count -> run1timeNS} for the load
+                   phases present ("load a partition into memory", "transform",
+                   "sort", "index")
   * data_size    : sum of "size (MB)" over tables in stats.yaml
-  * result       : list of [run1timeNS, run2timeNS, run3timeNS] per query
+  * max_res_mem_kb : "Maximum resident set size (kbytes)" of the solution's
+                   process, from the per-solution os.txt (/usr/bin/time -v
+                   output)
+  * engine       : the results.psv "engine" column (e.g. q-sql, duckdb_con),
+                   used by index.html to pick a query formatter
+  * queries      : the query texts the solution ran (results.psv "query"
+                   column), aligned with the result arrays
+  * result       : {thread count -> [[run1, run2, run3], ...]} per query
+
+Alongside the data file this also refreshes
+``artifacts/queries/inmemory/querymeta.generated.js``, a copy of querymeta.psv
+embedded as a JavaScript string. index.html normally fetches querymeta.psv
+directly, but browsers block fetch() when the page is opened via file://, and
+the page then falls back to this generated copy.
 """
 
 import argparse
@@ -40,34 +68,20 @@ from pathlib import Path
 
 import yaml
 
-MONTHS = {
-    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
-    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
-}
+VALID_SIZES = ("small", "medium", "large", "xlarge", "full")
+
+QUERYMETA_PSV = (Path(__file__).resolve().parent.parent
+                 / "artifacts" / "queries" / "inmemory" / "querymeta.psv")
 
 
-def normalize(name: str) -> str:
-    """Loose key for matching solution names to stats directories.
-
-    e.g. the PSV solution ``duckdbIndex`` matches the directory ``duckdb_index``.
-    """
-    return re.sub(r"[^a-z0-9]", "", name.lower())
-
-
-def parse_test_date(test_time: str) -> str:
-    """Extract the ISO date (YYYY-MM-DD) from a ctime-style "test time" string.
-
-    Example input: ``Thu Jul  9 11:53:40 PM PDT 2026`` -> ``2026-07-09``.
-    The timezone token is not parsed (strptime %Z is unreliable), so we read
-    the fixed positional fields instead.
-    """
-    parts = test_time.split()
-    if len(parts) < 3 or parts[1] not in MONTHS:
-        raise ValueError(f"Unrecognized test time format: {test_time!r}")
-    month = MONTHS[parts[1]]
-    day = int(parts[2])
-    year = int(parts[-1])
-    return f"{year:04d}-{month:02d}-{day:02d}"
+def write_querymeta_js():
+    """Embed querymeta.psv into querymeta.generated.js, the file:// fallback of index.html."""
+    out = QUERYMETA_PSV.with_name("querymeta.generated.js")
+    header = ("// Generated by pysrc/convertToClickBenchFormat.py from querymeta.psv"
+              " - do not edit.\n")
+    out.write_text(header + "const querymeta_psv = "
+                   + json.dumps(QUERYMETA_PSV.read_text()) + ";\n")
+    print(f"wrote {out}")
 
 
 def find_mappings(input_dir: Path) -> Path:
@@ -112,10 +126,30 @@ def parse_stats(stats_path: Path):
     return proprietary, total
 
 
+def parse_max_res_mem(os_txt_path: Path):
+    """Return "Maximum resident set size (kbytes)" from a solution's os.txt.
+
+    The file is the ``/usr/bin/time -v`` output of the solution's benchmark
+    process; None when the file or the line is missing.
+    """
+    if not os_txt_path.is_file():
+        return None
+    match = re.search(r"Maximum resident set size \(kbytes\)\s*:\s*(\d+)",
+                      os_txt_path.read_text())
+    return int(match.group(1)) if match else None
+
+
 def to_int(value: str):
     """Parse a nanosecond timing cell; blank/missing cells become None."""
     value = (value or "").strip()
     return int(value) if value else None
+
+
+def unquote(field: str):
+    """Undo the CSV-style quoting of results.psv cells that contain quotes."""
+    if len(field) >= 2 and field.startswith('"') and field.endswith('"'):
+        return field[1:-1].replace('""', '"')
+    return field
 
 
 def load_psv(psv_path: Path):
@@ -138,15 +172,18 @@ def load_psv(psv_path: Path):
             fields = line.split("|")
             solution = fields[col["solution"]]
             threadcount = int(fields[col["threadcount"]])
-            tags = fields[col["tags"]].split(",")
             row = {
                 "idx": int(fields[col["idx"]]),
+                "desc": unquote(fields[col["query"]]),
                 "run1": to_int(fields[col["run1timeNS"]]),
                 "run2": to_int(fields[col["run2timeNS"]]),
                 "run3": to_int(fields[col["run3timeNS"]]),
             }
-            kind = "load" if "load" in tags else "query"
+            # load phases are written with idx <= 0 (0, -1, -2, -3), queries start at 1
+            kind = "load" if row["idx"] <= 0 else "query"
             grouped[(solution, threadcount)][kind].append(row)
+            if "engine" in col:
+                grouped[(solution, threadcount)]["engine"] = fields[col["engine"]]
 
             if solution not in seen:
                 seen.add(solution)
@@ -155,89 +192,200 @@ def load_psv(psv_path: Path):
     return grouped, solutions
 
 
-def build_entry(solution, threadcount, rows, date, machine, proprietary, data_size):
-    load_time = sum(r["run1"] for r in rows["load"] if r["run1"] is not None)
-    query_rows = sorted(rows["query"], key=lambda r: r["idx"])
-    result = [[r["run1"], r["run2"], r["run3"]] for r in query_rows]
+def build_load_time(runs):
+    """load_time as {load phase -> {thread count -> run1timeNS}}.
 
+    ``runs`` maps thread count -> {"load": rows, "query": rows}. Phases are
+    ordered by their PSV idx descending (0, -1, -2, -3), i.e. the natural
+    pipeline order: load a partition into memory, transform, sort, index.
+    """
+    # phase description -> representative idx (for ordering)
+    phase_idx = {}
+    # thread count -> {phase description -> run1timeNS}
+    per_tc = {tc: {} for tc in runs}
+    for tc, rows in runs.items():
+        for row in rows["load"]:
+            per_tc[tc][row["desc"]] = row["run1"]
+            phase_idx.setdefault(row["desc"], row["idx"])
+
+    load_time = OrderedDict()
+    for desc in sorted(phase_idx, key=lambda d: phase_idx[d], reverse=True):
+        load_time[desc] = OrderedDict(
+            (str(tc), per_tc[tc][desc]) for tc in sorted(runs) if desc in per_tc[tc]
+        )
+    return load_time
+
+
+def build_result(runs):
+    """result as {thread count -> [[run1, run2, run3], ...]} ordered by query idx."""
+    result = OrderedDict()
+    for tc in sorted(runs):
+        query_rows = sorted(runs[tc]["query"], key=lambda r: r["idx"])
+        result[str(tc)] = [[r["run1"], r["run2"], r["run3"]] for r in query_rows]
+    return result
+
+
+def build_queries(runs):
+    """The query texts the solution ran, aligned with the result arrays."""
+    texts = {}
+    for tc in sorted(runs):
+        for row in runs[tc]["query"]:
+            texts[row["idx"]] = row["desc"]
+    return [texts[idx] for idx in sorted(texts)]
+
+
+def build_entry(solution, runs, date, machine, proprietary, data_size, max_res_mem):
+    engines = {payload["engine"] for payload in runs.values() if "engine" in payload}
     return OrderedDict([
-        ("system", solution),
-        ("date", date),
+        ("solution", solution),
+        ("datadate", date),
         ("machine", machine),
-        ("threadcount", threadcount),
+        ("engine", engines.pop() if engines else None),
         ("proprietary", proprietary),
         ("hardware", "cpu"),
         ("tuned", "no"),
         ("tags", []),
-        ("load_time", load_time),
+        ("load_time", build_load_time(runs)),
         ("data_size", data_size),
-        ("result", result),
+        ("max_res_mem_kb", max_res_mem),
+        ("queries", build_queries(runs)),
+        ("result", build_result(runs)),
     ])
+
+
+def process_run(run_dir: Path, machines: dict, mappings_path: Path):
+    """Extract per-(solution, thread count) measurements from one run directory.
+
+    Yields (datadate, machine, solution, threadcount, date, payload) tuples,
+    where payload holds the load/query rows for that thread count plus the
+    solution's proprietary/data_size stats.
+    """
+    env = yaml.safe_load((run_dir / "environment.yaml").read_text())
+    date = str(env["test date"])
+    datadate = str(env["parameters"]["datadate"])
+    # ISO-format an 8-digit datadate (20260401 -> 2026-04-01); leave any other
+    # format untouched.
+    datadate = (f"{datadate[:4]}-{datadate[4:6]}-{datadate[6:8]}"
+                if re.fullmatch(r"\d{8}", datadate) else datadate)
+    cpu_model = env["system"]["cpu"]["model"]
+
+    if cpu_model not in machines:
+        raise SystemExit(
+            f"CPU model {cpu_model!r} (from {run_dir}) not found in "
+            f"{mappings_path} 'machines' mapping. Add an entry to mappings.yaml."
+        )
+    machine = machines[cpu_model]
+
+    # Per-solution stats (proprietary + data_size). Newer runs sanitise the
+    # solution name for the directory ("DuckDB (Index)" -> "DuckDB_Index_")
+    # but record the real name on the stats.yaml "solution" line, so key by
+    # that when present and fall back to the directory name for older runs.
+    stats_dirs = {}
+    for p in run_dir.iterdir():
+        if not (p.is_dir() and (p / "stats.yaml").is_file()):
+            continue
+        stats_dirs.setdefault(p.name, p)
+        sol_match = re.search(r"^solution\s*:\s*(.+?)\s*$",
+                              (p / "stats.yaml").read_text(), re.MULTILINE)
+        if sol_match:
+            stats_dirs[sol_match.group(1).strip().strip("'\"")] = p
+
+    grouped, solutions = load_psv(run_dir / "results.psv")
+
+    for solution in solutions:
+        stats_dir = stats_dirs.get(solution)
+        if stats_dir is None:
+            proprietary, data_size, max_res_mem = None, None, None
+            print(f"warning: no stats.yaml directory found for solution "
+                  f"{solution!r} in {run_dir}; proprietary/data_size/"
+                  f"max_res_mem_kb set to null", file=sys.stderr)
+        else:
+            proprietary, data_size = parse_stats(stats_dir / "stats.yaml")
+            max_res_mem = parse_max_res_mem(stats_dir / "os.txt")
+
+        for tc in sorted({tc for (sol, tc) in grouped if sol == solution}):
+            payload = dict(grouped[(solution, tc)],
+                           proprietary=proprietary, data_size=data_size,
+                           max_res_mem=max_res_mem)
+            yield datadate, machine, solution, tc, date, payload
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("input_dir", type=Path,
-                        help="Benchmark result directory (e.g. results/inmemory/small/20260709)")
-    parser.add_argument("output_dir", type=Path,
-                        help="Directory to write the ClickBench-like output into")
+                        help="A <SIZE> benchmark directory to scan "
+                             "(e.g. results/inmemory/small)")
+    parser.add_argument("output_file", type=Path,
+                        help="Path of the .js file to write")
     parser.add_argument("--mappings", type=Path, default=None,
                         help="Path to mappings.yaml (default: search parents of input_dir)")
     args = parser.parse_args()
 
-    input_dir = args.input_dir
+    input_dir = args.input_dir.resolve()
     if not input_dir.is_dir():
         parser.error(f"Input directory does not exist: {input_dir}")
-
-    # Environment: date + machine.
-    env = yaml.safe_load((input_dir / "environment.yaml").read_text())
-    date = parse_test_date(env["test time"])
-    cpu_model = env["system"]["cpu"]["model"]
+    if input_dir.name not in VALID_SIZES:
+        parser.error(
+            f"Input directory must be a <SIZE> directory with SIZE in "
+            f"{VALID_SIZES}; got {input_dir.name!r} from {input_dir}"
+        )
 
     mappings_path = args.mappings or find_mappings(input_dir)
-    mappings = yaml.safe_load(mappings_path.read_text())
-    machines = mappings.get("machines", {})
-    if cpu_model not in machines:
-        parser.error(
-            f"CPU model {cpu_model!r} not found in {mappings_path} 'machines' mapping. "
-            "Add an entry to mappings.yaml."
-        )
-    machine = machines[cpu_model]
+    machines = yaml.safe_load(mappings_path.read_text()).get("machines", {})
 
-    # Per-solution stats (proprietary + data_size), matched by normalized name.
-    stats_dirs = {normalize(p.name): p for p in input_dir.iterdir()
-                  if p.is_dir() and (p / "stats.yaml").is_file()}
+    # Discover runs: any directory holding both environment.yaml and results.psv.
+    run_dirs = sorted({env.parent for env in input_dir.rglob("environment.yaml")
+                       if (env.parent / "results.psv").is_file()})
+    if not run_dirs:
+        parser.error(f"No benchmark runs (environment.yaml + results.psv) "
+                     f"found under {input_dir}")
 
-    grouped, solutions = load_psv(input_dir / "queryengines.psv")
+    # Keep the latest-dated measurement per (datadate, machine, solution,
+    # threadcount); a triple's thread counts may be spread over several runs.
+    latest = {}
+    for run_dir in run_dirs:
+        for datadate, machine, solution, tc, date, payload in process_run(
+                run_dir, machines, mappings_path):
+            key = (datadate, machine, solution, tc)
+            if key not in latest or date > latest[key][0]:
+                latest[key] = (date, payload)
 
-    written = 0
-    for solution in solutions:
-        stats_dir = stats_dirs.get(normalize(solution))
-        if stats_dir is None:
-            proprietary, data_size = None, None
-            print(f"warning: no stats.yaml directory found for solution "
-                  f"{solution!r}; proprietary/data_size set to null", file=sys.stderr)
-        else:
-            proprietary, data_size = parse_stats(stats_dir / "stats.yaml")
+    # Merge the thread counts of each triple into a single entry.
+    by_triple = defaultdict(dict)
+    for (datadate, machine, solution, tc), dated_payload in latest.items():
+        by_triple[(datadate, machine, solution)][tc] = dated_payload
 
-        threadcounts = sorted({tc for (sol, tc) in grouped if sol == solution})
-        for threadcount in threadcounts:
-            rows = grouped[(solution, threadcount)]
-            entry = build_entry(solution, threadcount, rows, date, machine,
-                                 proprietary, data_size)
+    entries = []
+    for (datadate, machine, solution) in sorted(by_triple):
+        runs = by_triple[(datadate, machine, solution)]
+        # proprietary/data_size/max_res_mem from the latest-dated measurement
+        # of the triple
+        _, newest = max(runs.values(), key=lambda dated: dated[0])
+        entries.append(build_entry(
+            solution, {tc: payload for tc, (_, payload) in runs.items()},
+            datadate, machine, newest["proprietary"], newest["data_size"],
+            newest["max_res_mem"]))
 
-            out_dir = args.output_dir / solution / str(threadcount)
-            out_dir.mkdir(parents=True, exist_ok=True)
-            out_path = out_dir / f"{machine}.json"
-            with out_path.open("w") as fh:
-                json.dump(entry, fh, indent=4)
-                fh.write("\n")
-            written += 1
-            print(f"wrote {out_path}")
+    # Match ClickBench data.generated.js: leading commas on every entry except
+    # the first (a leading comma on the first line would create an array hole),
+    # each entry serialised compactly on one line.
+    with args.output_file.open("w") as fh:
+        fh.write("const data = [\n")
+        for i, entry in enumerate(entries):
+            prefix = "" if i == 0 else ","
+            fh.write(prefix + json.dumps(entry, ensure_ascii=False,
+                                         separators=(",", ":")) + "\n")
+        fh.write("];\n")
 
-    print(f"\nDone: {written} result file(s) for {len(solutions)} solution(s) "
-          f"on machine {machine!r}.")
+    print(f"wrote {args.output_file}: {len(entries)} entr"
+          f"{'y' if len(entries) == 1 else 'ies'} from {len(run_dirs)} run(s).")
+
+    if QUERYMETA_PSV.is_file():
+        write_querymeta_js()
+    else:
+        print(f"warning: {QUERYMETA_PSV} not found; "
+              f"querymeta.generated.js not refreshed", file=sys.stderr)
 
 
 if __name__ == "__main__":

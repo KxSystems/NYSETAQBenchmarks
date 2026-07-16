@@ -1,17 +1,17 @@
 //
-// Export the trade & quote tables of a date-partitioned on-disk database to
+// Export the master, trade & quote tables of a date-partitioned on-disk database to
 // comma-separated CSV files that Rayforce can ingest with (read-csv ...).
 //
 // Rayforce ingests via CSV, so this script bridges from the generated on-disk
 // database: it loads one partition into memory and writes the complete trade
-// and quote schemas. Timespan columns are emitted as I64 nanoseconds so
+// master, trade, and quote schemas. Timespan columns are emitted as I64 nanoseconds so
 // Rayforce can do unambiguous integer comparisons /xbar without losing the
 // source precision.
 //
 // usage: q src/rayforce/exportRayCSV.q -db DB -date DATE -dst DSTDIR -batchrows N
 //   -db   DB       database root (e.g. ${DB_DIR}/kdb)
 //   -date DATE     partition date, e.g. 2026.04.01 or 20260401
-//   -dst  DSTDIR   directory to write trade.csv and quote.csv into
+//   -dst  DSTDIR   directory to write master.csv, trade.csv, and quote.csv into
 //   -batchrows N    maximum rows serialized in one CSV object
 //
 
@@ -40,6 +40,7 @@ system "P 17";
 // Complete source schemas, excluding the virtual partition column `date.
 // Keeping source order also makes `select from ...` outputs line up naturally
 // with the other adapters.
+MASTERCOLS: `sym`description`cusip`securityType`SIPSymbol`oldSym`testFlag`ex`tape`unit`roundLot`NYSEIndustryCode`sharesOutstanding`haltDelayReason`specialistClearingAgent`specialistClearingNumber`specialistPostNumber`specialistPanel`tradedOnNYSEMKT`tradedOnNASDAQBX`tradedOnNSX`tradedOnFINRA`tradedOnISE`tradedOnEdgeA`tradedOnEdgeX`tradedOnNYSETexas`tradedOnNYSE`tradedOnArca`tradedOnNasdaq`tradedOnCBOE`tradedOnPSX`tradedOnBATSY`tradedOnBATS`tradedOnIEX`tickPilotIndicator`effectiveDate`tradedOnLTSE`tradedOnMEMX`tradedOnMIAX;
 TRADECOLS: `time`ex`sym`cond`size`price`stop`corr`seq`tradeId`source`tradeReportingFacility`participantTimestamp`tradeReportingFacilityTRFTimestamp`tradeThroughExemptIndicator;
 QUOTECOLS: `time`ex`sym`bid`bsize`ask`asize`cond`seq`nationalBBOIndicator`finraBBOIndicator`finraADFMpidIndicator`corr`source`retailInterestIndicator`shortSaleRestrictionIndicator`LULDBBOIndicator`SIPGeneratedMessageIdentifier`nationalBBOLULDIndicator`participantTimestamp`FINRAADFTimestamp`FINRAADFMarketParticipantQuoteIndicator`securityStatusIndicator;
 TIMESPANCOLS: `time`participantTimestamp`tradeReportingFacilityTRFTimestamp`FINRAADFTimestamp;
@@ -86,6 +87,7 @@ save1: {[db; d; tbl; keepCols; dst; outname]
     }[h; t; n] each til ceiling n % BATCHROWS;
   hclose h; }
 
+save1[DB; D; `master; MASTERCOLS; DST; "master.csv"];
 save1[DB; D; `trade; TRADECOLS; DST; "trade.csv"];
 save1[DB; D; `quote; QUOTECOLS; DST; "quote.csv"];
 

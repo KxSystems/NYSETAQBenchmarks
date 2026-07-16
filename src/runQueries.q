@@ -4,7 +4,7 @@ USAGE: "usage: q ", string[.z.f], " [-help] -db DB -paramdir DIR -queryfile FILE
   " -storage_backend (memory|disk) [-format (KDB|TABLEDICT|PARQUET|PARQUET_ROWGROUP)]",
   " [-engine (q-sql|SQL)] [-sortcols COLS] [-indexon COL] [-date DATE]",
   " [-queryOutputDir DIR] [-result FILE] [-tableStatsDir DIR] [-encr FILE] [-tags TAGS]",
-  " [-idx FILTER] [-debug]\n\n",
+  " [-instrument (single|multi|all)] [-idx FILTER] [-debug]\n\n",
   "Loads a kdb+/Parquet database (in memory or on disk) and runs the benchmark queries against it,\n",
   "writing per-query timings, memory usage and IO stats to the result file.\n\n",
   "Required options:\n",
@@ -12,7 +12,7 @@ USAGE: "usage: q ", string[.z.f], " [-help] -db DB -paramdir DIR -queryfile FILE
   "  -storage_backend B   Where the data is read from: 'memory' or 'disk'\n",
   "  -paramdir DIR        Directory containing the query parameters\n",
   "  -queryfile FILE      PSV file with the queries to run\n",
-  "  -querymeta FILE      PSV file with the query metadata (idx|querytag)\n\n",
+  "  -querymeta FILE      PSV file with the query metadata (idx|querytag|instrument)\n\n",
   "Optional options:\n",
   "  -format FMT          Data format: KDB (default for disk), TABLEDICT, PARQUET, PARQUET_ROWGROUP\n",
   "  -engine ENG          Query engine: q-sql (default) or SQL\n",
@@ -24,6 +24,7 @@ USAGE: "usage: q ", string[.z.f], " [-help] -db DB -paramdir DIR -queryfile FILE
   "  -tableStatsDir DIR   Directory to save per-table statistics as YAML\n",
   "  -encr FILE           Encryption key file for an encrypted database\n",
   "  -tags TAGS           Comma-separated query tags to filter on\n",
+  "  -instrument VAL      Only run queries with this instrument scope: single, multi or all\n",
   "  -idx FILTER          Filter queries by index: single (42), list (32,42,50) or range (40-44)\n",
   "  -debug               Do not exit when finished (keep the q process alive)\n\n",
   "Environment variables:\n",
@@ -41,7 +42,7 @@ if[count missing: MANDATORY except ko;
   -2 "Run with -help for usage.";
   exit 1]
 
-ALLOWED: MANDATORY,`format`engine`sortcols`indexon`date`queryOutputDir`result`tableStatsDir`encr`tags`idx`debug;
+ALLOWED: MANDATORY,`format`engine`sortcols`indexon`date`queryOutputDir`result`tableStatsDir`encr`tags`instrument`idx`debug;
 if[count unknown: ko except ALLOWED;
   -2 "Unknown parameter(s): ", ", " sv string unknown;
   -2 "Run with -help for usage.";
@@ -89,10 +90,16 @@ checkInputFileExistence each ("queryfile"; "querymeta")
 
 QueryTable: ("****";enlist "|") 0: `$o `queryfile;
 .log.info "Loading and executing queries from ", o `queryfile;
-QueryMetaTable: `idx`querytag xcol ("**";enlist "|") 0: `$o `querymeta;
+QueryMetaTable: `idx`querytag`instrument xcol ("***";enlist "|") 0: `$o `querymeta;
 
 if[not QueryTable[`idx] ~ QueryMetaTable`idx;
   -2 "Index mismatch between the query and the query meta files";
+  exit 4]
+
+// instrument is a base scope (single|multi|all) optionally refined with a
+// frequency, e.g. "single:infrequent"; validate on the base before the colon.
+if[not all (first each ":" vs' QueryMetaTable `instrument) in ("single"; "multi"; "all");
+  -2 "Missing or invalid instrument value in the query meta file (expected single, multi or all, optionally :<frequency>)";
   exit 4]
 
 
@@ -101,10 +108,15 @@ if[`result in key o;
   .log.info "saving results to ", o `result;
   if[not ()~key `$resFile: ":", o `result; hdel `$resFile];
   resultH: hopen resFile;
-  resultH "storagebackend|compparam|threadcount|runner|engine|format|sortcols|indexon|engineversion|idx|tags|query|status|run1timeNS|run2timeNS|run3timeNS|run3memKB|run1ioKB|run2ioKB|run3ioKB|ressizeKB\n"]
+  resultH "storagebackend|compparam|threadcount|runner|engine|format|sortcols|indexon|engineversion|idx|query|status|run1timeNS|run2timeNS|run3timeNS|run3memKB|run1ioKB|run2ioKB|run3ioKB|ressizeKB\n"]
 
 
-Tags: ("," vs o`tags) except enlist ""
+TagsFilter: ("," vs o`tags) except enlist ""
+
+InstrumentFilter: $[`instrument in ko; o `instrument; ""]
+if[count[InstrumentFilter] and not InstrumentFilter in ("single"; "multi"; "all"; "single:infrequent"; "single:frequent"; "multi:50"; "multi:1000infreq");
+  -2 "Invalid value for -instrument: ", InstrumentFilter, " (expected single, multi or all, optionally :<subscope>)";
+  exit 2]
 
 (IdxFilter:`J): $[`idx in ko; parseIdxFilter o`idx; `long$()]
 
@@ -134,7 +146,7 @@ getKBRead: $["false" ~ lower getenv `IOSTAT; {[x] IOStatError}; .z.o ~ `m64; get
 getIdx: {[idx] $[10h ~ type idx; idx; string idx]}
 
 SEP: "|"
-writeRes: {[h; (storagebackend:`C; compparm:`C; engine:`s; format:`s; sortcols:`S; attrib:`C); idx:getIdx; tags; query:`C; (status:`C; ts:`N; memusage:`j; io:`J; ressize:`j)]
+writeRes: {[h; (storagebackend:`C; compparm:`C; engine:`s; format:`s; sortcols:`S; attrib:`C); idx:getIdx; query:`C; (status:`C; ts:`N; memusage:`j; io:`J; ressize:`j)]
   if[null h; :()];
   if[not 3 = count ts;
     .log.error "Three elapsed times are expected";
@@ -144,7 +156,7 @@ writeRes: {[h; (storagebackend:`C; compparm:`C; engine:`s; format:`s; sortcols:`
     io: 4#io];
   runner: "KDB-X";
   engineversion: string[.z.K], ",", string .z.k;
-  h ,[;"\n"] SEP sv (storagebackend; compparm; string 1|system "s"; "KDB-X"; string engine; string lower format; "," sv string sortcols; attrib; engineversion; idx; "," sv tags; query; status), string (`long$ts), (memusage div 1000), (1 _ deltas io), ressize div 1024;
+  h ,[;"\n"] SEP sv (storagebackend; compparm; string 1|system "s"; "KDB-X"; string engine; string lower format; "," sv string sortcols; attrib; engineversion; idx; query; status), string (`long$ts), (memusage div 1000), (1 _ deltas io), ressize div 1024;
   }
 
 loadParquetDB: {[db: `C; rowgroup: `b; device: `C; writerFN]
@@ -161,7 +173,7 @@ loadParquetDB: {[db: `C; rowgroup: `b; device: `C; writerFN]
   memusage: last first .Q.ts[loadHiveDataset; (db; rowgroup)];
   ts: .z.p-s;
   io,: getKBRead[device]`kB_read;
-  writerFN[0; enlist ""; "load/mmap DB"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj)];
+  writerFN[0; "load/mmap DB"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj)];
 
   exnames:: exec ex!`$name from exnames; / convert back to a map
   }
@@ -175,11 +187,12 @@ captureTableStats: {[tableStatsDir:`s]
   h: hopen tableStatsFile;
   h "proprietary: 'yes'\n";
   h {[h; tName]
-    h "name: ", (string tName), "\n";
-    h "size (MB): ", (string floor .mem.objsize[value tName] % 1024*1024), "\n";
-    h "rowCount: ", (string count value tName), "\n";
-    h "columnCount: ", (string count cols tName), "\n";
-    h "columns: \n";
+    h (string tName), ":\n";
+    h "  name: ", (string tName), "\n";
+    h "  size (MB): ", (string floor .mem.objsize[value tName] % 1024*1024), "\n";
+    h "  rowCount: ", (string count value tName), "\n";
+    h "  columnCount: ", (string count cols tName), "\n";
+    h "  columns: \n";
     {[h;tName;c]
       / enums stored as 'symbol'
       t: $[0h ~ type tName c; `string; "s" ~ .Q.ty tName c; `symbol; key tName c];
@@ -244,7 +257,7 @@ loadKDBPartitionIntoMemory: {[db: `s; device: `C; writerFN; d: `d; sortCols:`S; 
   memusage: last first .Q.ts[loadKDBDBIntoMemory; (db;d)];
   ts: .z.p-s;
   io,: getKBRead[device]`kB_read;
-  writerFN[0; enlist "load"; "load a partition into memory"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj; 0Nj)];
+  writerFN[0; "load a partition into memory"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj; 0Nj)];
 
   if[count sortCols;
     io: (), getKBRead[device]`kB_read;
@@ -252,7 +265,7 @@ loadKDBPartitionIntoMemory: {[db: `s; device: `C; writerFN; d: `d; sortCols:`S; 
     memusage: last first .Q.ts[sortTradeQuoteTables; enlist sortCols];
     ts: .z.p-s;
     io,: getKBRead[device]`kB_read;
-    writerFN[-2; enlist "load"; "sort"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj; 0Nj)]];
+    writerFN[-2; "sort"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj; 0Nj)]];
 
 
     (key attrib) {[device;writerFN;c;a] io: (), getKBRead[device]`kB_read;
@@ -260,7 +273,7 @@ loadKDBPartitionIntoMemory: {[db: `s; device: `C; writerFN; d: `d; sortCols:`S; 
     memusage: last first .Q.ts[addAttr; (c;a)];
     ts: .z.p-s;
     io,: getKBRead[device]`kB_read;
-    writerFN[-3; enlist "load"; "index"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj; 0Nj)]}[device; writerFN]' attrib;
+    writerFN[-3; "index"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj; 0Nj)]}[device; writerFN]' attrib;
   };
 
 loadKDBPartitionIntoMemoryTableDict: {[db: `s; device: `C; writerFN; d: `d]
@@ -270,7 +283,7 @@ loadKDBPartitionIntoMemoryTableDict: {[db: `s; device: `C; writerFN; d: `d]
   memusage: last first .Q.ts[loadKDBDBIntoMemoryTableDict; (db; d)];
   ts: .z.p-s;
   io,: getKBRead[device]`kB_read;
-  writerFN[0; enlist "load"; "load first partition into memory"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj; 0Nj)];
+  writerFN[0; "load first partition into memory"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj; 0Nj)];
   }
 
 /////////////////////////////////////////////////////////
@@ -289,7 +302,7 @@ loadKDBDB: {[db: `C; device: `C; writerFN]
     .log.info "Loading encryption file ", o`encr;
     -36!@[; 0; hsym `$] ":" vs o`encr];
 
-  writerFN[0; enlist "load"; "load/mmap DB"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj; 0Nj)];
+  writerFN[0; "load/mmap DB"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj; 0Nj)];
   }
 
 persistOutput: {[dir; res; idx:`C]
@@ -303,21 +316,27 @@ persistOutput: {[dir; res; idx:`C]
   ];
   }
 
-runQuery: {[db: `C; device: `C; writerFN; tags; idx:`C; querytags; query:`C; parameter:`C]
+runQuery: {[db: `C; device: `C; writerFN; filters; querytuple]
+  (idxFilter; tagsFilter; instrumentFilter): filters;
+  (idx:`C; querytags; instrument:`C; query:`C; parameter:`C): querytuple;
   query: trim query;
   parameter: trim parameter;
   idx: trim idx;
   if[not count query;
-    writerFN[idx; querytags; query; ("emptyquery"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
+    writerFN[idx; query; ("emptyquery"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
     :()];
   if["#" ~ first idx;
-    writerFN[1_idx; querytags; query; ("skip"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
+    writerFN[1_idx; query; ("skip"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
     :()];
-  if[count[IdxFilter] and not ("J"$idx) in IdxFilter;
-    writerFN[idx; querytags; query; ("idxfiltered"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
+  if[count[idxFilter] and not ("J"$idx) in idxFilter;
+    writerFN[idx; query; ("idxfiltered"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
     :()];
-  if[count[tags] and 0 = count querytags inter tags;
-    writerFN[idx; querytags; query; ("tagfiltered"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
+  if[count[tagsFilter] and 0 = count querytags inter tagsFilter;
+    writerFN[idx; query; ("tagfiltered"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
+    :()];
+  // a base filter (e.g. "single") matches its frequency variants too
+  if[count[instrumentFilter] and not (instrument ~ instrumentFilter) or instrumentFilter ~ first ":" vs instrument;
+    writerFN[idx; query; ("instrumentfiltered"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
     :()];
 
   executor: $[ENGINE ~ `SQL; $[count parameter; .s.sp[; enlist value parameter]; .s.e]; value];
@@ -332,7 +351,7 @@ runQuery: {[db: `C; device: `C; writerFN; tags; idx:`C; querytags; query:`C; par
   e: .z.p;
   ts,: e-s;
   if[10h ~ type res;
-    writerFN[idx; querytags; query; (res; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
+    writerFN[idx; query; (res; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
     :()];
   io,: getKBRead[device]`kB_read;
   .log.info "[", idx, "]   Shape of the result: ", string[count res], " x ", string count cols res;
@@ -347,7 +366,7 @@ runQuery: {[db: `C; device: `C; writerFN; tags; idx:`C; querytags; query:`C; par
   e: .z.p;
   ts,: e-s;
   if[10h ~ type res;
-    writerFN[idx; querytags; query; (res; ts[0], 2#0Nn; 0Nj; io, 2#0Nj; 0Nj)];
+    writerFN[idx; query; (res; ts[0], 2#0Nn; 0Nj; io, 2#0Nj; 0Nj)];
     :()];
   io,: getKBRead[device]`kB_read;
   res:();
@@ -361,7 +380,7 @@ runQuery: {[db: `C; device: `C; writerFN; tags; idx:`C; querytags; query:`C; par
     res: .[.Q.ts; (executor; enlist query); ::];
     e: .z.p;
     if[10h ~ type res;
-      writerFN[idx; querytags; query; (res; ts, 0Nn; 0Nj; io, 0Nj; 0Nj)];
+      writerFN[idx; query; (res; ts, 0Nn; 0Nj; io, 0Nj; 0Nj)];
       :()];
     memusage: last first res;
     res: last res];
@@ -370,13 +389,13 @@ runQuery: {[db: `C; device: `C; writerFN; tags; idx:`C; querytags; query:`C; par
     res: @[executor; query; ::];
     e: .z.p;
     if[10h ~ type res;
-      writerFN[idx; querytags; query; (res; ts[0], 2#0Nn; 0Nj; io, 2#0Nj; 0Nj)];
+      writerFN[idx; query; (res; ts[0], 2#0Nn; 0Nj; io, 2#0Nj; 0Nj)];
       :()];
     memusage: 0Nj]];
   ts,: e-s;
   io,: getKBRead[device]`kB_read;
 
-  writerFN[idx; querytags; query; ("success"; ts; memusage; io; .mem.objsize res)];
+  writerFN[idx; query; ("success"; ts; memusage; io; .mem.objsize res)];
   };
 
 / TODO: make this a bit more flexible
@@ -415,7 +434,7 @@ $[STORAGE_BACKEND ~ "memory"; [
       loadKDBDB[DB; Device; WriterFN]
     ]; [.log.error "Unknown format ", FORMAT; exit 1]]]];
 
-if[not FORMAT ~ `INMEMORYTABLEDICT;
+if[not FORMAT ~ `TABLEDICT;
   if[`tableStatsDir in ko; captureTableStats hsym `$o `tableStatsDir]];
 
 .log.info "Loading parameters from ", 1_string PARAMDIR
@@ -430,8 +449,8 @@ if[ENGINE ~ `SQL;
   ]
 
 queries: QueryTable lj `idx xkey QueryMetaTable;
-queries: select idx, (except[;enlist ""] each "," vs' "," sv' flip (querytag; tags)), query, parameter from queries
-(runQuery[DB; Device; WriterFN; Tags] . value@) each queries;
+queries: select idx, (except[;enlist ""] each "," vs' "," sv' flip (querytag; tags)), instrument, query, parameter from queries
+(runQuery[DB; Device; WriterFN; (IdxFilter; TagsFilter; InstrumentFilter)] value@) each queries;
 
 .log.info "Query benchmark completed in ", 2_string .z.p - startTime;
 if[not `debug in key o; exit 0];

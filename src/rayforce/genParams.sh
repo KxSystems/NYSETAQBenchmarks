@@ -23,12 +23,10 @@ emit_symvec() { # symbol-list param -> (set NAME ['A 'B ...])
     printf "])\n"
 }
 
-emit_sym    aFreqInstr             aFreqInstr.txt
-emit_sym    mostFreqInstr          mostFreqInstr.txt
-emit_sym    anInfreqInstr          anInfreqInstr.txt
-emit_symvec twentyInstrs           twentyInstrs.txt
-emit_symvec hundredInstrs          hundredInstrs.txt
-emit_symvec fivehundredInfreqInstrs fivehundredInfreqInstrs.txt
+emit_sym    freqInstr              freqInstr.txt
+emit_sym    infreqInstr            infreqInstr.txt
+emit_symvec fiftyInstrs            fiftyInstrs.txt
+emit_symvec thousandInfreqInstrs   thousandInfreqInstrs.txt
 
 # timeBuckets: "name=0DHH:MM:SS.mmm" -> ns-since-midnight bounds + names.
 awk -F'=' '
@@ -37,9 +35,10 @@ awk -F'=' '
     sub(/^0D/, "", t);                       # strip 0D
     split(t, hms, ":"); split(hms[3], sec, ".");
     ns = (hms[1]*3600 + hms[2]*60 + sec[1])*1000000000 + (sec[2]+0)*1000000;
-    names[NR]=name; bounds[NR]=ns; n=NR;
+    n++;
+    names[n]=name; bounds[n]=ns;
   }
   END {
     printf "(set tbNames [";  for(i=1;i<=n;i++) printf "%s'"'"'%s", (i>1?" ":""), names[i]; printf "])\n";
-    printf "(set tbBounds ["; for(i=1;i<=n;i++) printf "%s%s",             (i>1?" ":""), bounds[i]; printf "])\n";
+    printf "(set tbBounds ["; for(i=1;i<=n;i++) printf "%s%.0f",           (i>1?" ":""), bounds[i]; printf "])\n";
   }' "${PARAMDIR}/timeBuckets.txt"

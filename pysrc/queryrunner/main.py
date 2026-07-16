@@ -74,12 +74,11 @@ def load_parameters(param_dir: Path) -> dict[str, Any]:
         content = (param_dir / filename).read_text(encoding='utf-8')
         return [line.strip() for line in content.splitlines() if line.strip()]
     params.update({
-        "aFreqInstr": read_single("aFreqInstr.txt"),
-        "mostFreqInstr": read_single("mostFreqInstr.txt"),
-        "anInfreqInstr": read_single("anInfreqInstr.txt"),
-        "twentyInstrs": read_list("twentyInstrs.txt"),
-        "hundredInstrs": read_list("hundredInstrs.txt"),
-        "fivehundredInfreqInstrs": read_list("fivehundredInfreqInstrs.txt"),
+        "freqInstr": read_single("freqInstr.txt"),
+        "infreqInstr": read_single("infreqInstr.txt"),
+
+        "fiftyInstrs": read_list("fiftyInstrs.txt"),
+        "thousandInfreqInstrs": read_list("thousandInfreqInstrs.txt")
     })
 
     def _to_timedelta(s: str) -> timedelta:
@@ -188,7 +187,7 @@ def main(args: argparse.Namespace) -> None:
             from executors.inmemory.pykx import QueryExecutorPyKXInMemory
             import pykx as kx
             runner = QueryExecutorPyKXInMemory(params, sort_cols=args.sortcols, index_on=args.indexon)
-            threadnr = kx.q.system.num_threads
+            threadnr = max(1, kx.q.system.num_threads)
             engineversion = kx.__version__
         elif engine == "pandas":
             if len(args.indexon) > 0:
@@ -222,7 +221,7 @@ def main(args: argparse.Namespace) -> None:
     headers: list[str] = [
         "storagebackend", "compparam", "threadcount", "runner",
         "engine", "format", "sortcols", "indexon","engineversion",
-        "idx", "tags", "query", "status",
+        "idx", "query", "status",
         "run1timeNS", "run2timeNS", "run3timeNS",
         "run3memKB",
         "run1ioKB", "run2ioKB", "run3ioKB", "ressizeKB"
@@ -267,6 +266,13 @@ def main(args: argparse.Namespace) -> None:
                 query = row['query'].strip()
                 querytags = set(row['tags'].strip().split(",") + rowmeta['tags'].strip().split(","))
                 querytags.discard("")
+                instrument = (rowmeta.get('instrument') or '').strip()
+                # instrument is a base scope (single|multi|all) optionally refined
+                # with a frequency, e.g. "single:infrequent".
+                instrument_base = instrument.split(':', 1)[0]
+                if instrument_base not in ('single', 'multi', 'all'):
+                    logger.error("Missing or invalid instrument %r for query %s in the query meta file (expected single, multi or all, optionally :<frequency>)", instrument, idx)
+                    sys.exit(4)
                 if query.startswith("#"):
                     query = query[1:]
                     result = QueryResult(query, "skip")
@@ -276,10 +282,12 @@ def main(args: argparse.Namespace) -> None:
                     result = QueryResult(query, "idxfiltered")
                 elif len(tags) > 0 and len(tags & querytags) == 0:
                     result = QueryResult(query, "tagfiltered")
+                elif args.instrument is not None and args.instrument not in (instrument, instrument_base):
+                    result = QueryResult(query, "instrumentfiltered")
                 else:
                     result = run_query(runner, args.db, ios, idx, querytags, query, row['parameter'].strip(), args.queryOutputDir)
 
-                writer.writerow(row_start + [idx, ",".join(querytags)] + result.to_csv_row())
+                writer.writerow(row_start + [idx] + result.to_csv_row())
                 f_out.flush()
 
     elapsed = datetime.now() - start_time
@@ -306,6 +314,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('-querymeta', type=Path, required=True, help="PSV file containing the query metas")
     parser.add_argument('-paramdir', type=Path, required=True, help="Directory containing parameter txt files")
     parser.add_argument('-tags', type=str, required=False, help="Comma separated tags for filtering queries.")
+    parser.add_argument('-instrument', type=str, required=False,
+        choices=["single", "multi", "all",
+                 "single:infrequent", "single:frequent",
+                 "multi:50", "multi:1000infreq"],
+        help="Only run queries with this instrument scope (the mandatory instrument column of the query meta file). "
+             "A base scope like 'single' or 'multi' also matches its variants "
+             "(single:infrequent/frequent, multi:50/1000infreq).")
     parser.add_argument('-queryOutputDir', type=Path, required=False, help="Directory to save query results.")
     parser.add_argument('-tableStatsDir', dest='table_stats_dir', type=Path, required=False, help="Directory to save master/trade/quote table statistics YAML files.")
     parser.add_argument('-date', type=lambda s: datetime.strptime(s, '%Y%m%d').date(), required=True, help='Date in YYYYMMDD format')

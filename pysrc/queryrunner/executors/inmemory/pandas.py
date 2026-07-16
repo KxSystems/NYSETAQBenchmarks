@@ -48,7 +48,7 @@ class QueryExecutorPandas:
         quote = quote.set_column(quote.schema.get_field_index("sym"), "sym", quote.column("sym").dictionary_encode()).to_pandas()
         t_load_elapsed = time.perf_counter_ns() - t_load_start
         io_load_end = ios.get_io_stat()
-        writer.writerow(row_start + [0, "load", "load a partition into memory", "success", t_load_elapsed, None, None,
+        writer.writerow(row_start + [0, "load a partition into memory", "success", t_load_elapsed, None, None,
                          None, io_load_end - io_load_start, None, None, self.get_table_size(master) + self.get_table_size(trade) + self.get_table_size(quote)])
 
 
@@ -60,7 +60,7 @@ class QueryExecutorPandas:
         quote['ex'] = pd.Categorical(quote['ex'], categories=sorted(quote['ex'].unique()), ordered=True)
         t_load_elapsed = time.perf_counter_ns() - t_load_start
         io_load_end = ios.get_io_stat()
-        writer.writerow(row_start + [-1, "load", "transform", "success", t_load_elapsed, None, None,
+        writer.writerow(row_start + [-1, "transform", "success", t_load_elapsed, None, None,
                          None, io_load_end - io_load_start, None, None, self.get_table_size(master) + self.get_table_size(trade) + self.get_table_size(quote)])
         logger.info("Shape of trade: %s x %s", trade.shape[0], trade.shape[1])
         logger.info("Shape of quote: %s x %s", quote.shape[0], quote.shape[1])
@@ -72,7 +72,7 @@ class QueryExecutorPandas:
         quote = quote.sort_values(by=self.sort_cols, kind='stable')
         t_load_elapsed = time.perf_counter_ns() - t_load_start
         io_load_end = ios.get_io_stat()
-        writer.writerow(row_start + [-2, "load", "sort", "success", t_load_elapsed, None, None,
+        writer.writerow(row_start + [-2, "sort", "success", t_load_elapsed, None, None,
                          None, io_load_end - io_load_start, None, None, self.get_table_size(master) + self.get_table_size(trade) + self.get_table_size(quote)])
 
         self.eval_context["exnames"] = dict(zip(exnames["ex"], exnames["name"]))

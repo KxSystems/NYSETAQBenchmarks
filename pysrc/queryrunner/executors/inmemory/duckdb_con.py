@@ -58,7 +58,7 @@ class QueryExecutorDuckDBCon:
             parameters=[str(db_path / "quote" / f"date={datadate}" / "*.parquet")])
         t_load_elapsed = time.perf_counter_ns() - t_load_start
         io_load_end = ios.get_io_stat()
-        writer.writerow(row_start + [0, "load", "load a partition into memory", "success", t_load_elapsed, None, None,
+        writer.writerow(row_start + [0, "load a partition into memory", "success", t_load_elapsed, None, None,
                          None, io_load_end - io_load_start, None, None, sum(filter(None, [self.get_table_size("master"), self.get_table_size("trade"), self.get_table_size("quote")])) or None])
 
 
@@ -99,7 +99,7 @@ class QueryExecutorDuckDBCon:
         logger.info("Shape of quote: %s x %s", quote.shape[0], quote.shape[1])
         t_load_elapsed = time.perf_counter_ns() - t_load_start
         io_load_end = ios.get_io_stat()
-        writer.writerow(row_start + [-1, "load", "transform", "success", t_load_elapsed, None, None,
+        writer.writerow(row_start + [-1, "transform", "success", t_load_elapsed, None, None,
                          None, io_load_end - io_load_start, None, None, sum(filter(None, [self.get_table_size(master), self.get_table_size(trade), self.get_table_size(quote)])) or None])
 
 
@@ -113,7 +113,7 @@ class QueryExecutorDuckDBCon:
 
         t_load_elapsed = time.perf_counter_ns() - t_load_start
         io_load_end = ios.get_io_stat()
-        writer.writerow(row_start + [-2, "load", "sort", "success", t_load_elapsed, None, None,
+        writer.writerow(row_start + [-2, "sort", "success", t_load_elapsed, None, None,
                          None, io_load_end - io_load_start, None, None, sum(filter(None, [self.get_table_size(master), self.get_table_size(trade), self.get_table_size(quote)])) or None])
 
         if len(self.index_on) > 0:
@@ -127,7 +127,7 @@ class QueryExecutorDuckDBCon:
 
             t_load_elapsed = time.perf_counter_ns() - t_load_start
             io_load_end = ios.get_io_stat()
-            writer.writerow(row_start + [-3, "load", "index", "success", t_load_elapsed, None, None,
+            writer.writerow(row_start + [-3, "index", "success", t_load_elapsed, None, None,
                              None, io_load_end - io_load_start, None, None, sum(filter(None, [self.get_table_size(master), self.get_table_size(trade), self.get_table_size(quote)])) or None])
 
     @staticmethod

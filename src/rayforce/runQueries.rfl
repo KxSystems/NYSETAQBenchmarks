@@ -1,27 +1,29 @@
 ;; Rayforce in-memory benchmark runner.
 ;;
-;; Loads the Rayforce splayed trade/quote tables into memory, applies the layout
-;; selected by RAY_LAYOUT (grouped or parted), then runs each benchmark query
-;; three times (run1 cold, run2/run3 warm) capturing nanosecond timings, a
-;; memory delta and the logical in-memory result size.
-;;
-;; It emits a compact comma-CSV of machine columns
-;;   idx,status,run1timeNS,run2timeNS,run3timeNS,run3memKB,ressizeKB
-;; which src/rayforce/runRayforce.sh joins with the query text/tags and constant
-;; columns to produce the 21-column pipe PSV the suite merges.
+;; Loads one date-specific Rayforce splayed master/trade/quote database, applies the
+;; layout selected by RAY_LAYOUT, and runs each selected benchmark query three
+;; times. A fourth execution under .mem.ts supplies peak-memory and result-size
+;; measurements; when correctness output is enabled, that same fourth result is
+;; written rather than evaluating the query a fifth time.
 ;;
 ;; Inputs (environment variables):
-;;   RAY_DBDIR    splayed DB dir containing trade/ and quote/
-;;   RAY_PARAMS   generated Rayfall prelude that binds query parameter globals
-;;   RAY_DRIVER   generated Rayfall file of (runq idx (fn [] <query>)) calls
-;;   RAY_RESULT   output CSV path
-;;   RAY_LAYOUT   grouped: time sort + grouped sym hash index
-;;                parted:  sym,time sort + contiguous sym part index
+;;   RAY_DBDIR            date-specific directory containing master/, trade/, and quote/
+;;   RAY_PARAMS           generated Rayfall parameter prelude
+;;   RAY_DRIVER           generated (runq ...)/(skipq ...) calls
+;;   RAY_RESULT           compact machine-result CSV path
+;;   RAY_LAYOUT           grouped or parted
+;;   RAY_QUERY_OUTPUT_DIR optional correctness-output directory
+;;   RAY_TABLE_STATS      optional compact table-statistics CSV path
 
 ;; ---- result accumulators -------------------------------------------------
-(set RIDX (list)) (set RSTAT (list))
-(set RR1 (list)) (set RR2 (list)) (set RR3 (list))
-(set RMEM (list)) (set RSZ (list))
+(set RIDX  (as 'I64 (list)))
+(set RSTAT (as 'SYMBOL (list)))
+(set RR1   (as 'I64 (list)))
+(set RR2   (as 'I64 (list)))
+(set RR3   (as 'I64 (list)))
+(set RMEM  (as 'I64 (list)))
+(set RSZ   (as 'I64 (list)))
+(set NA 0Nl)
 
 (set push (fn [i s r1 r2 r3 m z]
   (set RIDX  (concat RIDX  (enlist i)))
@@ -32,19 +34,21 @@
   (set RMEM  (concat RMEM  (enlist m)))
   (set RSZ   (concat RSZ   (enlist z)))))
 
-;; timeit returns milliseconds (f64, derived from a ns clock) -> integer ns
+;; timeit returns milliseconds (F64, derived from a ns clock).
 (set ns (fn [ms] (as 'I64 (round (* ms 1000000.0)))))
-(set kb (fn [b] (as 'I64 (div (if (> b 0) b 0) 1024))))
+(set memkb (fn [b] (as 'I64 (div (if (> b 0) b 0) 1000))))
+(set reskb (fn [b] (as 'I64 (div (if (> b 0) b 0) 1024))))
 (set QOUT (.os.getenv "RAY_QUERY_OUTPUT_DIR"))
 
+;; Record a query row which was deliberately not executed. This keeps result
+;; files row-aligned with the query and querymeta PSVs under --idx filtering.
+(set skipq (fn [idx status]
+  (push idx status NA NA NA NA NA)))
+
 ;; ---- one benchmark query -------------------------------------------------
-;; thunk is (fn [] <query>) returning a table. run1 is the cold first eval;
-;; run2/run3 are warm. A failing query is recorded as status=error, never
-;; aborting the run.
-;; NOTE: a try handler lambda does NOT capture the enclosing fn's params, so the
-;; error path reads the index from a global (CURIDX) set before the try. Without
-;; this, the first failing query would abort the whole run instead of recording
-;; status=error and continuing.
+;; A failing query is recorded as status=error with unavailable metrics. A try
+;; handler does not capture the enclosing fn's parameters, so the current index
+;; and stage are globals for diagnostics and error-row recording.
 (set runq (fn [idx thunk]
   (set CURIDX idx)
   (try
@@ -60,66 +64,79 @@
       (let t3 (timeit (thunk)))
       (set CURSTAGE 'measure)
       (.sys.gc)
-      ;; Keep memory instrumentation out of the three performance timings.
-      ;; The fourth execution mirrors q's .Q.ts-style measurement pass.
       (let mts (.mem.ts (thunk)))
-      ;; Optional correctness output is a fifth, untimed execution.
       (set CURSTAGE 'output)
       (if (!= QOUT "")
-        (.csv.write (thunk)
+        (.csv.write (at mts 'result)
           (concat QOUT
             (concat "/queryoutput_" (concat (as 'STR idx) ".csv"))))
         null)
       (set CURSTAGE 'record)
       (push idx 'success (ns t1) (ns t2) (ns t3)
-        (kb (at mts 'peak-live-bytes)) (kb (at mts 'result-bytes))))
+        (memkb (at mts 'peak-live-bytes)) (reskb (at mts 'result-bytes))))
     (fn [e]
       (do
         (println (concat "Rayforce query failed: " (as 'STR CURIDX)))
         (println (concat "stage: " (as 'STR CURSTAGE)))
         (println e)
-        (push CURIDX 'error 0 0 0 0 0))))))
+        (push CURIDX 'error NA NA NA NA NA))))))
 
 ;; ---- load parameters -----------------------------------------------------
 (load (.os.getenv "RAY_PARAMS"))
 
 ;; ---- LOAD (idx 0) + SORT (idx -2): measured setup steps ------------------
-;; Load the on-disk table fully into RAM before querying: `.db.splayed.get` then
-;; materialize an in-memory copy with `take t (count t)`. Querying the raw
-;; mmap'd splayed handle would (a) hide disk page-faults inside "warm" query
-;; timings and (b) leave symbol columns in the enumerated on-disk form. This
-;; keeps the comparison a true in-memory one across all engines.
+;; Materialise the mmap-backed splayed handles before querying. Setup steps are
+;; single executions, so only run1timeNS is available for their result rows.
 (set dbdir (.os.getenv "RAY_DBDIR"))
 (set layout (.os.getenv "RAY_LAYOUT"))
 (let tl (timeit (do
+  (set master (.db.splayed.get (concat dbdir "/master")))
   (set trade (.db.splayed.get (concat dbdir "/trade")))
   (set quote (.db.splayed.get (concat dbdir "/quote")))
+  (set master (take master (count master)))
   (set trade (take trade (count trade)))
   (set quote (take quote (count quote))))))
-(push 0 'success (ns tl) (ns tl) (ns tl)
-  (kb (+ (count (ser trade)) (count (ser quote)))) 0)
+(push 0 'success (ns tl) NA NA NA NA)
 
 (let ts (timeit
   (if (== layout "parted")
     (do
-      ;; Multi-key xasc stamps the leading sym column with Rayforce's
-      ;; contiguous part index, the analogue of q's p# attribute.
       (set trade (xasc trade ['sym 'time]))
       (set quote (xasc quote ['sym 'time])))
     (do
       (set trade (xasc trade 'time))
       (set quote (xasc quote 'time))))))
-(push -2 'success (ns ts) (ns ts) (ns ts) 0 0)
+(push -2 'success (ns ts) NA NA NA NA)
 
-;; ---- INDEX (idx -3): grouped hash index or verified contiguous part index ---
+;; ---- INDEX (idx -3): grouped hash index or contiguous part index ---------
 (let ti (timeit (do
   (set trade (table (key trade)
-    (map (fn [c] (if (== c 'sym) (.attr.set (if (== layout "parted") 'parted 'grouped) (at trade c)) (at trade c)))
-         (key trade))))
+    (map (fn [c]
+      (if (== c 'sym)
+        (.attr.set (if (== layout "parted") 'parted 'grouped) (at trade c))
+        (at trade c)))
+      (key trade))))
   (set quote (table (key quote)
-    (map (fn [c] (if (== c 'sym) (.attr.set (if (== layout "parted") 'parted 'grouped) (at quote c)) (at quote c)))
-         (key quote)))))))
-(push -3 'success (ns ti) (ns ti) (ns ti) 0 0)
+    (map (fn [c]
+      (if (== c 'sym)
+        (.attr.set (if (== layout "parted") 'parted 'grouped) (at quote c))
+        (at quote c)))
+      (key quote)))))))
+(push -3 'success (ns ti) NA NA NA NA)
+
+;; Emit compact stats for runRayforce.sh to convert to the suite's YAML shape.
+(set statsout (.os.getenv "RAY_TABLE_STATS"))
+(if (!= statsout "")
+  (do
+    (let statTables (list master trade quote))
+    (.csv.write
+      (table [name sizeMB rowCount columnCount]
+        (list ['master 'trade 'quote]
+          (map (fn [t] (div (.mem.objsize t) 1048576)) statTables)
+          (map count statTables)
+          (map (fn [t] (count (cols t))) statTables)))
+      statsout))
+  null)
 
 ;; ---- run all queries -----------------------------------------------------
 (load (.os.getenv "RAY_DRIVER"))

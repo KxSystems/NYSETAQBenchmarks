@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>KX NYSE TAQ Benchmark — In-Memory Query Engines</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --color: black;
+            --title-color: black;
+            --background-color: white;
+
+            --link-color: #08F;
+            --link-hover-color: #F40;
+            --hashed-link-lightness: 0.5;
+
+            --selector-text-color: black;
+            --selector-active-text-color: black;
+            --selector-background-color: #EEE;
+            --selector-active-background-color: #FFCB80;
+            --selector-passive-background-color: #EEDDCC;
+            --selector-hover-text-color: black;
+            --selector-hover-background-color: #FDB;
+
+            --summary-every-other-row-color: #F8F8F8;
+            --highlight-color: #EEE;
+
+            --bar-color1: oklch(calc(0.9 - 0.6) 0.1 calc(90 - 60));
+            --bar-color2: oklch(calc(0.9 - 0.4) 0.1 calc(90 - 40));
+            --bar-color3: oklch(calc(0.9 - 0.1) 0.1 calc(90 - 20));
+            --bar-color4: oklch(0.9 0.1 90);
+
+            --tooltip-text-color: white;
+            --tooltip-background-color: black;
+
+            --nothing-selected-color: #CCC;
+            --shadow-color: grey;
+        }
+
+        [data-theme="dark"] {
+            --color: #CCC;
+            --title-color: white;
+            --background-color: #04293A;
+
+            --link-color: #8CF;
+            --link-hover-color: #FFF;
+            --hashed-link-lightness: 0.82;
+
+            --selector-text-color: white;
+            --selector-background-color: #444;
+            --selector-active-text-color: white;
+            --selector-active-background-color: #088;
+            --selector-passive-background-color: #566;
+            --selector-hover-text-color: black;
+            --selector-hover-background-color: white;
+
+            --summary-every-other-row-color: #042e41;
+            --highlight-color: #064663;
+
+            --bar-color1: oklch(calc(0.4 + 0.6) 0.1 calc(250 - 180));
+            --bar-color2: oklch(calc(0.4 + 0.4) 0.1 calc(250 - 120));
+            --bar-color3: oklch(calc(0.4 + 0.2) 0.1 calc(250 - 60));
+            --bar-color4: oklch(0.4 0.1 250);
+
+            --tooltip-text-color: white;
+            --tooltip-background-color: #444;
+
+            --nothing-selected-color: #666;
+            --shadow-color: black;
+        }
+
+        html, body {
+            color: var(--color);
+            background-color: var(--background-color);
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: auto;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            padding: 1% 3% 0 3%;
+        }
+
+        h1 {
+            color: var(--title-color);
+        }
+
+        table {
+             border-spacing: 1px;
+        }
+
+        .stick-left {
+            position: sticky;
+            left: 0px;
+        }
+
+        .selectors-container {
+            padding: 2rem 0 2rem 0;
+            user-select: none;
+        }
+
+        .selectors-container th {
+            text-align: left;
+            vertical-align: top;
+            white-space: nowrap;
+            padding-top: 0.5rem;
+            padding-right: 1rem;
+            font-weight: bold;
+        }
+
+        .inline-filter {
+            display: inline-block;
+            margin-right: 1.5rem;
+            white-space: nowrap;
+        }
+
+        .inline-filter-label {
+            font-weight: bold;
+            margin-right: 0.25rem;
+        }
+
+        .inline-filter-separator {
+            display: inline-block;
+            width: 1px;
+            height: 1.1em;
+            background: color-mix(in srgb, var(--color) 25%, transparent);
+            margin-right: 1.5rem;
+            vertical-align: middle;
+        }
+
+        .selector-separator td {
+            border-bottom: 1px solid color-mix(in srgb, var(--color) 25%, transparent);
+            padding: 0.4rem 0 0 0;
+        }
+
+        .selector-separator + tr th, .selector-separator + tr td {
+            padding-top: 0.9rem;
+        }
+
+        .selector-group-title th {
+            padding-top: 0.9rem;
+            padding-bottom: 0;
+        }
+
+        .selector {
+            display: inline-block;
+            margin-left: 0.1rem;
+            padding: 0.2rem 0.5rem 0.2rem 0.5rem;
+            background: var(--selector-background-color);
+            color: var(--selector-text-color);
+            border: 0.2rem solid var(--background-color);
+            border-radius: 0.5rem;
+        }
+
+        .selector-active {
+            color: var(--selector-active-text-color);
+            background: var(--selector-active-background-color);
+        }
+
+        .selector-passive {
+            color: var(--selector-active-text-color);
+            background: var(--selector-passive-background-color);
+        }
+
+        /* Frequency sub-selectors are inert while `single` itself is deselected. */
+        .selector-disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        a, a:visited {
+            text-decoration: none;
+            color: var(--link-color);
+            cursor: pointer;
+        }
+
+        a:hover {
+            color: var(--link-hover-color);
+        }
+
+        .selector:hover {
+            color: var(--selector-hover-text-color) !important;
+            background: var(--selector-background-color);
+        }
+
+        .selector-active:hover, .selector-passive:hover {
+            background: var(--selector-hover-background-color);
+        }
+
+        #summary tr:nth-child(odd) {
+            background: var(--summary-every-other-row-color);
+        }
+
+        .summary-container {
+            display: flex;
+            align-items: flex-start;
+            gap: 2rem;
+        }
+
+        .summary-table {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .summary-charts {
+            display: flex;
+            align-items: flex-start;
+            gap: 2rem;
+            padding-top: 1.5rem;
+        }
+
+        #winners-panel, #memory-panel {
+            flex: 1 1 50%;
+            max-width: 50%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #winners-title, #memory-title, #datasize-title {
+            font-weight: bold;
+            text-align: center;
+            padding-bottom: 0.5rem;
+        }
+
+        #datasize-title {
+            padding-top: 1.5rem;
+        }
+
+        #winners-hint, #memory-hint, #datasize-hint {
+            font-weight: normal;
+            font-size: 80%;
+            filter: contrast(10%);
+        }
+
+        #memory-table, #datasize-table {
+            width: 100%;
+        }
+
+        #memory-table tr:nth-child(odd), #datasize-table tr:nth-child(odd) {
+            background: var(--summary-every-other-row-color);
+        }
+
+        #winners-pie {
+            width: 100%;
+            max-width: 18rem;
+            height: auto;
+        }
+
+        #winners-legend {
+            padding-top: 0.75rem;
+            font-size: 90%;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            column-gap: 1.25rem;
+            row-gap: 0.25rem;
+        }
+
+        .winners-legend-entry {
+            white-space: nowrap;
+        }
+
+        .winners-swatch {
+            display: inline-block;
+            width: 0.8em;
+            height: 0.8em;
+            border-radius: 0.2em;
+            margin-right: 0.35em;
+        }
+
+        .summary-name {
+            white-space: nowrap;
+            text-align: right;
+            padding-right: 1rem;
+            position: relative;
+        }
+
+        .summary-bar-cell {
+            width: 100%;
+            position: relative;
+        }
+
+        .summary-date {
+            position: absolute;
+            right: 0.5rem;
+            top: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            font-size: 80%;
+            text-stroke: 2px var(--background-color);
+            -webkit-text-stroke: 2px var(--background-color);
+            paint-order: stroke fill;
+            pointer-events: none;
+            font-family: monospace;
+        }
+
+        .summary-bar {
+            height: 1rem;
+            width: 100%;
+        }
+
+        .summary-number {
+            font-family: monospace;
+            text-align: right;
+            padding-left: 1rem;
+            white-space: nowrap;
+        }
+
+        th {
+            padding-bottom: 0.5rem;
+        }
+
+        .th-entry-hilite {
+            background: var(--highlight-color);
+            font-weight: bold;
+        }
+
+        .summary-row:hover, .summary-row-hilite {
+            background: var(--highlight-color) !important;
+            font-weight: bold;
+        }
+
+        .remove-system {
+            visibility: hidden;
+            cursor: pointer;
+            color: var(--link-color);
+            user-select: none;
+            position: absolute;
+            left: -1rem;
+            padding-right: 1.5rem;
+        }
+
+        .summary-row:hover .remove-system {
+            visibility: visible;
+        }
+
+        .remove-system:hover {
+            color: var(--link-hover-color);
+        }
+
+        #details, #load_times {
+            padding-bottom: 1rem;
+        }
+
+        #details th, #load_times th {
+            vertical-align: bottom;
+            white-space: pre;
+        }
+
+        #details td, #load_times td {
+            white-space: pre;
+            font-family: monospace;
+            text-align: right;
+            padding: 0.1rem 0.5rem 0.1rem 0.5rem;
+        }
+
+        /* Anchor for the per-cell engine query tooltips */
+        #details td {
+            position: relative;
+        }
+
+        #details td:hover > .tooltip-engine-query {
+            visibility: visible;
+        }
+
+        .shadow:hover {
+            box-shadow: 0 0 1rem var(--shadow-color);
+            position: relative;
+        }
+
+        #nothing-selected {
+            display: none;
+            font-size: 32pt;
+            font-weight: bold;
+            color: var(--nothing-selected-color);
+        }
+
+        .note {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip {
+            position: absolute;
+            bottom: calc(100% + 0.5rem);
+            visibility: hidden;
+            background-color: var(--tooltip-background-color);
+            color: var(--tooltip-text-color);
+            box-shadow: 0 0 1rem var(--shadow-color);
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            z-index: 1;
+            text-align: left;
+            white-space: normal;
+        }
+
+        .tooltip-result {
+            left: calc(50% - 0.25rem);
+            width: 20rem;
+            margin-left: -10rem;
+        }
+
+        .tooltip-query {
+            left: 0;
+            width: 40rem;
+            margin-left: -3rem;
+        }
+
+        .note:hover .tooltip, .note:active .tooltip {
+            visibility: visible;
+        }
+
+        .tooltip::after {
+            content: " ";
+            position: absolute;
+            top: 100%;
+            border-width: 0.5rem;
+            border-style: solid;
+            border-color: var(--tooltip-background-color) transparent transparent transparent;
+        }
+
+        .tooltip-result::after {
+            left: 50%;
+            margin-left: -1rem;
+        }
+
+        .tooltip-query::after {
+            left: 3rem;
+            margin-left: 0.5rem;
+        }
+
+        /* The engine query of one result cell; anchored on the cell edge away
+           from the nearer side of the table so it stays on screen. */
+        .tooltip-engine-query {
+            right: 0;
+            width: max-content;
+            max-width: 44rem;
+            font-family: monospace;
+            font-size: 90%;
+            font-weight: normal;
+            white-space: pre;
+            text-align: left;
+        }
+
+        .tooltip-engine-query::after {
+            right: 1rem;
+        }
+
+        .tooltip-engine-query-left {
+            left: 0;
+            right: auto;
+        }
+
+        .tooltip-engine-query-left::after {
+            left: 1rem;
+            right: auto;
+        }
+
+        .nowrap {
+            text-wrap: none;
+        }
+
+        .themes {
+            float: right;
+            font-size: 200%;
+            cursor: pointer;
+        }
+
+        #toggle-dark, #toggle-light {
+            padding-right: 0.5rem;
+            cursor: pointer;
+        }
+
+        #toggle-dark:hover, #toggle-light:hover {
+            display: inline-block;
+            transform: translate(1px, 1px);
+            filter: brightness(125%);
+        }
+
+        #scale_hint {
+            font-weight: normal;
+            font-size: 80%;
+            filter: contrast(10%);
+        }
+    </style>
+    <script type="text/javascript" src="results/inmemory/data.generated.js"></script>
+    <!-- Fallback copy of querymeta.psv for when the page is opened via file:// and fetch() is blocked.
+         Refreshed by pysrc/convertToClickBenchFormat.py -->
+    <script type="text/javascript" src="artifacts/queries/inmemory/querymeta.generated.js"></script>
+</head>
+<body>
+
+<div class="header stick-left">
+    <span class="nowrap themes"><span id="toggle-dark">🌚</span><span id="toggle-light">🌞</span></span>
+    <h1>KX NYSE TAQ Benchmark — In-Memory Query Engines</h1>
+    <a href="https://github.com/KxSystems/NYSETAQBenchmarks">Methodology</a> | <a href="https://github.com/KxSystems/NYSETAQBenchmarks">Reproduce and Validate the Results</a> | <a href="https://github.com/KxSystems/NYSETAQBenchmarks#adding-a-new-python-based-in-memory-query-engine">Add a Solution</a>
+</div>
+
+<table class="selectors-container stick-left">
+    <tr>
+        <th>Solution: </th>
+        <td id="selectors_solution">
+            <a id="select-all-solutions" class="selector selector-active">All</a>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2">
+            <span class="inline-filter" id="selectors_opensource">
+                <span class="inline-filter-label">Open source:</span>
+                <a id="selector-opensource-yes" class="selector selector-active">Yes</a>
+                <a id="selector-opensource-no" class="selector selector-active">No</a>
+            </span>
+            <span class="inline-filter-separator"></span>
+            <span class="inline-filter" id="selectors_hardware">
+                <span class="inline-filter-label">Hardware:</span>
+                <a id="selector-hardware-cpu" class="selector selector-active">CPU</a>
+                <a id="selector-hardware-gpu" class="selector">GPU</a>
+            </span>
+            <span class="inline-filter-separator"></span>
+            <span class="inline-filter" id="selectors_tuned">
+                <span class="inline-filter-label">Tuned:</span>
+                <a id="selector-tuned-no" class="selector selector-active">No</a>
+                <a id="selector-tuned-yes" class="selector">Yes</a>
+            </span>
+        </td>
+    </tr>
+    <tr class="selector-separator"><td colspan="2"></td></tr>
+    <tr>
+        <th>Threads: </th>
+        <td>
+            <span class="inline-filter" id="selectors_threads"></span>
+            <span class="inline-filter-separator"></span>
+            <span class="inline-filter">
+                <span class="inline-filter-label">Metric:</span>
+                <span id="selectors_run">
+                    <a class="selector" id="selector-metric-cold">Cold Run</a>
+                    <a class="selector selector-active" id="selector-metric-hot">Hot Run</a>
+                    <a class="selector" id="selector-metric-hot2">Second Hot Run</a>
+                </span>
+            </span>
+        </td>
+    </tr>
+    <tr>
+        <th>Machine: </th>
+        <td>
+            <span class="inline-filter" id="selectors_machine"></span>
+            <span class="inline-filter-separator"></span>
+            <span class="inline-filter">
+                <span class="inline-filter-label">Data date:</span>
+                <span id="selectors_date"></span>
+            </span>
+        </td>
+    </tr>
+    <tr>
+        <th>Baseline: </th>
+        <td id="selectors_baseline">
+        </td>
+    </tr>
+    <tr class="selector-separator"><td colspan="2"></td></tr>
+    <tr class="selector-group-title">
+        <th colspan="2">Query Filters</th>
+    </tr>
+    <tr id="instrument-row" title="How many instruments the query works on: a single one, a few hundred, or the full universe (no instrument filter in the query).">
+        <th>Instrument filter: </th>
+        <td id="selectors_instrument">
+        </td>
+    </tr>
+    <tr id="complexity-row" title="How involved the query logic is; only queries of the selected complexities are compared.">
+        <th>Complexity filter: </th>
+        <td id="selectors_complexity">
+        </td>
+    </tr>
+    <tr id="tag-include-row" title="Only queries carrying at least one of the selected tags are compared. Nothing selected = all queries.">
+        <th>Include tags: </th>
+        <td id="selectors_tag_include">
+        </td>
+    </tr>
+    <tr id="tag-exclude-row" title="Queries carrying any of the selected tags are left out of the comparison.">
+        <th>Exclude tags: </th>
+        <td id="selectors_tag_exclude">
+        </td>
+    </tr>
+    <tr class="selector-separator"><td colspan="2"></td></tr>
+</table>
+
+<div class="stick-left comparison summary-container">
+    <table class="summary-table">
+        <thead>
+            <tr>
+                <th class="summary-name">
+                    Solution
+                </th>
+                <th colspan="2">
+                    Geometric mean of per-query time ratios relative to <span id="baseline-name"></span> (lower is better).<br/>
+                    <span id="scale_hint"></span>
+                </th>
+            </tr>
+        </thead>
+        <tbody id="summary">
+        </tbody>
+    </table>
+</div>
+
+<div class="stick-left comparison summary-charts">
+    <div id="winners-panel">
+        <div id="winners-title">Wins per solution<br/>
+            <span id="winners-hint">on how many of the compared queries the solution posts the fastest time</span>
+        </div>
+        <svg id="winners-pie" viewBox="-1.05 -1.05 2.1 2.1" role="img" aria-label="Pie chart of win counts per solution"></svg>
+        <div id="winners-legend"></div>
+    </div>
+    <div id="memory-panel">
+        <div id="memory-title">Max Res Mem (kb)<br/>
+            <span id="memory-hint">maximum resident set size of the benchmark process; not affected by the query filters</span>
+        </div>
+        <table id="memory-table" aria-label="Bar chart of maximum resident memory per solution"></table>
+        <div id="datasize-title">Data size (MB)<br/>
+            <span id="datasize-hint">in-memory size of the loaded tables; not affected by the query filters</span>
+        </div>
+        <table id="datasize-table" aria-label="Bar chart of in-memory data size per solution"></table>
+    </div>
+</div>
+
+<div id="nothing-selected" class="stick-left">Nothing selected</div>
+
+<div class="stick-left comparison">
+    <h2>Detailed Comparison</h2>
+</div>
+
+<table id="details">
+    <thead>
+        <tr id="details_head">
+        </tr>
+    </thead>
+    <tbody id="details_body">
+    </tbody>
+</table>
+
+<div class="stick-left comparison" id="load-times-heading">
+    <h2>Load Times</h2>
+</div>
+
+<table id="load_times">
+    <thead>
+        <tr id="load_times_head">
+        </tr>
+    </thead>
+    <tbody id="load_times_body">
+    </tbody>
+</table>
+
+<script type="text/javascript">
+
+const constant_time_add = 0.01;
+const missing_result_penalty = 2;
+const missing_result_time = 300;
+const ns_to_s = 1e-9;
+
+const load_phase_order = ['load a partition into memory', 'transform', 'sort', 'index'];
+
+/// Query descriptions and tags, loaded at startup from artifacts/queries/inmemory/querymeta.psv,
+/// so newly added queries show up without regenerating anything.
+let queries = [];
+let query_tags = [];
+let query_instrument = [];
+let query_complexity = [];
+
+/// Values of the mandatory `instrument` column of querymeta.psv, with their selector labels.
+/// They get their own "Instrument filter" selector instead of the generic tag filters.
+const instrument_values = {
+    'single': 'single',
+    'multi': 'multi',
+    'all': 'all (no filter)',
+};
+
+/// Sub-scopes of `single` and `multi`: queries are tagged single:<frequency>
+/// or multi:<size> in querymeta.psv. Each map refines its base selection.
+const instrument_freq_values = {
+    'infrequent': 'infrequent',
+    'frequent': 'frequent',
+};
+const instrument_multi_values = {
+    '50': '50',
+    '1000infreq': '1000 infreq',
+};
+
+/// Values of the complexity:<value> tags in querymeta.psv, with their selector labels.
+/// They get their own "Complexity filter" selector instead of the generic tag filters.
+const complexity_values = {
+    'simple': 'simple',
+    'advanced': 'advanced',
+    'complex': 'complex',
+};
+
+let selectors = {
+    "solution": {},
+    "machine": null,
+    "date": null,
+    "threads": null,
+    "baseline": "kdb",
+    "opensource": {"yes": true, "no": true},
+    "hardware": {"cpu": true, "gpu": false},
+    "tuned": {"no": true, "yes": false},
+    "metric": "hot",
+    "instrument": {},
+    "complexity": {},
+    "tag_include": {},
+    "tag_exclude": {},
+    "queries": [],
+};
+
+let theme = 'light';
+
+function setTheme(new_theme) {
+    theme = new_theme;
+    document.documentElement.setAttribute('data-theme', theme);
+    window.localStorage.setItem('theme', theme);
+    render();
+}
+
+document.getElementById('toggle-light').addEventListener('click', e => setTheme('light'));
+document.getElementById('toggle-dark').addEventListener('click', e => setTheme('dark'));
+
+let new_theme = window.localStorage.getItem('theme');
+if (new_theme && new_theme != theme) {
+    theme = new_theme;
+    document.documentElement.setAttribute('data-theme', theme);
+}
+
+/// Generate selectors
+
+let solutions = document.getElementById('selectors_solution');
+let machines = document.getElementById('selectors_machine');
+let dates = document.getElementById('selectors_date');
+let threads = document.getElementById('selectors_threads');
+let baselines = document.getElementById('selectors_baseline');
+let instruments = document.getElementById('selectors_instrument');
+let complexities = document.getElementById('selectors_complexity');
+let tag_includes = document.getElementById('selectors_tag_include');
+let tag_excludes = document.getElementById('selectors_tag_exclude');
+
+let unique_solutions = [... new Set(data.map(elem => elem.solution))].sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
+
+/// The selector map is addressed by key at click time: decoding the URL hash replaces
+/// the whole `selectors` object, so a map reference captured at build time goes stale.
+function toggle(e, elem, selectors_key) {
+    const selectors_map = selectors[selectors_key];
+    selectors_map[elem] = !selectors_map[elem];
+    e.target.className = selectors_map[elem] ? 'selector selector-active' : 'selector';
+    if (selectors_key === 'instrument') refreshInstrumentFreqEnabled();
+    render();
+    updateHistory();
+}
+
+/// Grey out sub-selectors whose base scope (single / multi) is not selected:
+/// they only refine that scope's queries, so they are inert otherwise.
+function refreshInstrumentFreqEnabled() {
+    [...instruments.querySelectorAll('a')].forEach(elem => {
+        const parent = elem.dataset.instrumentParent;
+        if (parent) elem.classList.toggle('selector-disabled', selectors.instrument[parent] === false);
+    });
+}
+
+function toggleAll(e, selectors_key) {
+    const selectors_map = selectors[selectors_key];
+    const new_value = Object.keys(selectors_map).filter(k => selectors_map[k]).length * 2 < Object.keys(selectors_map).length;
+    [...e.target.parentElement.querySelectorAll('a')].map(
+        elem => { elem.className = new_value ? 'selector selector-active' : 'selector' });
+
+    Object.keys(selectors_map).map(k => { selectors_map[k] = new_value });
+    render();
+    updateHistory();
+}
+
+unique_solutions.map(elem => {
+    let selector = document.createElement('a');
+    selector.className = 'selector selector-active';
+    selector.appendChild(document.createTextNode(elem));
+    solutions.appendChild(selector);
+    selectors.solution[elem] = data.some(entry => entry.solution == elem && !entry.hide);
+    selector.addEventListener('click', e => toggle(e, elem, 'solution'));
+
+    /// Highlighting summary rows and table columns on hovering over the solution selector.
+    selector.addEventListener('mouseover', e => {
+        [...document.querySelectorAll('.summary-row')].map(row => {
+            row.className = row.dataset.solution == elem ? 'summary-row summary-row-hilite' : 'summary-row' });
+        [...document.querySelectorAll('.th-entry')].map(th => {
+            th.className = th.dataset.solution == elem ? 'th-entry th-entry-hilite' : 'th-entry' });
+    });
+    selector.addEventListener('mouseout', e => {
+        [...document.querySelectorAll('.summary-row')].map(row => { row.className = 'summary-row' });
+        [...document.querySelectorAll('.th-entry')].map(row => { row.className = 'th-entry' });
+    });
+});
+
+document.getElementById('selector-opensource-yes').addEventListener('click', e => {
+    selectors.opensource.yes = !selectors.opensource.yes;
+    e.target.classList.toggle('selector-active', selectors.opensource.yes);
+    render();
+    updateHistory();
+});
+
+document.getElementById('selector-opensource-no').addEventListener('click', e => {
+    selectors.opensource.no = !selectors.opensource.no;
+    e.target.classList.toggle('selector-active', selectors.opensource.no);
+    render();
+    updateHistory();
+});
+
+document.getElementById('selector-hardware-cpu').addEventListener('click', e => {
+    selectors.hardware.cpu = !selectors.hardware.cpu;
+    e.target.classList.toggle('selector-active', selectors.hardware.cpu);
+    render();
+    updateHistory();
+});
+
+document.getElementById('selector-hardware-gpu').addEventListener('click', e => {
+    selectors.hardware.gpu = !selectors.hardware.gpu;
+    e.target.classList.toggle('selector-active', selectors.hardware.gpu);
+    render();
+    updateHistory();
+});
+
+document.getElementById('selector-tuned-yes').addEventListener('click', e => {
+    selectors.tuned.yes = !selectors.tuned.yes;
+    e.target.classList.toggle('selector-active', selectors.tuned.yes);
+    render();
+    updateHistory();
+});
+
+document.getElementById('selector-tuned-no').addEventListener('click', e => {
+    selectors.tuned.no = !selectors.tuned.no;
+    e.target.classList.toggle('selector-active', selectors.tuned.no);
+    render();
+    updateHistory();
+});
+
+document.getElementById('select-all-solutions').addEventListener('click', e => toggleAll(e, 'solution'));
+
+[...document.getElementById('selectors_run').querySelectorAll('a')].map(elem => elem.addEventListener('click', e => {
+    [...e.target.parentElement.querySelectorAll('a')].map(elem => { elem.className = elem == e.target ? 'selector selector-active' : 'selector' });
+}));
+
+document.getElementById('selector-metric-cold').addEventListener('click', e => { selectors.metric = 'cold'; render(); updateHistory(); });
+document.getElementById('selector-metric-hot').addEventListener('click', e => { selectors.metric = 'hot'; render(); updateHistory(); });
+document.getElementById('selector-metric-hot2').addEventListener('click', e => { selectors.metric = 'hot2'; render(); updateHistory(); });
+
+selectors.queries = Object.values(data[0].result)[0].map(k => true);
+
+/// Load query descriptions and tags from the PSV. The file is tiny, so parsing it on
+/// every page load is free; the benefit is that new queries appear automatically.
+/// When the page is opened via file:// the fetch is blocked - fall back to the copy
+/// embedded in querymeta.generated.js (refreshed by pysrc/convertToClickBenchFormat.py).
+async function loadQueryMeta() {
+    let text = null;
+    try {
+        const response = await fetch('artifacts/queries/inmemory/querymeta.psv');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        text = await response.text();
+    } catch (e) {
+        if (typeof querymeta_psv !== 'undefined') {
+            text = querymeta_psv;
+        } else {
+            console.warn('Could not load querymeta.psv, tag filters are disabled:', e);
+        }
+    }
+
+    if (text !== null) {
+        const lines = text.trim().split('\n');
+        const header = lines[0].split('|');
+        const idx_tags = header.indexOf('tags');
+        const idx_instrument = header.indexOf('instrument');
+        const idx_description = header.indexOf('description');
+        const idx_comment = header.indexOf('comment');
+        lines.slice(1).forEach(line => {
+            const fields = line.split('|');
+            const comment = (fields[idx_comment] ?? '').trim();
+            queries.push(fields[idx_description] + (comment ? ` (${comment})` : ''));
+            const tags = (fields[idx_tags] ?? '').split(',').map(t => t.trim()).filter(t => t !== '');
+            /// complexity:<value> tags feed the dedicated "Complexity filter" selector,
+            /// so they are kept out of the generic include/exclude tag lists.
+            const complexity_tag = tags.find(t => t.startsWith('complexity:'));
+            query_complexity.push(complexity_tag ? complexity_tag.split(':')[1] : '');
+            query_tags.push(tags.filter(t => !t.startsWith('complexity:')));
+            query_instrument.push((fields[idx_instrument] ?? '').trim());
+        });
+    }
+
+    const all_tags = [...new Set(query_tags.flat())].sort();
+    if (query_tags.length == 0) {
+        document.getElementById('instrument-row').style.display = 'none';
+        document.getElementById('complexity-row').style.display = 'none';
+        document.getElementById('tag-include-row').style.display = 'none';
+        document.getElementById('tag-exclude-row').style.display = 'none';
+        return;
+    }
+
+    Object.entries(instrument_values).forEach(([value, label]) => {
+        let selector = document.createElement('a');
+        selector.className = 'selector selector-active';
+        selector.appendChild(document.createTextNode(label));
+        selector.dataset.tag = value;
+        instruments.appendChild(selector);
+        selectors.instrument[value] = true;
+        selector.addEventListener('click', e => toggle(e, value, 'instrument'));
+    });
+
+    /// Sub-selectors that further narrow the `single` and `multi` scopes.
+    [['single', 'single freq:', instrument_freq_values],
+     ['multi', 'multi size:', instrument_multi_values]].forEach(([parent, sep_label, values]) => {
+        let sep = document.createElement('span');
+        sep.className = 'inline-filter-label';
+        sep.style.marginLeft = '1em';
+        sep.appendChild(document.createTextNode(sep_label));
+        instruments.appendChild(sep);
+        Object.entries(values).forEach(([value, label]) => {
+            let selector = document.createElement('a');
+            selector.className = 'selector selector-active';
+            selector.appendChild(document.createTextNode(label));
+            selector.dataset.tag = value;
+            selector.dataset.instrumentParent = parent;
+            instruments.appendChild(selector);
+            selectors.instrument[value] = true;
+            selector.addEventListener('click', e => toggle(e, value, 'instrument'));
+        });
+    });
+
+    Object.entries(complexity_values).forEach(([value, label]) => {
+        let selector = document.createElement('a');
+        selector.className = 'selector selector-active';
+        selector.appendChild(document.createTextNode(label));
+        selector.dataset.tag = value;
+        complexities.appendChild(selector);
+        selectors.complexity[value] = true;
+        selector.addEventListener('click', e => toggle(e, value, 'complexity'));
+    });
+
+    [[tag_includes, 'tag_include'], [tag_excludes, 'tag_exclude']].forEach(([container, selectors_key]) => {
+        all_tags.forEach(tag => {
+            let selector = document.createElement('a');
+            selector.className = 'selector';
+            selector.appendChild(document.createTextNode(tag));
+            container.appendChild(selector);
+            selectors[selectors_key][tag] = false;
+            selector.addEventListener('click', e => toggle(e, tag, selectors_key));
+        });
+    });
+}
+
+const sql_clauses = ['ASOF LEFT JOIN', 'ASOF JOIN', 'LEFT JOIN', 'INNER JOIN', 'CROSS JOIN',
+    'FULL JOIN', 'GROUP BY', 'ORDER BY', 'PARTITION BY', 'FROM', 'WHERE', 'HAVING',
+    'QUALIFY', 'WINDOW', 'LIMIT', 'UNION', 'JOIN', 'ON'];
+
+/// Insert a line break before each keyword found outside string literals, indented
+/// two spaces per bracket depth (plus extra_indent levels). Shared by the SQL and
+/// q formatters; keywords must be uppercase, sources are matched case-insensitively.
+function breakBeforeKeywords(query, keywords, extra_indent, string_quotes) {
+    let out = '';
+    let depth = 0, quote = null, skip_until = 0;
+    for (let i = 0; i < query.length; ++i) {
+        const c = query[i];
+        if (quote) { out += c; if (c == quote) quote = null; continue; }
+        if (string_quotes.includes(c)) { quote = c; out += c; continue; }
+        if ('([{'.includes(c)) ++depth;
+        else if (')]}'.includes(c)) --depth;
+        else if (i >= Math.max(skip_until, 1) && /\s/.test(query[i - 1])) {
+            const kw = keywords.find(kw =>
+                query.substr(i, kw.length).toUpperCase() == kw &&
+                !/\w/.test(query[i + kw.length] ?? ' '));
+            if (kw) {
+                out = out.replace(/[ \t]+$/, '') + '\n' + '  '.repeat(Math.max(0, depth) + extra_indent);
+                skip_until = i + kw.length;
+            }
+        }
+        out += c;
+    }
+    return out;
+}
+
+/// Break a python query before each top-level `.`, turning `t.f(x).g(y)` into a
+/// method chain with one call per line. Dots inside brackets, strings and numbers stay.
+function breakMethodChain(query) {
+    let out = '';
+    let depth = 0, quote = null;
+    for (let i = 0; i < query.length; ++i) {
+        const c = query[i];
+        if (quote) { out += c; if (c == quote) quote = null; continue; }
+        if (c == "'" || c == '"') { quote = c; out += c; continue; }
+        if ('([{'.includes(c)) ++depth;
+        else if (')]}'.includes(c)) --depth;
+        else if (c == '.' && depth == 0 && i > 0 &&
+                 !(/\d/.test(query[i - 1]) && /\d/.test(query[i + 1] ?? ''))) {
+            out += '\n  ';
+        }
+        out += c;
+    }
+    return out;
+}
+
+/// Best-effort pretty-printer for the single-line queries recorded in each entry:
+/// SQL clauses, python method chain calls and q select clauses each get their own
+/// line. Short queries are left as they are. The engine comes from results.psv;
+/// for engines this page does not know yet, the language is guessed from the text.
+function formatEngineQuery(query, engine) {
+    engine = engine.toLowerCase();
+    if (query.length <= 60) { return query; }
+    if (engine == 'q-sql') {
+        return breakBeforeKeywords(query, ['BY', 'FROM', 'WHERE'], 1, '"');
+    }
+    if (engine == 'sql' || engine.startsWith('duckdb') || /^\s*(SELECT|WITH)\b/.test(query)) {
+        return breakBeforeKeywords(query, sql_clauses, 0, "'\"");
+    }
+    if (['pandas', 'polars', 'pykx'].includes(engine) || /^\s*\w+\./.test(query)) {
+        return breakMethodChain(query);
+    }
+    return breakBeforeKeywords(query, ['BY', 'FROM', 'WHERE'], 1, '"');
+}
+
+/// Pre-format the per-cell tooltip texts from the query texts and engine name
+/// recorded in each entry by pysrc/convertToClickBenchFormat.py.
+data.forEach(elem => {
+    if (elem.queries) {
+        elem.queries_tooltip = elem.queries.map(query => formatEngineQuery(query, elem.engine ?? ''));
+    }
+});
+
+/// A query takes part in the comparison when its instrument scope and complexity are
+/// selected, it carries at least one of the included tags (no included tags = no
+/// restriction) and none of the excluded ones.
+function queryPassesTagFilters(query_num) {
+    const tags = query_tags[query_num] ?? [];
+    const instrument = query_instrument[query_num];
+    const include_active = Object.values(selectors.tag_include).some(x => x);
+    /// instrument is a base scope optionally refined by frequency, e.g.
+    /// "single:infrequent". The query shows only when both its base scope and
+    /// (for single) its frequency sub-scope are selected.
+    const [base, sub] = (instrument || '').split(':');
+    const instrument_ok = !instrument ||
+        (selectors.instrument[base] !== false && (!sub || selectors.instrument[sub] !== false));
+    const complexity = query_complexity[query_num];
+    const complexity_ok = !complexity || selectors.complexity[complexity] !== false;
+    return instrument_ok && complexity_ok &&
+        (!include_active || tags.some(tag => selectors.tag_include[tag])) &&
+        !tags.some(tag => selectors.tag_exclude[tag]);
+}
+
+function matchesTopRow(elem) {
+    return ((selectors.tuned.yes && elem.tuned === "yes") || (selectors.tuned.no && elem.tuned === "no")) &&
+        ((selectors.opensource.yes && elem.proprietary === "no") || (selectors.opensource.no && elem.proprietary === "yes")) &&
+        ((selectors.hardware.cpu && (elem.hardware === "cpu" || !elem.hardware)) || (selectors.hardware.gpu && elem.hardware === "gpu"));
+}
+
+/// Machine, Data date and Threads are single-selection and interdependent:
+/// the available dates depend on the machine, the available thread counts on both.
+/// If the current selection becomes unavailable, fall back to a sensible default.
+function reconcile() {
+    const base = data.filter(matchesTopRow);
+    if (base.length == 0) { return; }
+
+    const available_machines = availableMachines(base);
+    if (!available_machines.includes(selectors.machine)) {
+        selectors.machine = available_machines[0];
+    }
+
+    const available_dates = availableDates(base);
+    if (!available_dates.includes(selectors.date)) {
+        selectors.date = available_dates[available_dates.length - 1];
+    }
+
+    const available_threads = availableThreads(base);
+    if (!available_threads.includes(selectors.threads)) {
+        selectors.threads = available_threads[available_threads.length - 1];
+    }
+
+    if (!unique_solutions.includes(selectors.baseline)) {
+        selectors.baseline = unique_solutions.includes('kdb') ? 'kdb' : unique_solutions[0];
+    }
+}
+
+/// Machines ordered by the number of results, most covered first.
+function availableMachines(base) {
+    return [... new Set(base.map(elem => elem.machine))].sort((a, b) => {
+        const count_diff = base.filter(elem => elem.machine === b).length - base.filter(elem => elem.machine === a).length;
+        return count_diff == 0 ? a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}) : count_diff;
+    });
+}
+
+function availableDates(base) {
+    return [... new Set(base.filter(elem => elem.machine == selectors.machine).map(elem => elem.datadate))].sort();
+}
+
+function availableThreads(base) {
+    return [... new Set(base.filter(elem => elem.machine == selectors.machine && elem.datadate == selectors.date)
+        .flatMap(elem => Object.keys(elem.result)))].sort((a, b) => a - b);
+}
+
+function buildRadio(container, values, current, onSelect) {
+    clearElement(container);
+    values.forEach(value => {
+        let selector = document.createElement('a');
+        selector.className = value == current ? 'selector selector-active' : 'selector';
+        selector.appendChild(document.createTextNode(value));
+        container.appendChild(selector);
+        selector.addEventListener('click', e => {
+            if (value == current) { return; }
+            onSelect(value);
+            render();
+            updateHistory();
+        });
+    });
+}
+
+function rebuildDynamicSelectors(filtered_solutions) {
+    const base = data.filter(matchesTopRow);
+    if (base.length == 0) { return; }
+
+    buildRadio(machines, availableMachines(base), selectors.machine, value => { selectors.machine = value; });
+    buildRadio(dates, availableDates(base), selectors.date, value => { selectors.date = value; });
+    buildRadio(threads, availableThreads(base), selectors.threads, value => { selectors.threads = value; });
+    buildRadio(baselines, unique_solutions, selectors.baseline, value => { selectors.baseline = value; });
+
+    /// Baseline solutions without a result for the current machine/date/threads are shown as passive:
+    /// they can be selected, but the first of the displayed solutions is used instead.
+    [...baselines.childNodes].forEach(elem => {
+        if (elem.classList.contains('selector-active') && !filtered_solutions.has(elem.innerText)) {
+            elem.className = 'selector selector-passive';
+        }
+    });
+}
+
+function findPassiveSelectors(filtered_data) {
+    const filtered = new Set(filtered_data.map(elem => elem.solution));
+    for (let elem of solutions.childNodes) {
+        if (elem.tagName == 'A' && elem.id != 'select-all-solutions') {
+            if (elem.classList.contains('selector-active') && !filtered.has(elem.innerText)) {
+                elem.className = 'selector selector-passive';
+            } else if (elem.classList.contains('selector-passive') && filtered.has(elem.innerText)) {
+                elem.className = 'selector selector-active';
+            }
+        }
+    }
+}
+
+function updateSelectors() {
+    [...solutions.childNodes].map(elem => {
+        if (elem.tagName == 'A' && elem.id != 'select-all-solutions') {
+            elem.className = selectors.solution[elem.innerText] ? 'selector selector-active' : 'selector';
+        }
+    });
+
+    [...document.getElementById('selectors_run').querySelectorAll('a')].map(elem => {
+        elem.className = elem.id == 'selector-metric-' + selectors.metric ? 'selector selector-active' : 'selector' });
+
+    [...instruments.querySelectorAll('a')].map(elem => {
+        elem.className = selectors.instrument[elem.dataset.tag] ? 'selector selector-active' : 'selector' });
+    refreshInstrumentFreqEnabled();
+    [...complexities.querySelectorAll('a')].map(elem => {
+        elem.className = selectors.complexity[elem.dataset.tag] ? 'selector selector-active' : 'selector' });
+    [...tag_includes.querySelectorAll('a')].map(elem => {
+        elem.className = selectors.tag_include[elem.innerText] ? 'selector selector-active' : 'selector' });
+    [...tag_excludes.querySelectorAll('a')].map(elem => {
+        elem.className = selectors.tag_exclude[elem.innerText] ? 'selector selector-active' : 'selector' });
+
+    [...document.querySelectorAll('.query-checkbox')].map((elem, i) => { elem.checked = selectors.queries[i] });
+
+    document.getElementById('selector-opensource-yes').className = selectors.opensource.yes ? 'selector selector-active' : 'selector';
+    document.getElementById('selector-opensource-no').className = selectors.opensource.no ? 'selector selector-active' : 'selector';
+
+    document.getElementById('selector-hardware-cpu').className = selectors.hardware.cpu ? 'selector selector-active' : 'selector';
+    document.getElementById('selector-hardware-gpu').className = selectors.hardware.gpu ? 'selector selector-active' : 'selector';
+
+    document.getElementById('selector-tuned-yes').className = selectors.tuned.yes ? 'selector selector-active' : 'selector';
+    document.getElementById('selector-tuned-no').className = selectors.tuned.no ? 'selector selector-active' : 'selector';
+}
+
+function clearElement(elem)
+{
+    while (elem.firstChild) {
+        elem.removeChild(elem.lastChild);
+    }
+}
+
+/// Pick one of the three runs of a query (values are nanoseconds, returned as seconds).
+function selectRun(timings, metric) {
+    if (timings == null) return null;
+    const timing = metric == 'cold' ? timings[0] : metric == 'hot' ? timings[1] : timings[2];
+    return timing == null ? null : timing * ns_to_s;
+}
+
+/// Geometric mean of per-query time ratios against the baseline solution.
+function relativeQueryTime(num_queries, baseline_runs, runs, metric) {
+    const fallback_timing = missing_result_penalty * Math.max(missing_result_time, ...runs.map(timings => selectRun(timings, metric)).filter(x => x !== null));
+
+    let accumulator = 0;
+    let used_queries = 0;
+
+    const no_queries_selected = selectors.queries.filter(x => x).length == 0;
+
+    for (let i = 0; i < num_queries; ++i) {
+        if ((no_queries_selected || selectors.queries[i]) && queryPassesTagFilters(i)) {
+            const baseline_timing = selectRun(baseline_runs[i], metric);
+            /// Skip queries the baseline solution fails on - there is no ratio to take.
+            if (baseline_timing === null || !isFinite(baseline_timing)) continue;
+            const curr_timing = selectRun(runs[i], metric) ?? fallback_timing;
+            const ratio = (constant_time_add + curr_timing) / (constant_time_add + baseline_timing);
+            accumulator += Math.log(ratio);
+            ++used_queries;
+        }
+    }
+
+    return used_queries > 0 ? Math.exp(accumulator / used_queries) : null;
+}
+
+function addNote(text) {
+    let note = document.createElement('span');
+    note.className = 'note';
+    note.appendChild(document.createTextNode('†'));
+
+    let tooltip = document.createElement('span');
+    tooltip.className = 'tooltip tooltip-result';
+    tooltip.appendChild(document.createTextNode(text));
+
+    note.appendChild(tooltip);
+    return note;
+}
+
+function nameToColor(str) {
+    let x = 0;
+    for (let i = 0; i < str.length; i++) {
+        x += str.charCodeAt(i);
+        x *= 0xff51afd7;
+        x ^= x >> 17;
+    }
+
+    return 60 + Math.abs(x % 240);
+}
+
+/// The stable per-solution color, shared by the summary links and the pie chart slices.
+function solutionColor(solution) {
+    return `oklch(var(--hashed-link-lightness) 0.2018 ${nameToColor(solution.split(' ')[0])})`;
+}
+
+/// Pie chart of how many of the compared queries each solution wins (has the fastest time).
+/// On an exact tie every tied solution gets the win.
+function renderWinnersPie(filtered_data) {
+    const svg = document.getElementById('winners-pie');
+    const legend = document.getElementById('winners-legend');
+    clearElement(svg);
+    clearElement(legend);
+
+    const num_queries = filtered_data[0].runs.length;
+    const no_queries_selected = selectors.queries.filter(x => x).length == 0;
+    const wins = new Map(filtered_data.map(elem => [elem.solution, 0]));
+
+    for (let i = 0; i < num_queries; ++i) {
+        if (!((no_queries_selected || selectors.queries[i]) && queryPassesTagFilters(i))) continue;
+        const timings = filtered_data.map(elem => selectRun(elem.runs[i], selectors.metric));
+        const best = Math.min(...timings.filter(x => x !== null));
+        if (!isFinite(best)) continue;
+        filtered_data.forEach((elem, idx) => {
+            if (timings[idx] === best) { wins.set(elem.solution, wins.get(elem.solution) + 1); }
+        });
+    }
+
+    const winners = [...wins.entries()].filter(([solution, count]) => count > 0).sort((a, b) => b[1] - a[1]);
+    const total = winners.reduce((acc, [solution, count]) => acc + count, 0);
+    if (total == 0) { return; }
+
+    const svg_ns = 'http://www.w3.org/2000/svg';
+    let angle = -Math.PI / 2;
+    winners.forEach(([solution, count]) => {
+        let slice;
+        if (winners.length == 1) {
+            slice = document.createElementNS(svg_ns, 'circle');
+            slice.setAttribute('r', '1');
+        } else {
+            const sweep = count / total * 2 * Math.PI;
+            const x1 = Math.cos(angle), y1 = Math.sin(angle);
+            const x2 = Math.cos(angle + sweep), y2 = Math.sin(angle + sweep);
+            slice = document.createElementNS(svg_ns, 'path');
+            slice.setAttribute('d', `M 0 0 L ${x1} ${y1} A 1 1 0 ${sweep > Math.PI ? 1 : 0} 1 ${x2} ${y2} Z`);
+            angle += sweep;
+        }
+        slice.style.fill = solutionColor(solution);
+        /// Surface-colored gap between the slices
+        slice.style.stroke = 'var(--background-color)';
+        slice.style.strokeWidth = '0.02';
+
+        let title = document.createElementNS(svg_ns, 'title');
+        title.textContent = `${solution}: ${count} wins (${Math.round(count / total * 100)}%)`;
+        slice.appendChild(title);
+        svg.appendChild(slice);
+
+        let entry = document.createElement('span');
+        entry.className = 'winners-legend-entry';
+        let swatch = document.createElement('span');
+        swatch.className = 'winners-swatch';
+        swatch.style.background = solutionColor(solution);
+        entry.appendChild(swatch);
+        entry.appendChild(document.createTextNode(`${solution}: ${count}`));
+        legend.appendChild(entry);
+    });
+}
+
+/// Horizontal bar chart of one per-solution value in the summary-table anatomy,
+/// smallest value first. Returns whether any of the entries carries the value.
+function renderBarChart(table_id, entries, value_of, format_value, tooltip_suffix) {
+    const table = document.getElementById(table_id);
+    clearElement(table);
+
+    const with_value = entries.filter(elem => value_of(elem) != null);
+    if (!with_value.length) { return false; }
+
+    const max_value = Math.max(...with_value.map(value_of));
+    [...with_value].sort((a, b) => value_of(a) - value_of(b)).forEach(elem => {
+        const value = value_of(elem);
+        let tr = document.createElement('tr');
+        tr.title = `${elem.solution}: ${format_value(value)} ${tooltip_suffix}`;
+
+        let td_name = document.createElement('td');
+        td_name.className = 'summary-name';
+        let name = document.createElement('span');
+        name.style.color = solutionColor(elem.solution);
+        name.appendChild(document.createTextNode(elem.solution));
+        td_name.appendChild(name);
+        td_name.appendChild(document.createTextNode(': '));
+
+        let td_bar = document.createElement('td');
+        td_bar.className = 'summary-bar-cell';
+        let bar = document.createElement('div');
+        bar.className = 'summary-bar';
+        bar.style.width = `${value / max_value * 100}%`;
+        bar.style.background = solutionColor(elem.solution);
+        td_bar.appendChild(bar);
+
+        let td_number = document.createElement('td');
+        td_number.className = 'summary-number';
+        td_number.appendChild(document.createTextNode(format_value(value)));
+
+        tr.appendChild(td_name);
+        tr.appendChild(td_bar);
+        tr.appendChild(td_number);
+        table.appendChild(tr);
+    });
+    return true;
+}
+
+/// Bar charts of each solution's peak memory use (max_res_mem_kb) and in-memory data
+/// size. Both describe the whole benchmark run, so unlike the pie they are not
+/// affected by the query filters.
+function renderMemoryCharts(filtered_data) {
+    const has_mem = renderBarChart('memory-table', filtered_data,
+        elem => elem.max_res_mem_kb, value => value.toLocaleString('en-US'),
+        'kb maximum resident set size');
+    document.getElementById('memory-title').style.display = has_mem ? '' : 'none';
+
+    const has_size = renderBarChart('datasize-table', filtered_data,
+        elem => elem.data_size, value => Math.round(value).toLocaleString('en-US'),
+        'MB of loaded data');
+    document.getElementById('datasize-title').style.display = has_size ? '' : 'none';
+
+    document.getElementById('memory-panel').style.display = has_mem || has_size ? '' : 'none';
+}
+
+function renderSummary(filtered_data, baseline_runs) {
+    let table = document.getElementById('summary');
+    clearElement(table);
+
+    /// Generate summary
+
+    /// The algorithm: for each of the queries,
+    /// - if there is a result - take query duration, add 10 ms, and divide it to the corresponding value of the baseline solution,
+    /// - if there is no result - take the worst query duration across all query runs for this solution and multiply by 2.
+    /// Take geometric mean across the queries.
+
+    const num_queries = baseline_runs.length;
+
+    const summaries = filtered_data.map(elem => relativeQueryTime(num_queries, baseline_runs, elem.runs, selectors.metric));
+
+    const sorted_indices = [...summaries.keys()].sort((a, b) => summaries[a] - summaries[b]);
+
+    /// Scale the bars so that the slowest solution fills the row at the innermost zoom level.
+    /// All summaries are null when the filters leave no queries to compare.
+    const finite_summaries = summaries.filter(x => x !== null && isFinite(x));
+    const max_ratio = finite_summaries.length ? Math.max(10, Math.pow(10, Math.ceil(Math.log10(Math.max(...finite_summaries))))) : 10;
+
+    sorted_indices.map(idx => {
+        const elem = filtered_data[idx];
+
+        let tr = document.createElement('tr');
+        tr.className = 'summary-row';
+
+        tr.dataset.solution = elem.solution;
+
+        let td_name = document.createElement('td');
+        td_name.className = 'summary-name';
+
+        let remove = document.createElement('span');
+        remove.className = 'remove-system';
+        remove.textContent = '✕';
+        remove.title = 'Remove this solution from the selection';
+        remove.addEventListener('click', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            selectors.solution[elem.solution] = false;
+            for (const s of solutions.childNodes) {
+                if (s.tagName === 'A' && s.innerText === elem.solution) {
+                    s.className = 'selector';
+                }
+            }
+            render();
+            updateHistory();
+        });
+        td_name.appendChild(remove);
+
+        let link = document.createElement('a');
+        link.appendChild(document.createTextNode(elem.solution));
+        link.href = "https://github.com/KxSystems/NYSETAQBenchmarks";
+        link.style.color = solutionColor(elem.solution);
+        td_name.appendChild(link);
+
+        if (elem.comment) { td_name.appendChild(addNote(elem.comment)); }
+        td_name.appendChild(document.createTextNode(': '));
+
+        const ratio = summaries[idx];
+        const percentage = ratio !== null ? ratio / max_ratio * 100 : 0;
+
+        let td_number = document.createElement('td');
+        td_number.className = 'summary-number';
+        td_number.appendChild(document.createTextNode(ratio !== null ? `×${ratio.toFixed(2)}` : '—'));
+
+        let td_bar = document.createElement('td');
+        td_bar.className = 'summary-bar-cell';
+
+        let bar = document.createElement('div');
+
+        bar.className = `summary-bar`;
+        bar.style.background = `linear-gradient(to right,
+            var(--bar-color1) 0%,
+            var(--bar-color1) ${Math.min(100, percentage)}%,
+            var(--bar-color2) ${Math.min(100, percentage)}%,
+            var(--bar-color2) ${Math.min(100, percentage * 10)}%,
+            var(--bar-color3) ${Math.min(100, percentage * 10)}%,
+            var(--bar-color3) ${Math.min(100, percentage * 100)}%,
+            var(--bar-color4) ${Math.min(100, percentage * 100)}%,
+            var(--bar-color4) ${Math.min(100, percentage * 1000)}%,
+            transparent ${Math.min(100, percentage * 1000)}%,
+            transparent 100%)`;
+
+        td_bar.appendChild(bar);
+
+        if (elem.datadate) {
+            let date_span = document.createElement('span');
+            date_span.className = 'summary-date';
+            date_span.textContent = elem.datadate;
+            td_bar.appendChild(date_span);
+        }
+
+        tr.appendChild(td_name);
+        tr.appendChild(td_bar);
+        tr.appendChild(td_number);
+        table.appendChild(tr);
+    });
+
+    renderWinnersPie(filtered_data);
+    renderMemoryCharts(filtered_data);
+
+    return sorted_indices;
+}
+
+function colorize(elem, ratio) {
+    /// ratio from 0.9 to 1.1 - neutral: no background, on-par with the baseline
+    /// ratio below 0.9 - green, the smaller the ratio the darker (mirrors the
+    ///                   slow side on the inverse ratio: pale green to green to
+    ///                   dark green to near-black green)
+    /// ratio from 1.1 to 2 - pale yellow to yellow
+    /// ratio from 2 to 10 - yellow to red
+    /// ratio from 10 to 1000 to infinity - red to brown to black
+
+    /// Note: we are using RGB space without proper gamma correction. Read more: https://www.handprint.com/HP/WCL/color1.html
+
+    if (ratio !== null && ratio >= 0.9 && ratio <= 1.1) {
+        /// The best result is highlighted
+        if (ratio == 1) {
+            elem.style.fontWeight = 'bold';
+        }
+        return;
+    }
+
+    let [r, g, b] = [0, 0, 0];
+
+    if (ratio !== null) {
+        if (ratio < 0.9) {
+            const inv = 1 / ratio;
+            if (inv <= 2) {
+                g = 255;
+                r = b = (2 - inv) / (2 - 1 / 0.9) * 232;
+            } else if (inv <= 10) {
+                g = 100 + (10 - inv) / 8 * 155;
+            } else {
+                g = (1 - ((inv - 10) / ((inv - 10) + 1000))) * 100;
+            }
+        } else if (ratio <= 2) {
+            r = 255;
+            g = 255;
+            b = (2 - ratio) / (2 - 1.1) * 232;
+        } else if (ratio <= 10) {
+            g = (10 - ratio) / 8 * 255;
+            r = 255;
+        } else {
+            r = (1 - ((ratio - 10) / ((ratio - 10) + 1000))) * 255;
+        }
+    }
+
+    if (document.documentElement.getAttribute('data-theme') == 'dark') {
+        r /= 1.5;
+        g /= 1.5;
+        b /= 1.5;
+    }
+
+    elem.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+    if (ratio === null || ratio > 10 || ratio < 0.1) {
+        /// This will look better on dark backgrounds
+        elem.style.color = 'white';
+    } else {
+        elem.style.color = 'black';
+    }
+}
+
+function render() {
+    let details_head = document.getElementById('details_head');
+    let details_body = document.getElementById('details_body');
+    let load_times_head = document.getElementById('load_times_head');
+    let load_times_body = document.getElementById('load_times_body');
+
+    clearElement(details_head);
+    clearElement(details_body);
+    clearElement(load_times_head);
+    clearElement(load_times_body);
+
+    reconcile();
+
+    /// Each displayed entry keeps `runs`: the per-query timings for the selected thread count.
+    const filtered_data = data.filter(elem =>
+        matchesTopRow(elem) &&
+        selectors.solution[elem.solution] &&
+        elem.machine == selectors.machine &&
+        elem.datadate == selectors.date &&
+        elem.result[selectors.threads] != null
+    ).map(elem => ({...elem, runs: elem.result[selectors.threads]}));
+
+    /// The baseline entry is looked up independently of the solution selection,
+    /// so ratios stay stable when the baseline solution itself is hidden from the charts.
+    const baseline_entry = data.find(elem =>
+        matchesTopRow(elem) &&
+        elem.solution == selectors.baseline &&
+        elem.machine == selectors.machine &&
+        elem.datadate == selectors.date &&
+        elem.result[selectors.threads] != null) ?? filtered_data[0];
+
+    rebuildDynamicSelectors(new Set(baseline_entry ? [...filtered_data.map(elem => elem.solution), baseline_entry.solution] : []));
+
+    let nothing_selected_elem = document.getElementById('nothing-selected');
+    if (filtered_data.length == 0) {
+        nothing_selected_elem.style.display = 'block';
+        [...document.querySelectorAll('.comparison')].map(e => e.style.display = 'none');
+        return;
+    }
+    nothing_selected_elem.style.display = 'none';
+    /// Reset to the stylesheet display value (the summary container is a flexbox, not a block).
+    [...document.querySelectorAll('.comparison')].map(e => e.style.display = '');
+
+    const baseline_runs = baseline_entry.result[selectors.threads];
+    document.getElementById('baseline-name').innerText = baseline_entry.solution;
+
+    const sorted_indices = renderSummary(filtered_data, baseline_runs);
+
+    /// Generate details
+
+    /// Global checkbox
+    {
+        let th_checkbox = document.createElement('th');
+        let checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = true;
+        checkbox.addEventListener('change', e => {
+            [...document.querySelectorAll('.query-checkbox')].map(elem => { elem.checked = e.target.checked });
+            selectors.queries.map((_, i) => { selectors.queries[i] = e.target.checked });
+            renderSummary(filtered_data, baseline_runs);
+            updateHistory();
+        });
+        th_checkbox.appendChild(checkbox);
+        details_head.appendChild(th_checkbox);
+        details_head.appendChild(document.createElement('th'));
+    }
+
+    /// Table header
+    sorted_indices.map(idx => {
+        const elem = filtered_data[idx];
+        let th = document.createElement('th');
+        th.appendChild(document.createTextNode(elem.solution));
+        th.className = 'th-entry';
+        th.dataset.solution = elem.solution;
+        details_head.appendChild(th);
+    });
+
+    /// Load times, one row per load phase, in their own table at the bottom of the page
+    const load_phases = load_phase_order.filter(phase =>
+        filtered_data.some(elem => elem.load_time?.[phase]?.[selectors.threads] != null));
+
+    document.getElementById('load-times-heading').style.display = load_phases.length ? '' : 'none';
+
+    if (load_phases.length) {
+        load_times_head.appendChild(document.createElement('th'));
+        sorted_indices.map(idx => {
+            const elem = filtered_data[idx];
+            let th = document.createElement('th');
+            th.appendChild(document.createTextNode(elem.solution));
+            th.className = 'th-entry';
+            th.dataset.solution = elem.solution;
+            load_times_head.appendChild(th);
+        });
+    }
+
+    load_phases.forEach(phase => {
+        let tr = document.createElement('tr');
+        tr.className = 'shadow';
+
+        let td_title = document.createElement('td');
+        td_title.appendChild(document.createTextNode(`${phase}: `));
+        tr.appendChild(td_title);
+
+        const baseline_ns = baseline_entry.load_time?.[phase]?.[selectors.threads];
+        const baseline_timing = baseline_ns != null ? baseline_ns * ns_to_s : null;
+
+        sorted_indices.map(idx => {
+            const curr_ns = filtered_data[idx].load_time?.[phase]?.[selectors.threads];
+            const curr_timing = curr_ns != null ? curr_ns * ns_to_s : null;
+            const ratio = curr_timing !== null && baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
+
+            let td = document.createElement('td');
+            td.appendChild(document.createTextNode(curr_timing !== null ? `${curr_timing.toFixed(3)}s${ratio !== null ? ` (×${ratio.toFixed(2)})` : ''}` : '☠'));
+
+            colorize(td, ratio);
+            tr.appendChild(td);
+        });
+
+        load_times_body.appendChild(tr);
+    });
+
+    /// Query runtimes
+    const num_queries = filtered_data[0].runs.length;
+
+    for (let query_num = 0; query_num < num_queries; ++query_num) {
+        if (!queryPassesTagFilters(query_num)) { continue; }
+
+        let tr = document.createElement('tr');
+        tr.className = 'shadow';
+
+        let td_checkbox = document.createElement('td');
+        let checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'query-checkbox';
+        checkbox.checked = selectors.queries[query_num];
+        checkbox.addEventListener('change', e => {
+            selectors.queries[query_num] = e.target.checked;
+            renderSummary(filtered_data, baseline_runs);
+            updateHistory();
+        });
+        td_checkbox.appendChild(checkbox);
+        tr.appendChild(td_checkbox);
+
+        let td_query_num = document.createElement('td');
+        td_query_num.className = 'note';
+        td_query_num.appendChild(document.createTextNode(`Q${query_num + 1}. `));
+
+        let tooltip = document.createElement('span');
+        tooltip.className = 'tooltip tooltip-query';
+        const tags = query_tags[query_num] ?? [];
+        tooltip.appendChild(document.createTextNode(`Query ${query_num + 1}: ${queries[query_num] ?? '(no description)'}`
+            + (tags.length ? `\nTags: ${tags.join(', ')}` : '')));
+        td_query_num.appendChild(tooltip);
+
+        tr.appendChild(td_query_num);
+
+        sorted_indices.map((idx, col) => {
+            const curr_timing = selectRun(filtered_data[idx].runs[query_num], selectors.metric);
+            const baseline_timing = selectRun(baseline_runs[query_num], selectors.metric);
+            const ratio = curr_timing !== null && baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
+
+            let td = document.createElement('td');
+            td.appendChild(document.createTextNode(curr_timing !== null ? `${curr_timing.toFixed(3)}s${ratio !== null ? ` (×${ratio.toFixed(2)})` : ''}` : '☠'));
+
+            colorize(td, ratio);
+
+            /// The query this solution's engine actually ran, shown on hover. Columns
+            /// in the left half of the table grow the tooltip rightwards and vice versa.
+            const engine_query = filtered_data[idx].queries_tooltip?.[query_num];
+            if (engine_query) {
+                let tooltip = document.createElement('span');
+                tooltip.className = 'tooltip tooltip-engine-query'
+                    + (col * 2 < sorted_indices.length ? ' tooltip-engine-query-left' : '');
+                tooltip.appendChild(document.createTextNode(engine_query));
+                td.appendChild(tooltip);
+            }
+
+            tr.appendChild(td);
+        });
+
+        details_body.appendChild(tr);
+    }
+
+    findPassiveSelectors(filtered_data);
+
+    /// The small hint below the column heading
+    document.getElementById("scale_hint").textContent = 'Different colors on the bar chart represent the same values shown at different scales (1x, 10x, 100x zoom)';
+}
+
+function isSubsequence(str, subseq) {
+    let i = 0, j = 0;
+    while (i < str.length && j < subseq.length) {
+        if (str[i] === subseq[j]) j++;
+        i++;
+    }
+    return j === subseq.length;
+}
+
+/// A greedy algorithm to find a unique subsequence of a string in a set. Does not necessarily the smallest one.
+function findUniqueSubsequence(target, others) {
+    const num_matches = others.filter(s => isSubsequence(s, target)).length;
+    let num_failures = 0;
+    for (let i = 0; i < 1000; ++i) {
+        /// We cut characters from pseudorandom places, this gives shorter subsequences than cutting prefix/suffix.
+        const cut_idx = (i + 123) * 67601 % target.length;
+        const cut = target.substring(0, cut_idx) + target.substring(cut_idx + 1, target.length);
+        if (others.filter(s => isSubsequence(s, cut)).length == num_matches) {
+            target = cut;
+            num_failures = 0;
+        } else {
+            ++num_failures;
+            if (num_failures == target.length) {
+                break;
+            }
+        }
+    }
+    return target;
+}
+
+function encodedStrings(strings) {
+    let res = {};
+    strings.forEach(s => { res[s] = findUniqueSubsequence(s, strings) });
+    return res;
+}
+
+let encoded_keys = {};
+function encodeState(selectors) {
+    return Object.keys(selectors).map(k => {
+        let encoded_str = k + '=';
+        if (typeof selectors[k] === 'string') {
+            return encoded_str + selectors[k];
+        }
+        if (!encoded_keys[k]) {
+            encoded_keys[k] = encodedStrings(Object.keys(selectors[k]));
+        }
+        const count_total = Object.values(selectors[k]).length;
+        const count_selected = Object.values(selectors[k]).filter(x => x).length;
+        if (count_selected * 2 <= count_total) {
+            encoded_str += '+' + Object.keys(selectors[k]).filter(x => selectors[k][x]).map(x => encoded_keys[k][x]).join('|');
+        } else {
+            encoded_str += '-' + Object.keys(selectors[k]).filter(x => !selectors[k][x]).map(x => encoded_keys[k][x]).join('|');
+        }
+        return encoded_str;
+    }).join('&');
+}
+
+function decodeState(state) {
+    let decoded = {};
+    state.split('&').forEach(kv => {
+        let [k, v] = kv.split('=');
+
+        if (typeof selectors[k] === 'string') {
+            decoded[k] = v;
+        } else if (typeof selectors[k] === 'object' && selectors[k] !== null) {
+            decoded[k] = Array.isArray(selectors[k]) ? [] : {};
+
+            const filtered = v.substring(1, v.length).split('|').filter(s => s !== '')
+                .map(substr => Object.keys(selectors[k]).filter(x => isSubsequence(x, decodeURIComponent(substr))).reduce((a, b) => a.length <= b.length ? a : b));
+
+            if (v.startsWith('+')) {
+                Object.keys(selectors[k]).forEach(x => {
+                    decoded[k][x] = filtered.includes(x);
+                });
+            } else if (v.startsWith('-')) {
+                Object.keys(selectors[k]).forEach(x => {
+                    decoded[k][x] = !filtered.includes(x);
+                });
+            }
+        } else {
+            decoded[k] = v;
+        }
+    });
+    return decoded;
+}
+
+function applyStateDefaults() {
+    if (!selectors.opensource) {
+        selectors.opensource = {"yes": true, "no": true};
+    }
+    if (!selectors.hardware) {
+        selectors.hardware = {"cpu": true, "gpu": false};
+    }
+    if (!selectors.tuned) {
+        selectors.tuned = {"no": true, "yes": false};
+    }
+    if (!selectors.metric) {
+        selectors.metric = 'hot';
+    }
+    if (!selectors.baseline) {
+        selectors.baseline = 'kdb';
+    }
+    if (!selectors.instrument) {
+        selectors.instrument = Object.fromEntries(
+            [...Object.keys(instrument_values), ...Object.keys(instrument_freq_values),
+             ...Object.keys(instrument_multi_values)]
+                .map(value => [value, true]));
+    }
+    if (!selectors.complexity) {
+        selectors.complexity = Object.fromEntries(
+            Object.keys(complexity_values).map(value => [value, true]));
+    }
+    if (!selectors.tag_include) {
+        selectors.tag_include = allFalseTagMap();
+    }
+    if (!selectors.tag_exclude) {
+        selectors.tag_exclude = allFalseTagMap();
+    }
+}
+
+function allFalseTagMap() {
+    return Object.fromEntries([...new Set(query_tags.flat())].map(tag => [tag, false]));
+}
+
+function updateHistory() {
+    history.pushState(selectors, '',
+        window.location.pathname + (window.location.search || '') + '#' + encodeState(selectors));
+}
+
+window.onpopstate = function(event) {
+    if (!event.state) { return; }
+    selectors = event.state;
+    applyStateDefaults();
+    updateSelectors();
+    render();
+};
+
+async function init() {
+    /// The tag selectors must exist before the URL hash is decoded,
+    /// otherwise a shared link cannot restore the tag filters.
+    await loadQueryMeta();
+
+    if (window.location.hash) {
+        try {
+            selectors = decodeState(decodeURIComponent(window.location.hash.substring(1)));
+            applyStateDefaults();
+        } catch {}
+    }
+
+    updateSelectors();
+    render();
+}
+
+init();
+
+</script>
+</body>
+</html>

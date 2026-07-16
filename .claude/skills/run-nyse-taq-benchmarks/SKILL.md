@@ -58,8 +58,8 @@ Decide where to enter the workflow:
   Parquet additionally for the query-engine benchmark) → **skip Steps 2–3 and go
   straight to [Step 4](#step-4--run-the-benchmark)**. This is the right path when
   the user just wants to re-run with different thread counts or other query
-  parameters. Still confirm `SIZE` and `DATE` match what was generated, and that
-  the format required by the chosen benchmark is present.
+  parameters. Still confirm `SIZE` and `DATADATE` match what was generated, and
+  that the format required by the chosen benchmark is present.
 - **Partially present** (e.g. kdb+ exists but Parquet does not, and the
   query-engine benchmark needs both) → run only the missing part of Step 3, then
   go to Step 4.
@@ -73,7 +73,9 @@ Check these before running anything; a missing one causes a confusing
 mid-pipeline failure:
 
 - **KDB-X (`q`) installed and on `PATH`** — required for the kdb+ parser and all
-  kdb/sql runs. See https://code.kx.com/kdb-x/get_started/kdb-x-install.html
+  kdb/sql runs. The suite relies on modules, so KDB-X is required; it does not
+  run on kdb+ versions prior to 5.0. See
+  https://code.kx.com/kdb-x/get_started/kdb-x-install.html
 - **`uv`** (Astral) — runs every Python engine and the Parquet parser.
   https://docs.astral.sh/uv/getting-started/installation/
 - **Git submodule initialized** — the suite calls scripts from the KDB-X taq
@@ -109,16 +111,16 @@ changes `SIZE`, re-run Steps 2–3.
 export NYSEBENCHMARKDIR=$PWD/DATA   # where PSVs + DBs live (under the repo's DATA dir, gitignored)
 
 # Latest available date on the NYSE FTP server:
-export DATE=$(curl -s https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/ \
+export DATADATE=$(curl -s https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/ \
   | grep -oE 'EQY_US_ALL_TRADE_2[0-9]{7}' | grep -oE '2[0-9]{7}' | head -1)
 
 ./external/kx/taq/scripts/getPSVs.sh \
-  --csvdir ${NYSEBENCHMARKDIR}/${SIZE}/psv --dates ${DATE} --size ${SIZE}
+  --csvdir ${NYSEBENCHMARKDIR}/${SIZE}/psv --dates ${DATADATE} --size ${SIZE}
 ```
 
 Notes:
 - Downloads use `curl -C` and **resume** if interrupted — safe to re-run.
-- `${DATE}` is reused by every later command; keep it exported in the session.
+- `${DATADATE}` is reused by every later command; keep it exported in the session.
 - This is the slow, network-heavy step. Do **not** delete the `psv` directory
   until the binary databases are generated and verified (Step 3).
 
@@ -134,29 +136,29 @@ the Python dataframe/SQL engines read Parquet:
 | `--engines` value | Engine | Required format |
 | --- | --- | --- |
 | `kdb` | KDB-X (q-sql) | kdb+ |
-| `sql` | KDB-X SQL | kdb+ |
+| `kdbxsql` | KDB-X SQL | kdb+ |
 | `pykx` | KDB-X Python (`pykx`) | kdb+ |
 | `duckdb` | DuckDB | Parquet |
 | `polars` | Polars | Parquet |
 | `pandas` | Pandas | Parquet |
 
-So generate only kdb+ if restricting to `kdb`/`sql`/`pykx`, only Parquet if
+So generate only kdb+ if restricting to `kdb`/`kdbxsql`/`pykx`, only Parquet if
 restricting to `duckdb`/`polars`/`pandas`, and **both** for the default (all
 engines). The attribute benchmark always needs kdb+ only.
 
 **For the query-engine benchmark with all engines — generate BOTH formats:**
 ```bash
 DATAFORMAT=kdb ./generateDB.sh \
-  ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
+  ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATADATE}
 
 SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh \
-  ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATE}
+  ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATADATE}
 ```
 
 **For the attribute benchmark — kdb+ only:**
 ```bash
 DATAFORMAT=kdb ./generateDB.sh \
-  ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATE}
+  ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATADATE}
 ```
 
 The benchmark scripts expect the layout `${NYSEBENCHMARKDIR}/${SIZE}/{kdb,parquet/rowgroup}`,
@@ -172,42 +174,45 @@ rm -rf ${NYSEBENCHMARKDIR}/${SIZE}/psv
 `--db-dir` is the per-size directory (`${NYSEBENCHMARKDIR}/${SIZE}`), **not** the
 `kdb`/`parquet` subdirectory — the scripts append those themselves.
 
+Results are written under the directory given by `--result-dir`. Use a per-run
+subdirectory (e.g. a timestamp) so successive runs don't overwrite each other.
+
 ### Query-engine benchmark
 ```bash
 export NUMANODE=0   # optional: pins CPU+memory to NUMA node 0 via numactl
+TESTTIME="$(date +%Y%m%d_%H%M)"
 ./benchmarks/inmemory/queryEngines.sh \
   --db-dir   ${NYSEBENCHMARKDIR}/${SIZE} \
   --param-dir ./artifacts/parameters/${SIZE} \
-  --date     ${DATE} \
+  --datadate ${DATADATE} \
   --threads  "0 4 16 64" \
-  --results  ./results/inmemory/${SIZE}/queryengines.psv \
-  --stats-dir ./results/inmemory/${SIZE}/queryengines
+  --result-dir ./results/inmemory/${SIZE}/${TESTTIME}
 ```
 
 ### Attribute / table-format benchmark
 ```bash
 export NUMANODE=0
+TESTTIME="$(date +%Y%m%d_%H%M)"
 ./benchmarks/inmemory/kdbAttributes.sh \
   --db-dir   ${NYSEBENCHMARKDIR}/${SIZE} \
   --param-dir ./artifacts/parameters/${SIZE} \
-  --date     ${DATE} \
+  --datadate ${DATADATE} \
   --threads  "0 4 16 64" \
-  --results  ./results/inmemory/${SIZE}/kdbattr.psv \
-  --stats-dir ./results/inmemory/${SIZE}/kdbattr
+  --result-dir ./results/inmemory/${SIZE}/${TESTTIME}
 ```
 
 ### Arguments
 
-Mandatory: `--db-dir`, `-p/--param-dir`, `-d/--date`.
+Mandatory: `--db-dir`, `-p/--param-dir`, `-d/--datadate`.
 
 Optional:
 | Flag | Meaning | Default |
 | --- | --- | --- |
 | `-t`, `--threads` | space-separated secondary-thread counts to test; each engine runs once per value (`0` = no secondary threads) | `"1 4"` |
-| `-e`, `--engines` | (queryEngines only) comma-separated subset of `kdb,sql,duckdb,polars,pykx,pandas` | all |
-| `-s`, `--stats-dir` | per-table stats (one YAML per table + `time -v` output) | `./results/inmemory/<bench>` |
+| `-e`, `--engines` | (queryEngines only) comma-separated subset of `kdb,kdbxsql,duckdb,polars,pykx,pandas` | all |
 | `-i`, `--idx` | run a subset of queries: `42`, `32,42,50`, or range `40-44` | all |
-| `-r`, `--results` | single merged output PSV | `./results/inmemory/<bench>.psv` |
+| `-q`, `--query-output-dir` | persist each engine's query outputs as `queryoutput_<idx>.csv` (per-engine subdir) for cross-engine correctness checks | not persisted |
+| `-r`, `--result-dir` | directory for the merged `results.psv`, plus per-solution stats (`<solution>/stats.yaml` + `os.txt`) and `environment.yaml` | `./results/inmemory` |
 | `-h`, `--help` | usage | — |
 
 Tips for narrowing a run while iterating:
@@ -217,13 +222,19 @@ Tips for narrowing a run while iterating:
   `pysrc/queryrunner/main.py` (e.g. `"pykx==4.0.0"`).
 - `NUMANODE` launches every engine under `numactl -N <n> -m <n>`. Leave it unset
   on machines without NUMA or when pinning is not wanted.
-- `pykx` is currently commented out in `queryEngines.sh`; don't promise pykx
-  numbers from that script unless it has been re-enabled.
+- Engine-specific env vars are read at runtime — `export` them before launching.
+  Notably `SYMENUMBYTABLE` (`duckdb`, default `false`): when `false` a single
+  shared `sym_enum` is applied to all three tables; when truthy (`true`/`1`/`yes`)
+  each table gets its own ENUM built from only its distinct symbols.
+- To verify engines return equivalent results, pass `-q/--query-output-dir` to
+  persist per-engine outputs, then compare two engines with
+  `q src/compareOutput.q -querymeta ... -queryoutput1 <dirA> -queryoutput2 <dirB>`.
+  See the README's *Verifying Query Output Correctness* section.
 
 ## Reading the results
 
-Both scripts emit one merged **pipe-separated (PSV)** file (`--results`): a
-header row, one row per query, plus setup rows. Key columns:
+Both scripts emit one merged **pipe-separated (PSV)** file, `results.psv`, in the
+`--result-dir`: a header row, one row per query, plus setup rows. Key columns:
 
 - `runner` / `engine` — harness and engine (e.g. `KDB-X`/`kdb`, `Python`/`duckdb_con`).
 - `solution` — distinguishes runs of the same engine with different sort/index
@@ -232,16 +243,15 @@ header row, one row per query, plus setup rows. Key columns:
 - `threadcount` — secondary threads used (`0` = none).
 - `idx` — query index. Positive = a benchmark query; non-positive = setup:
   `0` load partition, `-1` transform, `-2` sort, `-3` index.
-- `tags` — query category tags (e.g. `timefilter,groupby,advanced`); setup rows
-  are tagged `load`.
-- `status` — `success`, `error`, `idxfiltered`, or `tagfiltered`.
+- `status` — `success`, `error`, `idxfiltered`, `tagfiltered`, or `instrumentfiltered`.
 - `run1timeNS` (cold) / `run2timeNS`, `run3timeNS` (warm) — each query runs
   3×; `run3memKB` is peak memory of run 3; `ressizeKB` is result size.
   IO columns should be ~0 for these in-memory benchmarks.
 
 When comparing engines, compare warm runs (`run2`/`run3`) at the same
-`threadcount` and `idx`. Per-table stats and OS `time -v` output land under
-`--stats-dir`.
+`threadcount` and `idx`. Per-table stats and OS `time -v` output land in
+per-solution subdirectories of `--result-dir` (`<solution>/stats.yaml` and
+`<solution>/os.txt`).
 
 ## Troubleshooting
 
@@ -256,4 +266,5 @@ When comparing engines, compare warm runs (`run2`/`run3`) at the same
 - **Out-of-memory on `medium`+ with Community Edition** — drop to `small`, or use
   a non-Community KDB-X license.
 - A single engine erroring shows up as `status=error` rows rather than aborting
-  the suite — inspect those rows and the `--stats-dir` `os.txt` for the cause.
+  the suite — inspect those rows and the per-solution `os.txt` under
+  `--result-dir` for the cause.
