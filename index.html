@@ -527,12 +527,6 @@
                 <a id="selector-hardware-cpu" class="selector selector-active">CPU</a>
                 <a id="selector-hardware-gpu" class="selector">GPU</a>
             </span>
-            <span class="inline-filter-separator"></span>
-            <span class="inline-filter" id="selectors_tuned">
-                <span class="inline-filter-label">Tuned:</span>
-                <a id="selector-tuned-no" class="selector selector-active">No</a>
-                <a id="selector-tuned-yes" class="selector">Yes</a>
-            </span>
         </td>
     </tr>
     <tr class="selector-separator"><td colspan="2"></td></tr>
@@ -544,8 +538,8 @@
             <span class="inline-filter">
                 <span class="inline-filter-label">Metric:</span>
                 <span id="selectors_run">
-                    <a class="selector" id="selector-metric-cold">Cold Run</a>
-                    <a class="selector selector-active" id="selector-metric-hot">Hot Run</a>
+                    <a class="selector selector-active" id="selector-metric-cold">Cold Run</a>
+                    <a class="selector" id="selector-metric-hot">Hot Run</a>
                     <a class="selector" id="selector-metric-hot2">Second Hot Run</a>
                 </span>
             </span>
@@ -622,11 +616,11 @@
     </div>
     <div id="memory-panel">
         <div id="memory-title">Max Res Mem (kb)<br/>
-            <span id="memory-hint">maximum resident set size of the benchmark process; not affected by the query filters</span>
+            <span id="memory-hint">maximum resident set size of the benchmark process (reported by <code>time -v</code>)</span>
         </div>
         <table id="memory-table" aria-label="Bar chart of maximum resident memory per solution"></table>
         <div id="datasize-title">Data size (MB)<br/>
-            <span id="datasize-hint">in-memory size of the loaded tables; not affected by the query filters</span>
+            <span id="datasize-hint">in-memory size of the loaded tables reported (by the engine)</span>
         </div>
         <table id="datasize-table" aria-label="Bar chart of in-memory data size per solution"></table>
     </div>
@@ -703,16 +697,22 @@ const complexity_values = {
     'complex': 'complex',
 };
 
+/// Tags excluded by default; queries carrying them are hidden until deselected.
+const default_excluded_tags = ['manydummyfilters', 'unnecessarycolumnfetch'];
+
+const default_baseline = 'KDB-X';
+const default_threads = '4';
+const default_metric = 'cold';
+
 let selectors = {
     "solution": {},
     "machine": null,
     "date": null,
     "threads": null,
-    "baseline": "kdb",
+    "baseline": default_baseline,
     "opensource": {"yes": true, "no": true},
     "hardware": {"cpu": true, "gpu": false},
-    "tuned": {"no": true, "yes": false},
-    "metric": "hot",
+    "metric": default_metric,
     "instrument": {},
     "complexity": {},
     "tag_include": {},
@@ -832,20 +832,6 @@ document.getElementById('selector-hardware-gpu').addEventListener('click', e => 
     updateHistory();
 });
 
-document.getElementById('selector-tuned-yes').addEventListener('click', e => {
-    selectors.tuned.yes = !selectors.tuned.yes;
-    e.target.classList.toggle('selector-active', selectors.tuned.yes);
-    render();
-    updateHistory();
-});
-
-document.getElementById('selector-tuned-no').addEventListener('click', e => {
-    selectors.tuned.no = !selectors.tuned.no;
-    e.target.classList.toggle('selector-active', selectors.tuned.no);
-    render();
-    updateHistory();
-});
-
 document.getElementById('select-all-solutions').addEventListener('click', e => toggleAll(e, 'solution'));
 
 [...document.getElementById('selectors_run').querySelectorAll('a')].map(elem => elem.addEventListener('click', e => {
@@ -948,11 +934,12 @@ async function loadQueryMeta() {
 
     [[tag_includes, 'tag_include'], [tag_excludes, 'tag_exclude']].forEach(([container, selectors_key]) => {
         all_tags.forEach(tag => {
+            const active = selectors_key === 'tag_exclude' && default_excluded_tags.includes(tag);
             let selector = document.createElement('a');
-            selector.className = 'selector';
+            selector.className = active ? 'selector selector-active' : 'selector';
             selector.appendChild(document.createTextNode(tag));
             container.appendChild(selector);
-            selectors[selectors_key][tag] = false;
+            selectors[selectors_key][tag] = active;
             selector.addEventListener('click', e => toggle(e, tag, selectors_key));
         });
     });
@@ -1056,8 +1043,7 @@ function queryPassesTagFilters(query_num) {
 }
 
 function matchesTopRow(elem) {
-    return ((selectors.tuned.yes && elem.tuned === "yes") || (selectors.tuned.no && elem.tuned === "no")) &&
-        ((selectors.opensource.yes && elem.proprietary === "no") || (selectors.opensource.no && elem.proprietary === "yes")) &&
+    return ((selectors.opensource.yes && elem.proprietary === "no") || (selectors.opensource.no && elem.proprietary === "yes")) &&
         ((selectors.hardware.cpu && (elem.hardware === "cpu" || !elem.hardware)) || (selectors.hardware.gpu && elem.hardware === "gpu"));
 }
 
@@ -1080,11 +1066,12 @@ function reconcile() {
 
     const available_threads = availableThreads(base);
     if (!available_threads.includes(selectors.threads)) {
-        selectors.threads = available_threads[available_threads.length - 1];
+        selectors.threads = available_threads.includes(default_threads)
+            ? default_threads : available_threads[available_threads.length - 1];
     }
 
     if (!unique_solutions.includes(selectors.baseline)) {
-        selectors.baseline = unique_solutions.includes('kdb') ? 'kdb' : unique_solutions[0];
+        selectors.baseline = unique_solutions.includes(default_baseline) ? default_baseline : unique_solutions[0];
     }
 }
 
@@ -1179,9 +1166,6 @@ function updateSelectors() {
 
     document.getElementById('selector-hardware-cpu').className = selectors.hardware.cpu ? 'selector selector-active' : 'selector';
     document.getElementById('selector-hardware-gpu').className = selectors.hardware.gpu ? 'selector selector-active' : 'selector';
-
-    document.getElementById('selector-tuned-yes').className = selectors.tuned.yes ? 'selector selector-active' : 'selector';
-    document.getElementById('selector-tuned-no').className = selectors.tuned.no ? 'selector selector-active' : 'selector';
 }
 
 function clearElement(elem)
@@ -1820,14 +1804,11 @@ function applyStateDefaults() {
     if (!selectors.hardware) {
         selectors.hardware = {"cpu": true, "gpu": false};
     }
-    if (!selectors.tuned) {
-        selectors.tuned = {"no": true, "yes": false};
-    }
     if (!selectors.metric) {
-        selectors.metric = 'hot';
+        selectors.metric = default_metric;
     }
     if (!selectors.baseline) {
-        selectors.baseline = 'kdb';
+        selectors.baseline = default_baseline;
     }
     if (!selectors.instrument) {
         selectors.instrument = Object.fromEntries(
@@ -1843,12 +1824,16 @@ function applyStateDefaults() {
         selectors.tag_include = allFalseTagMap();
     }
     if (!selectors.tag_exclude) {
-        selectors.tag_exclude = allFalseTagMap();
+        selectors.tag_exclude = tagMap(tag => default_excluded_tags.includes(tag));
     }
 }
 
 function allFalseTagMap() {
-    return Object.fromEntries([...new Set(query_tags.flat())].map(tag => [tag, false]));
+    return tagMap(() => false);
+}
+
+function tagMap(value) {
+    return Object.fromEntries([...new Set(query_tags.flat())].map(tag => [tag, value(tag)]));
 }
 
 function updateHistory() {

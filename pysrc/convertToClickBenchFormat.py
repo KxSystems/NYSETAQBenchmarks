@@ -37,7 +37,6 @@ entry mirrors the ClickBench result format with these differences:
   * machine      : mappings.yaml["machines"][cpu.model]
   * proprietary  : from the solution's stats.yaml
   * hardware     : "cpu" (GPUs are not supported yet)
-  * tuned        : "no"
   * tags         : []
   * load_time    : {load phase -> thread count -> run1timeNS} for the load
                    phases present ("load a partition into memory", "transform",
@@ -243,7 +242,6 @@ def build_entry(solution, runs, date, machine, proprietary, data_size, max_res_m
         ("engine", engines.pop() if engines else None),
         ("proprietary", proprietary),
         ("hardware", "cpu"),
-        ("tuned", "no"),
         ("tags", []),
         ("load_time", build_load_time(runs)),
         ("data_size", data_size),

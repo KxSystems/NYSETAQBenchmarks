@@ -5,8 +5,8 @@ idx|tags|query|parameter
 4||SELECT * FROM trade WHERE time BETWEEN '0D10:00:00' AND '0D10:00:10'|
 5||SELECT * FROM quote WHERE sym = $1 AND time BETWEEN '0D08:30' AND '0D16:30'|infreqInstr
 6||SELECT * FROM quote WHERE sym = $1 AND time BETWEEN '0D08:30' AND '0D16:30'|freqInstr
-7||SELECT * FROM quote WHERE sym IN $1 AND time BETWEEN '0D08:30' AND '0D08:35'|fiftyInstrs
-8||SELECT * FROM quote WHERE sym IN $1 AND time BETWEEN '0D08:30' AND '0D08:35'|thousandInfreqInstrs
+7||SELECT * FROM quote WHERE time BETWEEN '0D08:30' AND '0D08:35' AND sym IN $1|fiftyInstrs
+8||SELECT * FROM quote WHERE time BETWEEN '0D08:30' AND '0D08:35' AND sym IN $1|thousandInfreqInstrs
 9||SELECT sym, time, price, size, stop, cond, ex FROM trade WHERE source = 'N'|
 10||SELECT time, (bid + ask) / 2 AS mid FROM quote WHERE sym = $1|infreqInstr
 11||SELECT time, (bid + ask) / 2 AS mid FROM quote WHERE sym = $1|freqInstr
@@ -17,7 +17,7 @@ idx|tags|query|parameter
 16||SELECT sym, time, bid, ask, bsize, asize, cond, ex FROM quote WHERE sym = $1|infreqInstr
 17||SELECT sym, time, bid, ask, bsize, asize, cond, ex FROM quote WHERE sym = $1|freqInstr
 18||SELECT sym, time, bid, ask, bsize, asize, cond, ex FROM quote WHERE sym IN $1 AND CAST(2000 AS INTEGER)<bsize+asize|fiftyInstrs
-19||SELECT sym, time, bid, ask, bsize, asize, cond, ex FROM quote WHERE sym IN $1 AND CAST(2000 AS INTEGER)<bsize+asize|thousandInfreqInstrs
+19||SELECT sym, time, bid, ask, bsize, asize, cond, ex FROM quote WHERE CAST(2000 AS INTEGER)<bsize+asize AND sym IN $1|thousandInfreqInstrs
 20||SELECT AVG((bsize * bid + asize * ask) / (bsize + asize)) AS avgLiqWMid FROM quote WHERE sym = $1|infreqInstr
 21||SELECT AVG((bsize * bid + asize * ask) / (bsize + asize)) AS avgLiqWMid FROM quote WHERE sym = $1|freqInstr
 22||SELECT xbar('0D00:10', time), AVG((bsize * bid + asize * ask) / (bsize + asize)) AS avgLiqWMid, ex FROM quote WHERE sym = $1 GROUP BY xbar('0D00:10', time), ex|infreqInstr
@@ -63,7 +63,7 @@ idx|tags|query|parameter
 62||WITH tb AS (SELECT bucket, bound, ROW_NUMBER() OVER () AS rn FROM timeBuckets) SELECT ex, FIRST(bucket) AS timeBucket, COUNT(*) AS cnt, SUM(size) AS size FROM trade t ASOF JOIN tb ON t.time >= tb.bound GROUP BY ex, rn|
 63||SELECT sym, timebucketsstep(time), COUNT(*) AS cnt, SUM(size) FROM trade WHERE NOT corr=CAST(0 AS SMALLINT) GROUP BY sym, timebucketsstep(time)|
 64||SELECT sym, xbar('0D00:05', time), FIRST(price) AS o, MAX(price) AS h, MIN(price) AS l, LAST(price) AS c, SUM(size) AS s FROM trade WHERE sym IN $1 AND stop IS NOT NULL GROUP BY sym, xbar('0D00:05', time)|fiftyInstrs
-65||SELECT sym, xbar('0D00:05', time), FIRST(price) AS o, MAX(price) AS h, MIN(price) AS l, LAST(price) AS c, SUM(size) AS s FROM trade WHERE sym IN $1 AND stop IS NOT NULL GROUP BY sym, xbar('0D00:05', time)|thousandInfreqInstrs
+65||SELECT sym, xbar('0D00:05', time), FIRST(price) AS o, MAX(price) AS h, MIN(price) AS l, LAST(price) AS c, SUM(size) AS s FROM trade WHERE stop IS NOT NULL AND sym IN $1 GROUP BY sym, xbar('0D00:05', time)|thousandInfreqInstrs
 66||SELECT *, (CAST(bsize - asize as float)) / (bsize + asize) AS inbal FROM (SELECT xbar('0D00:01', time), first(asize), first(bsize) FROM quote WHERE sym = $1 GROUP BY xbar('0D00:01', time))|infreqInstr
 67||SELECT *, (CAST(bsize - asize as float)) / (bsize + asize) AS inbal FROM (SELECT xbar('0D00:01', time), first(asize), first(bsize) FROM quote WHERE sym = $1 GROUP BY xbar('0D00:01', time))|freqInstr
 68||SELECT weighted_sum(asize, ask) AS wsumAsk, weighted_sum(bsize, bid) AS wsumBid, STDDEV(asize) AS sdevasksize, STDDEV(bid) AS sdevbid, CORR(ask, bid) AS corPrice, CORR(asize, bsize) AS corSize FROM quote WHERE sym IN $1 GROUP BY sym|fiftyInstrs

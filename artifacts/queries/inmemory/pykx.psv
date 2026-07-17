@@ -5,8 +5,8 @@ idx|tags|query|parameter
 4||trade.select(where=kx.Column('time').within(timedelta(hours=10), timedelta(hours=10, seconds=10)))|
 5||quote.select(where=(kx.Column('sym') == infreqInstr) & kx.Column('time').within(timedelta(hours=8, minutes=30), timedelta(hours=16, minutes=30)))|
 6||quote.select(where=(kx.Column('sym') == freqInstr) & kx.Column('time').within(timedelta(hours=8, minutes=30), timedelta(hours=16, minutes=30)))|
-7||quote.select(where=(kx.Column('sym').isin(fiftyInstrs)) & kx.Column('time').within(timedelta(hours=8, minutes=30), timedelta(hours=8, minutes=35)))|
-8||quote.select(where=(kx.Column('sym').isin(thousandInfreqInstrs)) & kx.Column('time').within(timedelta(hours=8, minutes=30), timedelta(hours=8, minutes=35)))|
+7||quote.select(where=kx.Column('time').within(timedelta(hours=8, minutes=30), timedelta(hours=8, minutes=35)) & kx.Column('sym').isin(fiftyInstrs))|
+8||quote.select(where=kx.Column('time').within(timedelta(hours=8, minutes=30), timedelta(hours=8, minutes=35)) & kx.Column('sym').isin(thousandInfreqInstrs))|
 9||trade.select(columns=['sym', 'time', 'price', 'size', 'stop', 'cond', 'ex'], where=kx.Column('source') == b'N')|
 10||quote.select(columns=kx.Column('time') & ((kx.Column('bid') + kx.Column('ask')) / 2).name('mid'), where=kx.Column('sym') == infreqInstr)|
 11||quote.select(columns=kx.Column('time') & ((kx.Column('bid') + kx.Column('ask')) / 2).name('mid'), where=kx.Column('sym') == freqInstr)|
@@ -17,7 +17,7 @@ idx|tags|query|parameter
 16||quote.select(columns=['sym', 'time', 'bid', 'ask', 'bsize', 'asize', 'cond', 'ex'], where=kx.Column('sym') == infreqInstr)|
 17||quote.select(columns=['sym', 'time', 'bid', 'ask', 'bsize', 'asize', 'cond', 'ex'], where=kx.Column('sym') == freqInstr)|
 18||quote.select(columns=['sym', 'time', 'bid', 'ask', 'bsize', 'asize', 'cond', 'ex'], where=kx.Column('sym').isin(fiftyInstrs) & ((kx.Column('bsize') + kx.Column('asize')) > kx.IntAtom(2000)))|
-19||quote.select(columns=['sym', 'time', 'bid', 'ask', 'bsize', 'asize', 'cond', 'ex'], where=kx.Column('sym').isin(thousandInfreqInstrs) & ((kx.Column('bsize') + kx.Column('asize')) > kx.IntAtom(2000)))|
+19||quote.select(columns=['sym', 'time', 'bid', 'ask', 'bsize', 'asize', 'cond', 'ex'], where= ((kx.Column('bsize') + kx.Column('asize')) > kx.IntAtom(2000)) & kx.Column('sym').isin(thousandInfreqInstrs))|
 20||quote.select(columns=((kx.Column('bsize') * kx.Column('bid') + kx.Column('asize') * kx.Column('ask')) / (kx.Column('bsize') + kx.Column('asize'))).avg().name('avgLiqWMid'), where=kx.Column('sym') == infreqInstr)|
 21||quote.select(columns=((kx.Column('bsize') * kx.Column('bid') + kx.Column('asize') * kx.Column('ask')) / (kx.Column('bsize') + kx.Column('asize'))).avg().name('avgLiqWMid'), where=kx.Column('sym') == freqInstr)|
 22||quote.select(columns=((kx.Column('bsize') * kx.Column('bid') + kx.Column('asize') * kx.Column('ask')) / (kx.Column('bsize') + kx.Column('asize'))).avg().name('avgLiqWMid'), where=kx.Column('sym') == infreqInstr, by=kx.Column('time').minute.xbar(10) & kx.Column('ex'))|
@@ -63,7 +63,7 @@ idx|tags|query|parameter
 62||trade.select(columns=kx.Column('i').count().name('cnt') & kx.Column('size').sum(), by=kx.Column('ex') & kx.Column('time').bin(kx.Column('timeBucket', data=timeBuckets).value()).name('timeBucket')).update(kx.Column('timeBucket').call('@', list(timeBuckets.keys()), col_arg_ind=1))|
 63||trade.select(columns=kx.Column('price').count().name('cnt') & kx.Column('size').sum(), where=(kx.Column('corr') == kx.ShortAtom(0))._not(), by=kx.Column('sym') & kx.Column('time').call('timeBucketsStep').name('timeBucket'))|
 64||trade.select(columns=kx.Column('price').first().name('o') & kx.Column('price').max().name('h') & kx.Column('price').min().name('l') & kx.Column('price').last().name('c') & kx.Column('size').sum().name('s'), where=kx.Column('sym').isin(fiftyInstrs) & ~ kx.Column('stop').null(), by=kx.Column('sym') & kx.Column('time').minute.xbar(5))|
-65||trade.select(columns=kx.Column('price').first().name('o') & kx.Column('price').max().name('h') & kx.Column('price').min().name('l') & kx.Column('price').last().name('c') & kx.Column('size').sum().name('s'), where=kx.Column('sym').isin(thousandInfreqInstrs) & ~ kx.Column('stop').null(), by=kx.Column('sym') & kx.Column('time').minute.xbar(5))|
+65||trade.select(columns=kx.Column('price').first().name('o') & kx.Column('price').max().name('h') & kx.Column('price').min().name('l') & kx.Column('price').last().name('c') & kx.Column('size').sum().name('s'), where=(~ kx.Column('stop').null()) & kx.Column('sym').isin(thousandInfreqInstrs), by=kx.Column('sym') & kx.Column('time').minute.xbar(5))|
 66||quote.select(columns=kx.Column('asize').first() & kx.Column('bsize').first(), where=kx.Column('sym') == infreqInstr, by=kx.Column('time').minute.name('minute')).update(columns=((kx.Column('bsize') - kx.Column('asize')) / (kx.Column('bsize') + kx.Column('asize'))).name('inbal'))|
 67||quote.select(columns=kx.Column('asize').first() & kx.Column('bsize').first(), where=kx.Column('sym') == freqInstr, by=kx.Column('time').minute.name('minute')).update(columns=((kx.Column('bsize') - kx.Column('asize')) / (kx.Column('bsize') + kx.Column('asize'))).name('inbal'))|
 68||quote.select(columns=kx.Column('asize').wsum(kx.Column('ask')).name('wsumAsk') & kx.Column('bsize').wsum(kx.Column('bid')).name('wsumBid') & kx.Column('asize').sdev().name('sdevasksize') & kx.Column('bid').sdev().name('sdevbid') & kx.Column('ask').cor(kx.Column('bid')).name('corPrice') & kx.Column('asize').cor(kx.Column('bsize')).name('corSize'), where=kx.Column('sym').isin(fiftyInstrs), by="sym")|
