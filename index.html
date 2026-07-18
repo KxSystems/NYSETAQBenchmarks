@@ -615,12 +615,12 @@
         <div id="winners-legend"></div>
     </div>
     <div id="memory-panel">
-        <div id="memory-title">Max Res Mem (kb)<br/>
+        <div id="memory-title">Max Res Mem (GB)<br/>
             <span id="memory-hint">maximum resident set size of the benchmark process (reported by <code>time -v</code>)</span>
         </div>
         <table id="memory-table" aria-label="Bar chart of maximum resident memory per solution"></table>
-        <div id="datasize-title">Data size (MB)<br/>
-            <span id="datasize-hint">in-memory size of the loaded tables reported (by the engine)</span>
+        <div id="datasize-title">Data Size (GB)<br/>
+            <span id="datasize-hint">in-memory size of the loaded tables (reported by the engine)</span>
         </div>
         <table id="datasize-table" aria-label="Bar chart of in-memory data size per solution"></table>
     </div>
@@ -787,6 +787,9 @@ unique_solutions.map(elem => {
     let selector = document.createElement('a');
     selector.className = 'selector selector-active';
     selector.appendChild(document.createTextNode(elem));
+    const versions = [... new Set(data.filter(entry => entry.solution == elem)
+        .map(entry => entry.engineversion).filter(Boolean))];
+    if (versions.length) { selector.title = `Engine version: ${versions.join(', ')}`; }
     solutions.appendChild(selector);
     selectors.solution[elem] = data.some(entry => entry.solution == elem && !entry.hide);
     selector.addEventListener('click', e => toggle(e, elem, 'solution'));
@@ -1345,13 +1348,17 @@ function renderBarChart(table_id, entries, value_of, format_value, tooltip_suffi
 /// affected by the query filters.
 function renderMemoryCharts(filtered_data) {
     const has_mem = renderBarChart('memory-table', filtered_data,
-        elem => elem.max_res_mem_kb, value => value.toLocaleString('en-US'),
-        'kb maximum resident set size');
+        elem => elem.max_res_mem_kb,
+        value => (value / 1024 / 1024).toLocaleString('en-US',
+            { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+        'GB maximum resident set size');
     document.getElementById('memory-title').style.display = has_mem ? '' : 'none';
 
     const has_size = renderBarChart('datasize-table', filtered_data,
-        elem => elem.data_size, value => Math.round(value).toLocaleString('en-US'),
-        'MB of loaded data');
+        elem => elem.data_size,
+        value => (value / 1024).toLocaleString('en-US',
+            { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+        'GB of loaded data');
     document.getElementById('datasize-title').style.display = has_size ? '' : 'none';
 
     document.getElementById('memory-panel').style.display = has_mem || has_size ? '' : 'none';

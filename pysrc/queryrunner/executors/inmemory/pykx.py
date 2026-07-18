@@ -83,7 +83,7 @@ class QueryExecutorPyKXInMemory:
         return None
 
     def get_table_stats(self) -> dict[str, Any]:
-        table_stats_dict = {"proprietary": "yes"}
+        table_stats_dict = {"proprietary": "yes", "engineversion": kx.__version__}
         for t_name in ["master", "trade", "quote"]:
             df = self.eval_context[t_name]
             table_stats = {

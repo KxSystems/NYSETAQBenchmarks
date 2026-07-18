@@ -172,7 +172,6 @@ def main(args: argparse.Namespace) -> None:
             import polars as pl
             runner = QueryExecutorPolarsInMemory(params, sort_cols=args.sortcols, datadate=args.date)
             threadnr = pl.thread_pool_size()
-            engineversion = pl.__version__
         elif engine == "duckdb_con":
             from executors.inmemory.duckdb_con import QueryExecutorDuckDBCon
             import duckdb
@@ -181,23 +180,19 @@ def main(args: argparse.Namespace) -> None:
             if 'DUCKDB_THREADS' in os.environ:
                 con.execute(f"SET threads = {os.environ['DUCKDB_THREADS']}")
             threadnr = con.sql("SELECT current_setting('threads')").fetchall()[0][0]
-            engineversion = duckdb.__version__
             logger.info("Using DuckDB with %s threads", threadnr)
         elif engine == "pykx":
             from executors.inmemory.pykx import QueryExecutorPyKXInMemory
             import pykx as kx
             runner = QueryExecutorPyKXInMemory(params, sort_cols=args.sortcols, index_on=args.indexon)
             threadnr = max(1, kx.q.system.num_threads)
-            engineversion = kx.__version__
         elif engine == "pandas":
             if len(args.indexon) > 0:
                 raise ValueError("Pandas does not support indices")
             from executors.inmemory.pandas import QueryExecutorPandas
-            import pandas as pd
             runner = QueryExecutorPandas(params, sort_cols=args.sortcols)
             import numexpr
             threadnr = os.environ.get('NUMEXPR_NUM_THREADS', numexpr.nthreads)
-            engineversion = pd.__version__
         else:
             raise ValueError(f"Invalid engine parameter: {args.engine}")
     elif storage_backend == "disk":
@@ -206,13 +201,11 @@ def main(args: argparse.Namespace) -> None:
             import polars as pl
             runner = QueryExecutorPolars(params)
             threadnr = pl.thread_pool_size()
-            engineversion = pl.__version__
         elif engine == "pykx":
             from executors.ondisk.pykx import QueryExecutorPyKX
             import pykx as kx
             runner = QueryExecutorPyKX(params)
             threadnr = kx.q.system.num_threads
-            engineversion = kx.__version__
         else:
             raise ValueError(f"Invalid engine parameter: {args.engine}")
     else:
@@ -220,14 +213,14 @@ def main(args: argparse.Namespace) -> None:
 
     headers: list[str] = [
         "storagebackend", "compparam", "threadcount", "runner",
-        "engine", "format", "sortcols", "indexon","engineversion",
+        "engine", "format", "sortcols", "indexon",
         "idx", "query", "status",
         "run1timeNS", "run2timeNS", "run3timeNS",
         "run3memKB",
         "run1ioKB", "run2ioKB", "run3ioKB", "ressizeKB"
     ]
     row_start = [storage_backend, "nyi", threadnr, "Python", engine, "",
-        ','.join(args.sortcols), ','.join(args.indexon), engineversion]
+        ','.join(args.sortcols), ','.join(args.indexon)]
     ios = IOStat(args.db)
     file_ctx = (open(args.result, 'w', newline='', encoding='utf-8')
                 if args.result is not None
