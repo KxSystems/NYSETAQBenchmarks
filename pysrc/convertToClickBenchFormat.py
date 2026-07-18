@@ -15,8 +15,8 @@ Entries are keyed by the (datadate, machine, solution) triple. A triple's
 measurements may be split across several run directories (e.g. one directory
 per thread count); all their thread counts are merged into a single entry.
 When the same thread count of a triple appears in several runs, only the run
-with the latest "test date" is kept; proprietary and data_size come from the
-latest run overall.
+with the latest "test date" is kept; proprietary, engineversion and data_size
+come from the latest run overall.
 
 The kept entries are written to a single JavaScript file in the style of
 https://github.com/ClickHouse/ClickBench/blob/main/data.generated.js :
@@ -36,6 +36,8 @@ entry mirrors the ClickBench result format with these differences:
                    only to pick the latest run per triple
   * machine      : mappings.yaml["machines"][cpu.model]
   * proprietary  : from the solution's stats.yaml
+  * engineversion : version of the engine library, from the solution's
+                   stats.yaml (null for runs predating the field)
   * hardware     : "cpu" (GPUs are not supported yet)
   * tags         : []
   * load_time    : {load phase -> thread count -> run1timeNS} for the load
@@ -95,13 +97,14 @@ def find_mappings(input_dir: Path) -> Path:
 
 
 def parse_stats(stats_path: Path):
-    """Return (proprietary, data_size_mb) from a solution's stats.yaml.
+    """Return (proprietary, engineversion, data_size_mb) from a solution's stats.yaml.
 
     The file comes in two shapes: a nested mapping (one key per table) and a
-    flat concatenation of table documents. Both keep ``proprietary`` on the
-    first line and repeat ``size (MB):`` once per table, so we read those two
-    fields directly with regexes rather than fully parsing (a plain YAML load
-    would collapse the flat form's duplicate keys and lose sizes).
+    flat concatenation of table documents. Both keep ``proprietary`` (and,
+    since it was added, ``engineversion``) near the top and repeat
+    ``size (MB):`` once per table, so we read these fields directly with
+    regexes rather than fully parsing (a plain YAML load would collapse the
+    flat form's duplicate keys and lose sizes).
     """
     text = stats_path.read_text()
 
@@ -109,6 +112,11 @@ def parse_stats(stats_path: Path):
     proprietary = None
     if prop_match:
         proprietary = prop_match.group(1).strip().strip("'\"")
+
+    version_match = re.search(r"^\s*engineversion\s*:\s*(.+?)\s*$", text, re.MULTILINE)
+    engineversion = None
+    if version_match:
+        engineversion = version_match.group(1).strip().strip("'\"")
 
     total = None
     for raw in re.findall(r"size \(MB\)\s*:\s*(\S+)", text):
@@ -122,7 +130,7 @@ def parse_stats(stats_path: Path):
     if total is not None and total == int(total):
         total = int(total)
 
-    return proprietary, total
+    return proprietary, engineversion, total
 
 
 def parse_max_res_mem(os_txt_path: Path):
@@ -233,13 +241,14 @@ def build_queries(runs):
     return [texts[idx] for idx in sorted(texts)]
 
 
-def build_entry(solution, runs, date, machine, proprietary, data_size, max_res_mem):
+def build_entry(solution, runs, date, machine, proprietary, engineversion, data_size, max_res_mem):
     engines = {payload["engine"] for payload in runs.values() if "engine" in payload}
     return OrderedDict([
         ("solution", solution),
         ("datadate", date),
         ("machine", machine),
         ("engine", engines.pop() if engines else None),
+        ("engineversion", engineversion),
         ("proprietary", proprietary),
         ("hardware", "cpu"),
         ("tags", []),
@@ -293,18 +302,18 @@ def process_run(run_dir: Path, machines: dict, mappings_path: Path):
     for solution in solutions:
         stats_dir = stats_dirs.get(solution)
         if stats_dir is None:
-            proprietary, data_size, max_res_mem = None, None, None
+            proprietary, engineversion, data_size, max_res_mem = None, None, None, None
             print(f"warning: no stats.yaml directory found for solution "
-                  f"{solution!r} in {run_dir}; proprietary/data_size/"
-                  f"max_res_mem_kb set to null", file=sys.stderr)
+                  f"{solution!r} in {run_dir}; proprietary/engineversion/"
+                  f"data_size/max_res_mem_kb set to null", file=sys.stderr)
         else:
-            proprietary, data_size = parse_stats(stats_dir / "stats.yaml")
+            proprietary, engineversion, data_size = parse_stats(stats_dir / "stats.yaml")
             max_res_mem = parse_max_res_mem(stats_dir / "os.txt")
 
         for tc in sorted({tc for (sol, tc) in grouped if sol == solution}):
             payload = dict(grouped[(solution, tc)],
-                           proprietary=proprietary, data_size=data_size,
-                           max_res_mem=max_res_mem)
+                           proprietary=proprietary, engineversion=engineversion,
+                           data_size=data_size, max_res_mem=max_res_mem)
             yield datadate, machine, solution, tc, date, payload
 
 
@@ -357,13 +366,13 @@ def main():
     entries = []
     for (datadate, machine, solution) in sorted(by_triple):
         runs = by_triple[(datadate, machine, solution)]
-        # proprietary/data_size/max_res_mem from the latest-dated measurement
-        # of the triple
+        # proprietary/engineversion/data_size/max_res_mem from the latest-dated
+        # measurement of the triple
         _, newest = max(runs.values(), key=lambda dated: dated[0])
         entries.append(build_entry(
             solution, {tc: payload for tc, (_, payload) in runs.items()},
-            datadate, machine, newest["proprietary"], newest["data_size"],
-            newest["max_res_mem"]))
+            datadate, machine, newest["proprietary"], newest["engineversion"],
+            newest["data_size"], newest["max_res_mem"]))
 
     # Match ClickBench data.generated.js: leading commas on every entry except
     # the first (a leading comma on the first line would create an array hole),

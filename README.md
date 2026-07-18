@@ -230,7 +230,6 @@ The file starts with a header row. The columns are:
 | `format` | Data format. |
 | `sortcols` | Columns the `trade`/`quote` tables were sorted by before querying, e.g. `time` or `sym,time`. Empty if unsorted. |
 | `indexon` | Columns an index/attribute was applied to, e.g. `sym`. Empty if none. |
-| `engineversion` | Version string of the engine library, e.g. `1.5.4`. |
 | `idx` | Query index. Positive integers are benchmark queries; non-positive values are setup steps: `0` = load a partition into memory, `-1` = transform, `-2` = sort, `-3` = index. |
 | `query` | The query text that was executed (or a short description for setup rows). |
 | `status` | Outcome: `success`, `error` (query raised an exception), `idxfiltered` (skipped by the `--idx` filter), `tagfiltered` (skipped by the `--tags` filter), or `instrumentfiltered` (skipped by the `--instrument` filter). |
@@ -298,12 +297,12 @@ reads the kdb+ database instead.
    | `get_parameters(self, parameter)` | Pre-process the raw `parameter` string into whatever `execute_query` expects (excluded from the measured time). |
    | `execute_query(self, idx, tags, query_str, params, runidx)` | Execute the query and return the result object. |
    | `get_table_size(df)` (static) | Result/table size in KB, or `None` if unavailable. |
-   | `get_table_stats(self)` | Per-table stats dict written to the `--stats-dir` YAML files. |
+   | `get_table_stats(self)` | Per-table stats dict written to the `--stats-dir` YAML files. Must include the top-level `proprietary` and `engineversion` (version string of the engine library) keys. |
    | `write_csv(self, res, out_file)` | Serialize a result to CSV for cross-engine output comparison. The CSV must be in **kdb+-loadable format**, so values need special formatting: booleans as `1`/`0` (not `true`/`false`), and temporal values as kdb+ literals (e.g. timespans like `0D09:30:00.000000000`). See the `write_csv` implementations in [polars.py](./pysrc/queryrunner/executors/inmemory/polars.py) and [pandas.py](./pysrc/queryrunner/executors/inmemory/pandas.py) for the duration/boolean conversions. |
 
 2. **Wire it into the runner.** In [main.py](./pysrc/queryrunner/main.py), add an
    `elif engine == "<name>":` branch inside the `inmemory` block that imports and
-   instantiates your class as `runner` and sets `threadnr` and `engineversion`.
+   instantiates your class as `runner` and sets `threadnr`.
    Also add `"<name>"` to the `-engine` argument's `choices` list in
    `build_parser`.
 

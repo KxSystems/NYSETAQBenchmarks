@@ -108,7 +108,7 @@ if[`result in key o;
   .log.info "saving results to ", o `result;
   if[not ()~key `$resFile: ":", o `result; hdel `$resFile];
   resultH: hopen resFile;
-  resultH "storagebackend|compparam|threadcount|runner|engine|format|sortcols|indexon|engineversion|idx|query|status|run1timeNS|run2timeNS|run3timeNS|run3memKB|run1ioKB|run2ioKB|run3ioKB|ressizeKB\n"]
+  resultH "storagebackend|compparam|threadcount|runner|engine|format|sortcols|indexon|idx|query|status|run1timeNS|run2timeNS|run3timeNS|run3memKB|run1ioKB|run2ioKB|run3ioKB|ressizeKB\n"]
 
 
 TagsFilter: ("," vs o`tags) except enlist ""
@@ -155,8 +155,7 @@ writeRes: {[h; (storagebackend:`C; compparm:`C; engine:`s; format:`s; sortcols:`
     .log.error "Four IO numbers are expected";
     io: 4#io];
   runner: "KDB-X";
-  engineversion: string[.z.K], ",", string .z.k;
-  h ,[;"\n"] SEP sv (storagebackend; compparm; string 1|system "s"; "KDB-X"; string engine; string lower format; "," sv string sortcols; attrib; engineversion; idx; query; status), string (`long$ts), (memusage div 1000), (1 _ deltas io), ressize div 1024;
+  h ,[;"\n"] SEP sv (storagebackend; compparm; string 1|system "s"; "KDB-X"; string engine; string lower format; "," sv string sortcols; attrib; idx; query; status), string (`long$ts), (memusage div 1000), (1 _ deltas io), ressize div 1024;
   }
 
 loadParquetDB: {[db: `C; rowgroup: `b; device: `C; writerFN]
@@ -186,6 +185,7 @@ captureTableStats: {[tableStatsDir:`s]
 
   h: hopen tableStatsFile;
   h "proprietary: 'yes'\n";
+  h "engineversion: '", string[.z.k], "'\n";
   h {[h; tName]
     h (string tName), ":\n";
     h "  name: ", (string tName), "\n";
