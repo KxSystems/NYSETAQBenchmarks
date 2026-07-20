@@ -38,6 +38,9 @@ entry mirrors the ClickBench result format with these differences:
   * proprietary  : from the solution's stats.yaml
   * engineversion : version of the engine library, from the solution's
                    stats.yaml (null for runs predating the field)
+  * sortcols     : comma-separated columns trade/quote were sorted by, from
+                   the solution's stats.yaml (null for runs predating the
+                   field)
   * hardware     : "cpu" (GPUs are not supported yet)
   * tags         : []
   * load_time    : {load phase -> thread count -> run1timeNS} for the load
@@ -52,6 +55,11 @@ entry mirrors the ClickBench result format with these differences:
   * queries      : the query texts the solution ran (results.psv "query"
                    column), aligned with the result arrays
   * result       : {thread count -> [[run1, run2, run3], ...]} per query
+
+After the data array the file also carries ``const machine_environments``,
+mapping each machine name to the raw environment.yaml text of that machine's
+latest run (by "test date" / "test time"); index.html shows it as a hover
+tooltip on the machine selectors.
 
 Alongside the data file this also refreshes
 ``artifacts/queries/inmemory/querymeta.generated.js``, a copy of querymeta.psv
@@ -97,14 +105,14 @@ def find_mappings(input_dir: Path) -> Path:
 
 
 def parse_stats(stats_path: Path):
-    """Return (proprietary, engineversion, data_size_mb) from a solution's stats.yaml.
+    """Return (proprietary, engineversion, sortcols, data_size_mb) from a solution's stats.yaml.
 
     The file comes in two shapes: a nested mapping (one key per table) and a
     flat concatenation of table documents. Both keep ``proprietary`` (and,
-    since it was added, ``engineversion``) near the top and repeat
-    ``size (MB):`` once per table, so we read these fields directly with
-    regexes rather than fully parsing (a plain YAML load would collapse the
-    flat form's duplicate keys and lose sizes).
+    since they were added, ``engineversion`` and ``sortcols``) as top-level
+    scalars and repeat ``size (MB):`` once per table, so we read these fields
+    directly with regexes rather than fully parsing (a plain YAML load would
+    collapse the flat form's duplicate keys and lose sizes).
     """
     text = stats_path.read_text()
 
@@ -118,6 +126,11 @@ def parse_stats(stats_path: Path):
     if version_match:
         engineversion = version_match.group(1).strip().strip("'\"")
 
+    sortcols_match = re.search(r"^sortcols\s*:\s*(.+?)\s*$", text, re.MULTILINE)
+    sortcols = None
+    if sortcols_match:
+        sortcols = sortcols_match.group(1).strip().strip("'\"") or None
+
     total = None
     for raw in re.findall(r"size \(MB\)\s*:\s*(\S+)", text):
         if raw.lower() in ("null", "none", "~"):
@@ -130,7 +143,7 @@ def parse_stats(stats_path: Path):
     if total is not None and total == int(total):
         total = int(total)
 
-    return proprietary, engineversion, total
+    return proprietary, engineversion, sortcols, total
 
 
 def parse_max_res_mem(os_txt_path: Path):
@@ -144,6 +157,12 @@ def parse_max_res_mem(os_txt_path: Path):
     match = re.search(r"Maximum resident set size \(kbytes\)\s*:\s*(\d+)",
                       os_txt_path.read_text())
     return int(match.group(1)) if match else None
+
+
+def cpu_model_of(env: dict):
+    """The cpu model of a loaded environment.yaml; some runs capitalize the key."""
+    cpu = env["system"]["cpu"]
+    return cpu.get("model", cpu.get("Model"))
 
 
 def to_int(value: str):
@@ -241,7 +260,7 @@ def build_queries(runs):
     return [texts[idx] for idx in sorted(texts)]
 
 
-def build_entry(solution, runs, date, machine, proprietary, engineversion, data_size, max_res_mem):
+def build_entry(solution, runs, date, machine, proprietary, engineversion, sortcols, data_size, max_res_mem):
     engines = {payload["engine"] for payload in runs.values() if "engine" in payload}
     return OrderedDict([
         ("solution", solution),
@@ -249,6 +268,7 @@ def build_entry(solution, runs, date, machine, proprietary, engineversion, data_
         ("machine", machine),
         ("engine", engines.pop() if engines else None),
         ("engineversion", engineversion),
+        ("sortcols", sortcols),
         ("proprietary", proprietary),
         ("hardware", "cpu"),
         ("tags", []),
@@ -274,7 +294,7 @@ def process_run(run_dir: Path, machines: dict, mappings_path: Path):
     # format untouched.
     datadate = (f"{datadate[:4]}-{datadate[4:6]}-{datadate[6:8]}"
                 if re.fullmatch(r"\d{8}", datadate) else datadate)
-    cpu_model = env["system"]["cpu"]["model"]
+    cpu_model = cpu_model_of(env)
 
     if cpu_model not in machines:
         raise SystemExit(
@@ -302,17 +322,18 @@ def process_run(run_dir: Path, machines: dict, mappings_path: Path):
     for solution in solutions:
         stats_dir = stats_dirs.get(solution)
         if stats_dir is None:
-            proprietary, engineversion, data_size, max_res_mem = None, None, None, None
+            proprietary, engineversion, sortcols, data_size, max_res_mem = None, None, None, None, None
             print(f"warning: no stats.yaml directory found for solution "
                   f"{solution!r} in {run_dir}; proprietary/engineversion/"
-                  f"data_size/max_res_mem_kb set to null", file=sys.stderr)
+                  f"sortcols/data_size/max_res_mem_kb set to null", file=sys.stderr)
         else:
-            proprietary, engineversion, data_size = parse_stats(stats_dir / "stats.yaml")
+            proprietary, engineversion, sortcols, data_size = parse_stats(stats_dir / "stats.yaml")
             max_res_mem = parse_max_res_mem(stats_dir / "os.txt")
 
         for tc in sorted({tc for (sol, tc) in grouped if sol == solution}):
             payload = dict(grouped[(solution, tc)],
                            proprietary=proprietary, engineversion=engineversion,
+                           sortcols=sortcols,
                            data_size=data_size, max_res_mem=max_res_mem)
             yield datadate, machine, solution, tc, date, payload
 
@@ -358,6 +379,20 @@ def main():
             if key not in latest or date > latest[key][0]:
                 latest[key] = (date, payload)
 
+    # The environment.yaml text of each machine's latest run, embedded for the
+    # machine hover tooltips of index.html. The "test date" / "test time"
+    # lines only order the runs and are dropped from the embedded text.
+    machine_envs = {}
+    for run_dir in run_dirs:
+        text = (run_dir / "environment.yaml").read_text()
+        env = yaml.safe_load(text)
+        machine = machines[cpu_model_of(env)]
+        stamp = (str(env["test date"]), str(env.get("test time", "")))
+        text = "".join(line for line in text.splitlines(keepends=True)
+                       if not re.match(r"""['"]?test (date|time)['"]?\s*:""", line))
+        if machine not in machine_envs or stamp > machine_envs[machine][0]:
+            machine_envs[machine] = (stamp, text)
+
     # Merge the thread counts of each triple into a single entry.
     by_triple = defaultdict(dict)
     for (datadate, machine, solution, tc), dated_payload in latest.items():
@@ -366,13 +401,13 @@ def main():
     entries = []
     for (datadate, machine, solution) in sorted(by_triple):
         runs = by_triple[(datadate, machine, solution)]
-        # proprietary/engineversion/data_size/max_res_mem from the latest-dated
-        # measurement of the triple
+        # proprietary/engineversion/sortcols/data_size/max_res_mem from the
+        # latest-dated measurement of the triple
         _, newest = max(runs.values(), key=lambda dated: dated[0])
         entries.append(build_entry(
             solution, {tc: payload for tc, (_, payload) in runs.items()},
             datadate, machine, newest["proprietary"], newest["engineversion"],
-            newest["data_size"], newest["max_res_mem"]))
+            newest["sortcols"], newest["data_size"], newest["max_res_mem"]))
 
     # Match ClickBench data.generated.js: leading commas on every entry except
     # the first (a leading comma on the first line would create an array hole),
@@ -384,6 +419,12 @@ def main():
             fh.write(prefix + json.dumps(entry, ensure_ascii=False,
                                          separators=(",", ":")) + "\n")
         fh.write("];\n")
+        fh.write("const machine_environments = {\n")
+        for i, machine in enumerate(sorted(machine_envs)):
+            prefix = "" if i == 0 else ","
+            fh.write(prefix + json.dumps(machine) + ":"
+                     + json.dumps(machine_envs[machine][1], ensure_ascii=False) + "\n")
+        fh.write("};\n")
 
     print(f"wrote {args.output_file}: {len(entries)} entr"
           f"{'y' if len(entries) == 1 else 'ies'} from {len(run_dirs)} run(s).")

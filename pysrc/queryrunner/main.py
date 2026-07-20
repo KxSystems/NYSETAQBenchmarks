@@ -213,14 +213,14 @@ def main(args: argparse.Namespace) -> None:
 
     headers: list[str] = [
         "storagebackend", "compparam", "threadcount", "runner",
-        "engine", "format", "sortcols", "indexon",
+        "engine", "format", "indexon",
         "idx", "query", "status",
         "run1timeNS", "run2timeNS", "run3timeNS",
         "run3memKB",
         "run1ioKB", "run2ioKB", "run3ioKB", "ressizeKB"
     ]
     row_start = [storage_backend, "nyi", threadnr, "Python", engine, "",
-        ','.join(args.sortcols), ','.join(args.indexon)]
+        ','.join(args.indexon)]
     ios = IOStat(args.db)
     file_ctx = (open(args.result, 'w', newline='', encoding='utf-8')
                 if args.result is not None
@@ -236,6 +236,7 @@ def main(args: argparse.Namespace) -> None:
             logger.info("Saving table statistics to %s", args.table_stats_dir)
             args.table_stats_dir.mkdir(parents=True, exist_ok=True)
             table_stats_dict = runner.get_table_stats()
+            table_stats_dict["sortcols"] = ','.join(args.sortcols or [])
             with open(args.table_stats_dir / "stats.yaml", 'w') as f:
                 yaml.dump(table_stats_dict, f, indent=2, sort_keys=False)
 

@@ -44,11 +44,64 @@ function save_environment () {
         cores_per_socket=$(lscpu | awk -F: '/^Core\(s\) per socket:/{gsub(/[ \t]/,"",$2); print $2}')
         threads_per_core=$(lscpu | awk -F: '/^Thread\(s\) per core:/{gsub(/[ \t]/,"",$2); print $2}')
         cpu_model=$(lscpu | awk -F: '/^Model name:/{gsub(/^[ \t]+/,"",$2); print $2}')
+        numa_nodes=$(lscpu | awk -F: '/^NUMA node\(s\):/{gsub(/[ \t]/,"",$2); print $2}')
+        l1d_cache=$(lscpu | awk -F: '/^L1d cache:/{gsub(/^[ \t]+/,"",$2); print $2}')
+        l2_cache=$(lscpu | awk -F: '/^L2 cache:/{gsub(/^[ \t]+/,"",$2); print $2}')
+        l3_cache=$(lscpu | awk -F: '/^L3 cache:/{gsub(/^[ \t]+/,"",$2); print $2}')
+        # These sysfs entries depend on the kernel/cpufreq driver and may be
+        # absent (e.g. VMs, containers, intel_pstate); record "" when missing.
+        smt=$(cat /sys/devices/system/cpu/smt/active 2>/dev/null || true)
+        scaling_governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || true)
+        boost=$(cat /sys/devices/system/cpu/cpufreq/boost 2>/dev/null || true)
+        energy_performance_preference=$(cat /sys/devices/system/cpu/cpufreq/policy0/energy_performance_preference 2>/dev/null || true)
+        max_freq_mhz=$(awk '{printf "%d", $1/1000}' /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq 2>/dev/null || true)
+        # The active THP mode is the bracketed word, e.g. "always [madvise] never"
+        thp=$(sed -n 's/.*\[\(.*\)\].*/\1/p' /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null || true)
+        thp_defrag=$(sed -n 's/.*\[\(.*\)\].*/\1/p' /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null || true)
+        numa_balancing=$(cat /proc/sys/kernel/numa_balancing 2>/dev/null || true)
+        zone_reclaim_mode=$(cat /proc/sys/vm/zone_reclaim_mode 2>/dev/null || true)
+        mem_total_gb=$(awk '/^MemTotal:/{printf "%d", $2/1024/1024}' /proc/meminfo)
+        # DIMM details come from SMBIOS; dmidecode needs root, so try it
+        # directly (root run) then via passwordless sudo; record "" when
+        # unavailable. Values are deduplicated across the installed DIMMs.
+        dmi_mem=$( (dmidecode -t 17 || sudo -n dmidecode -t 17) 2>/dev/null || true)
+        dimm_field () {
+            awk -F': ' -v key="$1" '
+                /^\tSize:/ { ok = ($0 !~ /No Module/) }
+                ok && $1 == "\t" key { seen[$2] }
+                END { s = ""; for (v in seen) s = s (s ? "," : "") v; print s }
+            ' <<< "${dmi_mem}"
+        }
+        dimm_count=$(awk '/^\tSize:/ && $0 !~ /No Module/ {n++} END{print n+0}' <<< "${dmi_mem}")
+        [[ -n "${dmi_mem}" ]] || dimm_count=""
+        dimm_size=$(dimm_field "Size")
+        mem_type=$(dimm_field "Type")
+        mem_speed=$(dimm_field "Speed")
+        mem_configured_speed=$(dimm_field "Configured Memory Speed")
     else
         sockets=1
         cores_per_socket=$(sysctl -n hw.ncpu)
         threads_per_core=1
         cpu_model=$(sysctl -n machdep.cpu.brand_string)
+        smt=""
+        scaling_governor=""
+        boost=""
+        energy_performance_preference=""
+        max_freq_mhz=""
+        numa_nodes=""
+        l1d_cache=""
+        l2_cache=""
+        l3_cache=""
+        thp=""
+        thp_defrag=""
+        numa_balancing=""
+        zone_reclaim_mode=""
+        mem_total_gb=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
+        dimm_count=""
+        dimm_size=""
+        mem_type=""
+        mem_speed=""
+        mem_configured_speed=""
     fi
     cpu_arch=$(arch)
 
@@ -64,12 +117,33 @@ system:
   os:
     name: "$(uname)"
     kernel: "$(uname -r)"
+    TransparentHugePages: "${thp}"
+    TransparentHugePagesDefrag: "${thp_defrag}"
+    NumaBalancing: "${numa_balancing}"
   cpu:
-    arch: "${cpu_arch}"
-    model: "${cpu_model}"
-    socketnr: ${sockets}
-    corepersocket: ${cores_per_socket}
-    threadpercore: ${threads_per_core}
+    Arch: "${cpu_arch}"
+    Model: "${cpu_model}"
+    SocketNr: ${sockets}
+    CoresPerSocket: ${cores_per_socket}
+    ThreadsPerCore: ${threads_per_core}
+    SimultaneousMultithreading: "${smt}"
+    NumaNodeNr: "${numa_nodes}"
+    L1dCache: "${l1d_cache}"
+    L2Cache: "${l2_cache}"
+    L3Cache: "${l3_cache}"
+    FrequencyScaling:
+        ScalingGovernor: "${scaling_governor}"
+        Boost: "${boost}"
+        EnergyPerformancePreference: "${energy_performance_preference}"
+        MaxFreqMHz: "${max_freq_mhz}"
+  memory:
+    TotalGB: ${mem_total_gb}
+    DIMMCount: "${dimm_count}"
+    DIMMSize: "${dimm_size}"
+    Type: "${mem_type}"
+    Speed: "${mem_speed}"
+    ConfiguredSpeed: "${mem_configured_speed}"
+    ZoneReclaimMode: "${zone_reclaim_mode}"
 EOF
 
     echo "Saved environment info to ${out}"
