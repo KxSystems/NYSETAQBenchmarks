@@ -28,19 +28,19 @@ trap 'rm -rf "${TESTDB}" "${RESULTDIR}"' EXIT
 # SIZE=full (letters A-Z) is deliberate: the test data only ships BBO_Y and
 # BBO_Z files, and the test parameter files reference Y instruments (e.g. YXT,
 # YHGJ), so a smaller SIZE (e.g. small = Z-Z) would omit data those queries need.
-rm -rf ${TESTDB}/kdb
-rm -rf ${TESTDB}/parquet/rowgroup
+rm -rf "${TESTDB}/kdb"
+rm -rf "${TESTDB}/parquet/rowgroup"
 
 SIZE=full DATAFORMAT=kdb ./generateDB.sh ${TESTPSV} ${TESTDB}/kdb ${TESTDBDATE}
 SIZE=full SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${TESTPSV} ${TESTDB}/parquet/rowgroup ${TESTDBDATE}
 
-rm -rf ${RESULTDIR}
+rm -rf "${RESULTDIR}"
 
 # Run the benchmarks.
 PARAM_DIR=./artifacts/parameters/test
-./benchmarks/inmemory/queryEngines.sh --db-dir ${TESTDB} --param-dir ${PARAM_DIR} --datadate ${TESTDBDATE} --threads "4 16" --result-dir ${RESULTDIR}
-./benchmarks/inmemory/kdbAttributes.sh --db-dir ${TESTDB} --param-dir ${PARAM_DIR} --datadate ${TESTDBDATE} --threads "4 16" --result-dir ${RESULTDIR}
+./benchmarks/inmemory/queryEngines.sh --db-dir "${TESTDB}" --param-dir "${PARAM_DIR}" --datadate "${TESTDBDATE}" --threads "4 16" --result-dir "${RESULTDIR}"
+./benchmarks/inmemory/kdbAttributes.sh --db-dir "${TESTDB}" --param-dir "${PARAM_DIR}" --datadate "${TESTDBDATE}" --threads "4 16" --result-dir "${RESULTDIR}"
 
-python3 ./pysrc/convertToClickBenchFormat.py ${RESULTDIR} ${RESULTDIR}/data.generated.js
+python3 ./pysrc/convertToClickBenchFormat.py "${RESULTDIR}" "${RESULTDIR}/data.generated.js"
 
 popd

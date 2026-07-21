@@ -26,7 +26,7 @@ usage() {
 
 # 1. Argument Validation
 if [[ $# -eq 0 ]]; then
-    usage
+    usage >&2
     exit "$EXIT_ERR_ARGS"
 fi
 
@@ -39,15 +39,20 @@ fi
 
 # 2. OS Check
 if [[ "$(uname -s)" == "Darwin" ]]; then
-    echo "disk0"  # TODO: Implement accurate macOS disk resolution (e.g., using diskutil)
+    # TODO: Implement accurate macOS disk resolution (e.g., using diskutil)
+    printf "[WARN] macOS disk resolution not implemented; assuming disk0.\n" >&2
+    echo "disk0"
     exit "$EXIT_SUCCESS"
 fi
 
 # 3. Resolve Filesystem Info
-if ! FSTYPE=$(findmnt -n -o FSTYPE --target "$TARGET_PATH" 2>/dev/null); then
+if ! FSINFO=$(findmnt -n -o FSTYPE,SOURCE --target "$TARGET_PATH" 2>/dev/null); then
     log_error "Could not determine filesystem for '$TARGET_PATH'."
     exit "$EXIT_ERR_GENERIC"
 fi
+read -r FSTYPE MOUNT_SOURCE <<< "$FSINFO"
+# btrfs reports subvolume sources as /dev/sda1[/subvol]; strip the suffix for lsblk
+MOUNT_SOURCE="${MOUNT_SOURCE%%\[*}"
 
 
 # 4. Handle Specific Filesystems
@@ -61,25 +66,29 @@ case "$FSTYPE" in
         exit "$EXIT_ERR_UNSUPPORTED"
         ;;
     zfs)
-        # Attempt to find the ZFS pool name
-        POOL_SOURCE=$(findmnt -n -o SOURCE --target "$TARGET_PATH")
-        # Extract pool name (text before the first slash)
-        POOL_NAME="${POOL_SOURCE%%/*}"
+        # The mount source is <pool>[/dataset...]; the pool name is the text
+        # before the first slash.
+        POOL_NAME="${MOUNT_SOURCE%%/*}"
 
-        # Get the first physical device associated with the pool.
-        # Note: This is a heuristic; ZFS pools can span multiple disks.
-        if ! ZFS_DEV=$(zpool list -vHP "$POOL_NAME" 2>/dev/null | tail -n 1 | awk '{print $2}'); then
-             log_error "Could not resolve ZFS pool device."
-             exit "$EXIT_ERR_GENERIC"
+        # List the pool's vdevs (-H: script mode, -P: full device paths) and
+        # keep the /dev/* lines (the pool line itself has the pool name in $1).
+        if ! ZFS_DEVS=$(zpool list -vHP "$POOL_NAME" 2>/dev/null | awk '$1 ~ /^\/dev\// { print $1 }'); then
+            log_error "Could not list devices for ZFS pool '$POOL_NAME'."
+            exit "$EXIT_ERR_GENERIC"
+        fi
+        if [[ -z "$ZFS_DEVS" ]]; then
+            log_error "No physical devices found for ZFS pool '$POOL_NAME'."
+            exit "$EXIT_ERR_GENERIC"
         fi
 
-        # Return the ZFS device immediately
-        echo "$ZFS_DEV"
-        exit "$EXIT_SUCCESS"
+        # Take the first data vdev and fall through to the physical device
+        # resolution below. Note: this is a heuristic; ZFS pools can span
+        # multiple disks.
+        MOUNT_SOURCE="${ZFS_DEVS%%$'\n'*}"
         ;;
     *)
-        # Standard block devices (ext4, xfs, btrfs, etc.)
-        MOUNT_SOURCE=$(findmnt -n -o SOURCE --target "$TARGET_PATH")
+        # Standard block devices (ext4, xfs, btrfs, etc.); MOUNT_SOURCE is
+        # already set from findmnt above.
         ;;
 esac
 
@@ -94,7 +103,10 @@ fi
 # so LVM is detected here from the device type rather than the FSTYPE case above.
 # An LV can be striped/mirrored across many physical volumes; we only resolve it
 # when it maps to a single underlying disk, and error otherwise.
-SOURCE_TYPE=$(lsblk -dno TYPE "$MOUNT_SOURCE" 2>/dev/null | head -n 1)
+if ! SOURCE_TYPE=$(lsblk -dno TYPE "$MOUNT_SOURCE" 2>/dev/null); then
+    log_error "'$MOUNT_SOURCE' is not a resolvable block device (fstype: $FSTYPE)."
+    exit "$EXIT_ERR_UNSUPPORTED"
+fi
 if [[ "$SOURCE_TYPE" == "lvm" ]]; then
     # Walk the inverse dependency tree (-s) to the whole disks backing the LV.
     # KNAME avoids the tree-drawing characters added to the NAME column.
@@ -117,14 +129,17 @@ fi
 # -d: don't print slaves (we want the parent)
 # -n: no headings
 # -o pkname: print parent kernel name
-PARENT_DEV=$(lsblk -dno pkname "$MOUNT_SOURCE" | head -n 1)
+if ! PARENT_DEV=$(lsblk -dno pkname "$MOUNT_SOURCE" 2>/dev/null); then
+    log_error "Could not resolve parent device for '$MOUNT_SOURCE'."
+    exit "$EXIT_ERR_GENERIC"
+fi
 
-# If lsblk fails to find a parent (e.g., it is already the raw disk), default to the source name
+# If lsblk finds no parent (e.g., it is already the raw disk), default to the
+# source's own kernel name. Both are bare names (psutil/iostat key format).
 if [[ -n "$PARENT_DEV" ]]; then
-    echo "$(basename "$MOUNT_SOURCE")"
+    echo "$PARENT_DEV"
 else
-    # Fallback: Just print the source (e.g., /dev/sda)
-    echo "$MOUNT_SOURCE"
+    basename "$MOUNT_SOURCE"
 fi
 
 exit "$EXIT_SUCCESS"

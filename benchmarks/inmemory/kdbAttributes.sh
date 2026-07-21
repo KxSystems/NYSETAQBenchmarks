@@ -16,7 +16,7 @@ Options:
   -d, --datadate     Data date
   -t, --threads      Space-separated list of thread counts, e.g., "1 4 16", (default: "1 4")
   -i, --idx          (optional) Filter queries by index: single (42), list (32,42,50), or range (40-44)
-  -r, --result-dir   (optional) Directory to persist merged results (default: ${RESULTS_FILE})
+  -r, --result-dir   (optional) Directory to persist merged results (default: ${RESULT_DIR})
   -q, --query-output-dir (optional) Directory to persist query outputs
   -h, --help         Show this help message
 EOF
@@ -40,7 +40,7 @@ done
 init_benchmark
 
 function execute_queries () {
-    mkdir -p ${RESULT_DIR}
+    mkdir -p "${RESULT_DIR}"
     echo "Running Queries..."
     local COMMONPARAMS="-date $DATADATE -db ${DB_DIR}/kdb -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM}"
     for s in "${THREAD_NRS[@]}"; do
