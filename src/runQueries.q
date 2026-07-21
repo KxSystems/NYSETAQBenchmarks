@@ -435,7 +435,7 @@ $[STORAGE_BACKEND ~ "memory"; [
       loadKDBDB[DB; Device; WriterFN]
     ]; [.log.error "Unknown format ", FORMAT; exit 1]]]];
 
-if[not FORMAT ~ `INMEMORYTABLEDICT;
+if[not FORMAT ~ `TABLEDICT;
   if[`tableStatsDir in ko; captureTableStats hsym `$o `tableStatsDir]];
 
 .log.info "Loading parameters from ", 1_string PARAMDIR

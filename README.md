@@ -113,7 +113,7 @@ The `getPSVs.sh` script:
 
 ## Step 3: Converting PSV Files to Binary Data Formats
 
-The PSV files must be converted to a binary format that the query engines can read directly. Both kdb+ and Parquet formats are supported. Each benchmark has its own data format requirement, so example commands are only provided in [Step 4](#step-4-selecting-and-running-a-benchmark).
+The PSV files must be converted to a binary format that the query engines can read directly. The suite supports kdb+ and Parquet, plus Rayforce's native splayed format for the optional Rayforce engine. Each benchmark has its own data format requirement, so example commands are provided in [Step 4](#step-4-selecting-and-running-a-benchmark).
 
 The `./generateDB.sh` script wraps the underlying TAQ parsers. Each parser has its own dependencies.
 
@@ -130,6 +130,15 @@ The kdb+ parser requires:
 
 The Parquet parser uses Python and the PyArrow library. Install [uv](https://docs.astral.sh/uv/getting-started/installation/) to manage your Python environment. The full list of required libraries is defined in the inline script metadata in [pysrc/taqToParquet/main.py](./pysrc/taqToParquet/main.py).
 
+### Rayforce Parser
+
+Rayforce support is optional. Build a Rayforce binary and set `RAYFORCE_BIN` if
+it is not available at the default sibling-repository path
+`../rayforce/rayforce`. Rayforce generation uses the kdb+ database for the same
+date as its source, then writes native splayed tables under
+`rayforce/${DATADATE}`. Keeping dates separate prevents a benchmark from
+silently loading stale data from another run.
+
 ### PSV Cleanup
 
 Exercise caution when running cleanup: downloading PSV files can be time-consuming. Delete the PSV files only when the binary data has been generated and you are sure that no other binary format will be required.
@@ -142,12 +151,14 @@ rm -rf ${NYSEBENCHMARKDIR}/${SIZE}/psv
 
 Two benchmarks are available:
 
-1. **In-memory query engine benchmark** — compares query execution time across the KDB-X, KDB-X SQL, Polars, DuckDB, Pandas, and KDB-X Python (`pykx`) engines.
+1. **In-memory query engine benchmark** — compares query execution time across the KDB-X, KDB-X SQL, Polars, DuckDB, Pandas, KDB-X Python (`pykx`), and optional Rayforce engines.
 1. **In-memory KDB-X attribute and table format comparison** — evaluates the impact of attributes and table dictionary formats.
 
 ### 1. In-Memory Query Engine Benchmark — `benchmarks/inmemory/queryEngines.sh`
 
-Query engines read data into memory from Hive-partitioned Parquet or kdb+ format. The required format depends on the engine: the KDB-X engines read kdb+ data, while the Python dataframe/SQL engines read Parquet. If you run all engines (the default), **both** formats must be generated.
+Query engines read data into memory from Hive-partitioned Parquet, kdb+, or
+Rayforce's native splayed format. The default engine set uses kdb+ and Parquet;
+Rayforce is opt-in and does not change the QuickStart prerequisites.
 
 | Engine (`--engines` value) | Description | Required data format |
 | --- | --- | --- |
@@ -157,6 +168,7 @@ Query engines read data into memory from Hive-partitioned Parquet or kdb+ format
 | `duckdb` | DuckDB | Parquet |
 | `polars` | Polars | Parquet |
 | `pandas` | Pandas | Parquet |
+| `rayforce` | Rayforce (grouped and parted layouts) | Rayforce splayed |
 
 So you only need the kdb+ database if you restrict the run to `kdb`/`kdbxsql`/`pykx` (e.g. `--engines kdb,kdbxsql`), and only the Parquet database if you restrict it to `duckdb`/`polars`/`pandas`. Convert the TAQ PSV files to the format(s) you need using `./generateDB.sh`:
 
@@ -165,6 +177,25 @@ So you only need the kdb+ database if you restrict the run to `kdb`/`kdbxsql`/`p
 DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATADATE}
 # Hive-partitioned Parquet — needed for the duckdb, polars, and pandas engines
 SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATADATE}
+```
+
+To run Rayforce, first generate the kdb+ database above, then generate the
+date-specific Rayforce database and opt into the engine. The benchmark runs
+both grouped (`time`) and parted (`sym,time`) in-memory layouts:
+
+```bash
+export RAYFORCE_BIN=../rayforce/rayforce
+SIZE=${SIZE} DATAFORMAT=rayforce ./generateDB.sh \
+  ${NYSEBENCHMARKDIR}/${SIZE}/psv \
+  ${NYSEBENCHMARKDIR}/${SIZE}/rayforce \
+  ${DATADATE}
+
+./benchmarks/inmemory/queryEngines.sh \
+  --db-dir ${NYSEBENCHMARKDIR}/${SIZE} \
+  --param-dir ./artifacts/parameters/${SIZE} \
+  --datadate ${DATADATE} --threads "0 4 16 64" \
+  --engines rayforce \
+  --result-dir ./results/inmemory/${SIZE}/rayforce
 ```
 
 Once the on-disk data has been generated, you can start the benchmark. Python libraries are run via `uv`, so ensure [uv](https://docs.astral.sh/uv/getting-started/installation/) is installed. To test the engines with 0, 4, 16, and 64 secondary threads, run:
@@ -178,7 +209,7 @@ The script accepts the following mandatory parameters:
 
 | Parameter | Description |
 | --- | --- |
-| `--db-dir` | Directory containing the generated databases. The script expects the `kdb` and `parquet/rowgroup` subdirectories created by `./generateDB.sh`. |
+| `--db-dir` | Directory containing the generated databases. The script expects `kdb` and/or `parquet/rowgroup` for the default engines, and `rayforce/${DATADATE}` when Rayforce is selected. |
 | `-p`, `--param-dir` | Directory of the query parameters (e.g. `./artifacts/parameters/${SIZE}`). |
 | `-d`, `--datadate` | Target date to query, in the same format as `${DATADATE}`. |
 
@@ -187,9 +218,9 @@ And the following optional parameters:
 | Parameter | Description |
 | --- | --- |
 | `-t`, `--threads` | Space-separated list of secondary-thread counts to test, e.g. `"0 4 16 64"`. Each engine runs once per value. Default: `"1 4"`. |
-| `-e`, `--engines` | Comma-separated subset of engines to run. Valid values: `kdb`, `kdbxsql`, `duckdb`, `polars`, `pykx`, `pandas`. Default: all of them. |
+| `-e`, `--engines` | Comma-separated subset of engines to run. Valid values: `kdb`, `kdbxsql`, `duckdb`, `polars`, `pykx`, `pandas`, `rayforce`. Default: all except the optional `rayforce` engine. |
 | `-i`, `--idx` | Filter queries by index: single (`42`), comma-separated list (`32,42,50`), or range (`40-44`). Default: run all queries. |
-| `-r`, `--result-dir` | Single PSV file that all per-engine results are merged into. The individual per-engine files are written to a temporary directory and removed afterwards. Default: `./results/inmemory`. |
+| `-r`, `--result-dir` | Directory for `results.psv`, per-solution statistics, OS measurements, and environment metadata. Temporary per-engine PSV files are removed after they are merged. Default: `./results/inmemory`. |
 | `-q`, `--query-output-dir` | Directory to persist query outputs. Each engine writes its results as `queryoutput_<idx>.csv` into a per-engine subdirectory, for cross-engine correctness checks (see [Verifying Query Output Correctness](#verifying-query-output-correctness)). Default: outputs are not persisted. |
 | `-h`, `--help` | Show usage and exit. |
 
@@ -211,11 +242,19 @@ launching a benchmark.
 | Variable | Engine(s) | Default | Description |
 | --- | --- | --- | --- |
 | `SYMENUMBYTABLE` | `duckdb` | `false` | ENUM encoding of the `sym` column. When `false`, a single shared `sym_enum` (union of symbols across all three tables) is applied to master, trade and quote. When `true`, each table gets its own ENUM built from only that table's distinct symbols (`sym_master_enum`, `sym_trade_enum`, `sym_quote_enum`). Truthy values (case-insensitive): `true`, `1`, `yes`. |
+| `RAYFORCE_BIN` | `rayforce` | `../rayforce/rayforce` | Path to the Rayforce executable used for data generation and benchmark execution. |
+
+The smoke test also keeps Rayforce opt-in. To exercise its generation and both
+layouts in addition to the default engines, run:
+
+```bash
+RAYFORCE_SMOKE=1 RAYFORCE_BIN=../rayforce/rayforce ./test/inmemory.sh
+```
 
 #### Results
 
 The script merges every engine's results into a single pipe-separated values (PSV) file
-(set by `--results`), one row per query (plus a few rows for the data-loading steps).
+under `--result-dir`, one row per query (plus a few rows for the data-loading steps).
 
 The file starts with a header row. The columns are:
 
@@ -225,8 +264,8 @@ The file starts with a header row. The columns are:
 | `storagebackend` | Where the data is read from: `memory` or `disk`. |
 | `compparam` | Compression parameter used for the data. |
 | `threadcount` | Number of (secondary/worker) threads the engine was configured to use. `0` means no secondary threads. |
-| `runner` | The harness driving the engine, e.g. `KDB-X` or `Python`. |
-| `engine` | The query engine, e.g. `pykx`, `duckdb_con`, `polars`, `pandas`. |
+| `runner` | The harness driving the engine, e.g. `KDB-X`, `Python`, or `Rayforce`. |
+| `engine` | The query engine, e.g. `pykx`, `duckdb_con`, `polars`, `pandas`, or `rayforce`. |
 | `format` | Data format. |
 | `sortcols` | Columns the `trade`/`quote` tables were sorted by before querying, e.g. `time` or `sym,time`. Empty if unsorted. |
 | `indexon` | Columns an index/attribute was applied to, e.g. `sym`. Empty if none. |
@@ -327,7 +366,7 @@ reads the kdb+ database instead.
 
 Queries are defined **per engine** in PSV files under
 [artifacts/queries/inmemory/](./artifacts/queries/inmemory/) (`kdb.psv`,
-`sql.psv`, `duckdb.psv`, `polars.psv`, `pandas.psv`, `pykx.psv`, and the
+`sql.psv`, `duckdb.psv`, `polars.psv`, `pandas.psv`, `pykx.psv`, `rayforce.psv`, and the
 attribute-benchmark variants `kdb_noattr.psv`, `kdb_tabledict.psv`). Each file
 has the columns:
 

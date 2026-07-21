@@ -16,7 +16,7 @@ Options:
   -p, --param-dir    Directory of the query parameters
   -d, --datadate     Data date
   -t, --threads      Space-separated list of thread counts, e.g., "1 4 16", (default: "1 4")
-  -e, --engines      Comma-separated list of engines to test (default: "kdb,kdbxsql,duckdb,polars,pykx,pandas")
+  -e, --engines      Comma-separated list of engines to test; add rayforce explicitly (default: "${ENGINES}")
   -i, --idx          (optional) Filter queries by index: single (42), list (32,42,50), or range (40-44)
   -r, --result-dir   (optional) Directory to persist merged results (default: ${RESULT_DIR})
   -q, --query-output-dir (optional) Directory to persist query outputs
@@ -51,6 +51,10 @@ function execute_queries () {
     mkdir -p ${RESULT_DIR}
     echo "Running Queries..."
     local COMMONPARAMS="-date $DATADATE -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ${PARAM_DIR} ${IDX_PARAM}"
+    local RAY_IDX_ARGS=()
+    if [[ -n "${IDX_PARAM}" ]]; then
+        RAY_IDX_ARGS=(--idx "${IDX_PARAM#-idx }")
+    fi
     for s in "${THREAD_NRS[@]}"; do
         echo "--> Running with $s threads"
 
@@ -79,6 +83,26 @@ function execute_queries () {
         fi
         if engine_enabled pandas; then
             run_solution "Pandas" env OMP_NUM_THREADS=$(( s > 1 ? s : 1 )) NUMEXPR_NUM_THREADS=$(( s > 1 ? s : 1 )) MKL_NUM_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine pandas -sortcols "time" -queryfile ./artifacts/queries/inmemory/pandas.psv
+        fi
+        if engine_enabled rayforce; then
+            # Rayforce -c is its total execution-core count, including the main
+            # worker, so the suite's zero-thread case maps to one core.
+            local RAYCORES=$(( s > 1 ? s : 1 ))
+            run_solution "Rayforce" bash ./src/rayforce/runRayforce.sh \
+                --db-dir "${DB_DIR}" --param-dir "${PARAM_DIR}" \
+                --datadate "${DATADATE}" --cores "${RAYCORES}" \
+                --thread-label "${RAYCORES}" --layout grouped \
+                --queryfile ./artifacts/queries/inmemory/rayforce.psv \
+                --querymeta ./artifacts/queries/inmemory/querymeta.psv \
+                "${RAY_IDX_ARGS[@]}"
+
+            run_solution "Rayforce Parted" bash ./src/rayforce/runRayforce.sh \
+                --db-dir "${DB_DIR}" --param-dir "${PARAM_DIR}" \
+                --datadate "${DATADATE}" --cores "${RAYCORES}" \
+                --thread-label "${RAYCORES}" --layout parted \
+                --queryfile ./artifacts/queries/inmemory/rayforce.psv \
+                --querymeta ./artifacts/queries/inmemory/querymeta.psv \
+                "${RAY_IDX_ARGS[@]}"
         fi
     done
 }
