@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Convert NYSE TAQ benchmark results into a ClickBench-like data.js file.
 
-The input directory is a <SIZE> directory (SIZE is one of small, medium, large
-or full), e.g. ``results/inmemory/small``. It is scanned recursively for
-benchmark runs; a run is any directory that contains both:
+The input directory (e.g. ``results/inmemory/small``) is scanned recursively
+for benchmark runs; a run is any directory that contains both:
 
   * results.psv           - the query/engine timing results (pipe separated)
   * environment.yaml      - machine / test-run environment
@@ -77,8 +76,6 @@ from pathlib import Path
 
 import yaml
 
-VALID_SIZES = ("small", "medium", "large", "xlarge", "full")
-
 QUERYMETA_PSV = (Path(__file__).resolve().parent.parent
                  / "artifacts" / "queries" / "inmemory" / "querymeta.psv")
 
@@ -91,17 +88,6 @@ def write_querymeta_js():
     out.write_text(header + "const querymeta_psv = "
                    + json.dumps(QUERYMETA_PSV.read_text()) + ";\n")
     print(f"wrote {out}")
-
-
-def find_mappings(input_dir: Path) -> Path:
-    """Locate mappings.yaml by walking up from the input directory."""
-    for parent in [input_dir, *input_dir.parents]:
-        candidate = parent / "mappings.yaml"
-        if candidate.is_file():
-            return candidate
-    raise FileNotFoundError(
-        f"Could not find mappings.yaml in {input_dir} or any parent directory"
-    )
 
 
 def parse_stats(stats_path: Path):
@@ -342,24 +328,22 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("input_dir", type=Path,
-                        help="A <SIZE> benchmark directory to scan "
+                        help="Benchmark results directory to scan recursively "
                              "(e.g. results/inmemory/small)")
     parser.add_argument("output_file", type=Path,
                         help="Path of the .js file to write")
-    parser.add_argument("--mappings", type=Path, default=None,
-                        help="Path to mappings.yaml (default: search parents of input_dir)")
+    parser.add_argument("--mappings", type=Path,
+                        default=Path("./results/mappings.yaml"),
+                        help="Path to mappings.yaml (default: %(default)s)")
     args = parser.parse_args()
 
     input_dir = args.input_dir.resolve()
     if not input_dir.is_dir():
         parser.error(f"Input directory does not exist: {input_dir}")
-    if input_dir.name not in VALID_SIZES:
-        parser.error(
-            f"Input directory must be a <SIZE> directory with SIZE in "
-            f"{VALID_SIZES}; got {input_dir.name!r} from {input_dir}"
-        )
 
-    mappings_path = args.mappings or find_mappings(input_dir)
+    mappings_path = args.mappings
+    if not mappings_path.is_file():
+        parser.error(f"mappings.yaml not found: {mappings_path}")
     machines = yaml.safe_load(mappings_path.read_text()).get("machines", {})
 
     # Discover runs: any directory holding both environment.yaml and results.psv.

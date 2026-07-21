@@ -760,7 +760,7 @@ const instrument_multi_values = {
     '1000infreq': '1000 infreq',
 };
 
-/// Values of the complexity:<value> tags in querymeta.psv, with their selector labels.
+/// Values of the mandatory `complexity` column of querymeta.psv, with their selector labels.
 /// They get their own "Complexity filter" selector instead of the generic tag filters.
 const complexity_values = {
     'simple': 'simple',
@@ -955,6 +955,7 @@ async function loadQueryMeta() {
         const header = lines[0].split('|');
         const idx_tags = header.indexOf('tags');
         const idx_instrument = header.indexOf('instrument');
+        const idx_complexity = header.indexOf('complexity');
         const idx_description = header.indexOf('description');
         const idx_comment = header.indexOf('comment');
         lines.slice(1).forEach(line => {
@@ -962,10 +963,9 @@ async function loadQueryMeta() {
             const comment = (fields[idx_comment] ?? '').trim();
             queries.push(fields[idx_description] + (comment ? ` (${comment})` : ''));
             const tags = (fields[idx_tags] ?? '').split(',').map(t => t.trim()).filter(t => t !== '');
-            /// complexity:<value> tags feed the dedicated "Complexity filter" selector,
-            /// so they are kept out of the generic include/exclude tag lists.
-            const complexity_tag = tags.find(t => t.startsWith('complexity:'));
-            query_complexity.push(complexity_tag ? complexity_tag.split(':')[1] : '');
+            /// The `complexity` column feeds the dedicated "Complexity filter" selector;
+            /// legacy complexity:<value> tags are kept out of the generic tag lists.
+            query_complexity.push((fields[idx_complexity] ?? '').trim());
             query_tags.push(tags.filter(t => !t.startsWith('complexity:')));
             query_instrument.push((fields[idx_instrument] ?? '').trim());
         });
