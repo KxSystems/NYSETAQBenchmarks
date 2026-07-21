@@ -189,7 +189,7 @@ captureTableStats: {[tableStatsDir:`s]
   h {[h; tName]
     h (string tName), ":\n";
     h "  name: ", (string tName), "\n";
-    h "  size (MB): ", (string floor .mem.objsize[value tName] % 1024*1024), "\n";
+    h "  size (MB): ", (string (.mem.objsize[value tName] div 1024) % 1024), "\n";
     h "  rowCount: ", (string count value tName), "\n";
     h "  columnCount: ", (string count cols tName), "\n";
     h "  columns: \n";
