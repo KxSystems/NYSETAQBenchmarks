@@ -1,85 +1,85 @@
-idx|tags|instrument|description|sortby|comment
-1|complexity:simple,rawcolumn,timefilter|all|select all quotes before 8am|time,idx|
-2|complexity:simple,emptyresult,rawcolumn|all|query trade with a single filter that filters out everything|time,idx|
-3|complexity:simple,manydummyfilters,rawcolumn,timefilter|all|query contains multiple filters that do not filter out anything|time,idx|
-4|complexity:simple,rawcolumn,timefilter|all|filter trades within a 10-second window at 10:00am|time,idx|
-5|complexity:simple,rawcolumn,timefilter|single:infrequent|filter quotes for an instrument during regular trading hours (8:30–16:30)|time,idx|
-6|complexity:simple,rawcolumn,timefilter|single:frequent|filter quotes for an instrument during regular trading hours (8:30–16:30)|time,idx|
-7|complexity:simple,rawcolumn,timefilter|multi:50|filter quotes for a set of instruments in the first 5 minutes of trading (8:30–8:35)|time,idx|
-8|complexity:simple,rawcolumn,timefilter|multi:1000infreq|filter quotes for a set of instruments in the first 5 minutes of trading (8:30–8:35)|time,idx|
-9|complexity:simple,rawcolumn|all|filter trades from source "N" and select key columns|time,idx|
-10|complexity:simple|single:infrequent|calculate mid quote for an instrument (provided as a parameter)|time,idx|
-11|complexity:simple|single:frequent|calculate mid quote for an instrument (provided as a parameter)|time,idx|
-12|complexity:simple,unnecessarycolumnfetch|single:infrequent|calculate mid quote for an instrument (provided as a parameter), fetching all columns first|time,idx|We fetch columns that we immediately throw away
-13|complexity:simple,unnecessarycolumnfetch|single:frequent|calculate mid quote for an instrument (provided as a parameter), fetching all columns first|time,idx|We fetch columns that we immediately throw away
-14|complexity:simple,sort|single:infrequent|calculate and sort mid quotes descending for an instrument (provided as a parameter). Sorting must be stable, i.e. keep time ordering for the same values|mid,time,idx|
-15|complexity:simple,sort|single:frequent|calculate and sort mid quotes descending for an instrument (provided as a parameter). Sorting must be stable, i.e. keep time ordering for the same values|mid,time,idx|
-16|complexity:simple,rawcolumn|single:infrequent|select key quote columns for an instrument|time,idx|
-17|complexity:simple,rawcolumn|single:frequent|select key quote columns for an instrument|time,idx|
-18|complexity:simple,rawcolumn|multi:50|select key quote columns for a set of instruments where combined bid+ask size exceeds 2000|time,idx|
-19|complexity:simple,rawcolumn|multi:1000infreq|select key quote columns for a set of instruments where combined bid+ask size exceeds 2000|time,idx|
-20|complexity:simple|single:infrequent|calculate overall average liquidity-weighted mid quote for an instrument||
-21|complexity:simple|single:frequent|calculate overall average liquidity-weighted mid quote for an instrument||
-22|complexity:simple,groupby:2|single:infrequent|calculate 10-minute average liquidity-weighted mid quote by exchange for an instrument|minute,ex|
-23|complexity:simple,groupby:2|single:frequent|calculate 10-minute average liquidity-weighted mid quote by exchange for an instrument|minute,ex|
-24|complexity:advanced,pivot,groupby:2|single:infrequent|pivot 10-minute average liquidity-weighted mid quote by exchange for an instrument|minute|
-25|complexity:advanced,pivot,groupby:2|single:frequent|pivot 10-minute average liquidity-weighted mid quote by exchange for an instrument|minute|
-26|complexity:advanced,pivot,groupby:2|multi:50|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments|minute|
-27|complexity:advanced,pivot,groupby:2|multi:1000infreq|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments|minute|
-28|complexity:advanced,pivot,groupby:2|multi:50|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments with forward fill for missing values|minute|
-29|complexity:advanced,pivot,groupby:2|multi:1000infreq|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments with forward fill for missing values|minute|
-30|complexity:simple,groupby:1|single:infrequent|calculate average bid-ask spread in 10-minute buckets for an instrument|minute|
-31|complexity:simple,groupby:1|single:frequent|calculate average bid-ask spread in 10-minute buckets for an instrument|minute|
-32|complexity:simple,groupby:2|multi:50|calculate average bid-ask spread in 10-minute buckets per instrument for a set of instruments|sym,minute|
-33|complexity:simple,groupby:2|multi:1000infreq|calculate average bid-ask spread in 10-minute buckets per instrument for a set of instruments|sym,minute|
-34|complexity:advanced|single:infrequent|calculate size-weighted average spread for an instrument||
-35|complexity:advanced|single:frequent|calculate size-weighted average spread for an instrument||
-36|complexity:advanced,timefilter|all|calculate weighted average spread, deviation/max/min of spread for quotes between 8:30 and 8:35||
-37|complexity:advanced,groupby:1|single:infrequent|calculate weighted average spread, deviation/max/min of spread by exchange names|ex|
-38|complexity:advanced,groupby:1|single:frequent|calculate weighted average spread, deviation/max/min of spread by exchange names|ex|
-39|complexity:advanced,groupby:1|single:infrequent|calculate weighted average spread, deviation/max/min of spread by exchange names|ex|same as query 13 but measures impact of manual optimization (calculate spread once)
-40|complexity:advanced,groupby:1|single:frequent|calculate weighted average spread, deviation/max/min of spread by exchange names|ex|same as query 13 but measures impact of manual optimization (calculate spread once)
-41|complexity:advanced,groupby:2|multi:50|calculate weighted average spread and deviation of spread by exchange names and instrument|sym,ex|
-42|complexity:advanced,groupby:2|multi:1000infreq|calculate weighted average spread and deviation of spread by exchange names and instrument|sym,ex|
-43|complexity:advanced,groupby:1|all|calculate weighted average spread and deviation of spread by exchange names for quotes without short sale restriction on UTP (Short Sale Restriction Indicator is "0")|ex|
-44|complexity:simple|all|find unique sym/exchange pairs where trade size exceeds 700,000. Order results as they appear in the input|idx|
-45|complexity:simple,groupby:1|multi:50|calculate size weighted bid and offer prices by instrument for a set of instruments|sym|
-46|complexity:simple,groupby:1|multi:1000infreq|calculate size weighted bid and offer prices by instrument for a set of instruments|sym|
-47|complexity:advanced|single:infrequent|calculate 20-trade rolling average price for an instrument (provided as a parameter)|time,idx|
-48|complexity:advanced|single:frequent|calculate 20-trade rolling average price for an instrument (provided as a parameter)|time,idx|
-49|complexity:advanced,groupby:1|multi:50|calculate rolling average liquidity-weighted mid quote and combined size (window=5) by instrument for a set of instruments|sym,time,idx|
-50|complexity:advanced,groupby:1|multi:1000infreq|calculate rolling average liquidity-weighted mid quote and combined size (window=5) by instrument for a set of instruments|sym,time,idx|
-51|complexity:advanced|single:infrequent|select cummulative trade sizes for a given instrument|time,idx|
-52|complexity:advanced|single:frequent|select cummulative trade sizes for a given instrument|time,idx|
-53|complexity:advanced|all|calculate cumulative trade size for illiquid exchange "L"|time,idx|
-54|complexity:complex,timefilter,groupby:1|all|calculate moving volume weighted average price by instrument within a time range|time,idx|
-55|complexity:advanced|all|calculate cumulative trade size for liquid exchange "T"|time,idx|
-56|complexity:advanced,rawcolumn,groupby:1|all|select largest trades on all exchanges|time,idx|
-57|complexity:advanced,groupby:1|single:infrequent|select all rows from quote when a given instrument first reaches its daily maximal bid price or daily minimal ask price. Introduce a new `tag` column that can take either value `maxbid` or `minask`|tag,time,idx|
-58|complexity:advanced,groupby:1|single:frequent|select all rows from quote when a given instrument first reaches its daily maximal bid price or daily minimal ask price. Introduce a new `tag` column that can take either value `maxbid` or `minask`|tag,time,idx|
-59|complexity:advanced,groupby:2|all|select trades with the smallest size per exchange-symbol combination. The result order must match the input order|time,idx|
-60|complexity:advanced,groupby:1|all|select trades with the smallest size per exchange-symbol combination. The result must be ordered by sym and withing sym by time, idx|sym,time,idx|
-61|complexity:advanced,groupby:1|all|select the indices of all rows in which the sequence number decreases for the instrument|sym,seqDecr|
-62|complexity:complex,groupby:2|all|custom time bucket (e.g. before 9:00 is preopen), sort result by instrumentID and time bucket|ex,timeBucketIdx|
-63|complexity:complex,groupby:2|all|custom time bucket (e.g. before 9:00 is preopen)|ex,timeBucket|
-64|complexity:simple,groupby:2|multi:50|calculate 5-minute open/high/low/close/volume bars for a set of instruments filtered to non-UTP trades (field stop is not null)|sym,minute|
-65|complexity:simple,groupby:2|multi:1000infreq|calculate 5-minute open/high/low/close/volume bars for a set of instruments filtered to non-UTP trades (field stop is not null)|sym,minute|
-66|complexity:simple,groupby:1|single:infrequent|calculate 1-minute first bid/ask sizes with order imbalance for an instrument|minute|
-67|complexity:simple,groupby:1|single:frequent|calculate 1-minute first bid/ask sizes with order imbalance for an instrument|minute|
-68|complexity:advanced,groupby:1|multi:50|calculate size weighted ask/bid quotes, size standard deviations, and price/size correlations for a set of instruments|sym|
-69|complexity:advanced,groupby:1|multi:1000infreq|calculate size weighted ask/bid quotes, size standard deviations, and price/size correlations for a set of instruments|sym|
-70|complexity:advanced,rawcolumn,groupby:1|all|trades with the smallest price for all instruments|time,idx|
-71|complexity:complex,groupby:1|single:infrequent|We want to calculate how much volume was transacted at each price. Whenever the price changes, we want to restart the count. We only want to consider prices for the same instrument|pricegroup|
-72|complexity:complex,groupby:1|single:frequent|We want to calculate how much volume was transacted at each price. Whenever the price changes, we want to restart the count. We only want to consider prices for the same instrument|pricegroup|
-73|complexity:complex,groupby:2|multi:50|We want to calculate how much volume was transacted at each price. Whenever the price changes, we want to restart the count. We only want to consider prices for the same instrument|sym,pricegroup|
-74|complexity:complex,groupby:2|multi:1000infreq|We want to calculate how much volume was transacted at each price. Whenever the price changes, we want to restart the count. We only want to consider prices for the same instrument|sym,pricegroup|
-75|complexity:complex,groupby:2|all|We want to calculate how much volume was transacted at each price. Whenever the price changes, we want to restart the count. We only want to consider prices for the same instrument|sym,pricegroup|
-76|complexity:simple|single:infrequent|calculate median bid+ask size for an instrument||
-77|complexity:simple|single:frequent|calculate median bid+ask size for an instrument||
-78|complexity:simple,groupby:1|all|calculate median trade size by exchange|ex|
-79|complexity:advanced,asofjoin,rawcolumn|multi:50|as-of join trades with quotes for a set of instruments to get prevailing quote at trade time|time,idx|
-80|complexity:advanced,asofjoin,rawcolumn|multi:1000infreq|as-of join trades with quotes for a set of instruments to get prevailing quote at trade time|time,idx|
-81|complexity:advanced,asofjoin,rawcolumn|single:infrequent|as-of join trades with quotes for an instrument to get prevailing quote at trade time|time,idx|
-82|complexity:advanced,asofjoin,rawcolumn|single:frequent|as-of join trades with quotes for an instrument to get prevailing quote at trade time|time,idx|
-83|complexity:advanced,asofjoin,rawcolumn|all|as-of join large trades (size > 500,000) with quotes by sym+exchange to get prevailing quote at trade time|time,idx|
-84|complexity:advanced,asofjoin,timefilter,rawcolumn|all|as-of join pre close trades (time between 0D16:20 and 0D16:30) with quotes by sym+exchange to get prevailing quote at trade time|time,idx|
+idx|tags|instrument|complexity|description|sortby|comment
+1|rawcolumn,timefilter|all|simple|select all quotes before 8am|time,idx|
+2|emptyresult,rawcolumn|all|simple|query trade with a single filter that filters out everything|time,idx|
+3|manydummyfilters,rawcolumn,timefilter|all|simple|query contains multiple filters that do not filter out anything|time,idx|
+4|rawcolumn,timefilter|all|simple|filter trades within a 10-second window at 10:00am|time,idx|
+5|rawcolumn,timefilter|single:infrequent|simple|filter quotes for an instrument during regular trading hours (8:30–16:30)|time,idx|
+6|rawcolumn,timefilter|single:frequent|simple|filter quotes for an instrument during regular trading hours (8:30–16:30)|time,idx|
+7|rawcolumn,timefilter|multi:50|simple|filter quotes for a set of instruments in the first 5 minutes of trading (8:30–8:35)|time,idx|
+8|rawcolumn,timefilter|multi:1000infreq|simple|filter quotes for a set of instruments in the first 5 minutes of trading (8:30–8:35)|time,idx|
+9|rawcolumn|all|simple|filter trades from source "N" and select key columns|time,idx|
+10||single:infrequent|simple|calculate mid quote for an instrument (provided as a parameter)|time,idx|
+11||single:frequent|simple|calculate mid quote for an instrument (provided as a parameter)|time,idx|
+12|unnecessarycolumnfetch|single:infrequent|simple|calculate mid quote for an instrument (provided as a parameter), fetching all columns first|time,idx|We fetch columns that we immediately throw away
+13|unnecessarycolumnfetch|single:frequent|simple|calculate mid quote for an instrument (provided as a parameter), fetching all columns first|time,idx|We fetch columns that we immediately throw away
+14|sort|single:infrequent|simple|calculate and sort mid quotes descending for an instrument (provided as a parameter). Sorting must be stable, i.e. keep time ordering for the same values|mid,time,idx|
+15|sort|single:frequent|simple|calculate and sort mid quotes descending for an instrument (provided as a parameter). Sorting must be stable, i.e. keep time ordering for the same values|mid,time,idx|
+16|rawcolumn|single:infrequent|simple|select key quote columns for an instrument|time,idx|
+17|rawcolumn|single:frequent|simple|select key quote columns for an instrument|time,idx|
+18|rawcolumn|multi:50|simple|select key quote columns for a set of instruments where combined bid+ask size exceeds 2000|time,idx|
+19|rawcolumn|multi:1000infreq|simple|select key quote columns for a set of instruments where combined bid+ask size exceeds 2000|time,idx|
+20||single:infrequent|simple|calculate overall average liquidity-weighted mid quote for an instrument||
+21||single:frequent|simple|calculate overall average liquidity-weighted mid quote for an instrument||
+22|groupby:2|single:infrequent|simple|calculate 10-minute average liquidity-weighted mid quote by exchange for an instrument|minute,ex|
+23|groupby:2|single:frequent|simple|calculate 10-minute average liquidity-weighted mid quote by exchange for an instrument|minute,ex|
+24|pivot,groupby:2|single:infrequent|advanced|pivot 10-minute average liquidity-weighted mid quote by exchange for an instrument|minute|
+25|pivot,groupby:2|single:frequent|advanced|pivot 10-minute average liquidity-weighted mid quote by exchange for an instrument|minute|
+26|pivot,groupby:2|multi:50|advanced|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments|minute|
+27|pivot,groupby:2|multi:1000infreq|advanced|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments|minute|
+28|pivot,groupby:2|multi:50|advanced|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments with forward fill for missing values|minute|
+29|pivot,groupby:2|multi:1000infreq|advanced|pivot 10-minute average liquidity-weighted mid quote by symbol for a set of instruments with forward fill for missing values|minute|
+30|groupby:1|single:infrequent|simple|calculate average bid-ask spread in 10-minute buckets for an instrument|minute|
+31|groupby:1|single:frequent|simple|calculate average bid-ask spread in 10-minute buckets for an instrument|minute|
+32|groupby:2|multi:50|simple|calculate average bid-ask spread in 10-minute buckets per instrument for a set of instruments|sym,minute|
+33|groupby:2|multi:1000infreq|simple|calculate average bid-ask spread in 10-minute buckets per instrument for a set of instruments|sym,minute|
+34||single:infrequent|advanced|calculate size-weighted average spread for an instrument||
+35||single:frequent|advanced|calculate size-weighted average spread for an instrument||
+36|timefilter|all|advanced|calculate weighted average spread, deviation/max/min of spread for quotes between 8:30 and 8:35||
+37|groupby:1|single:infrequent|advanced|calculate weighted average spread, deviation/max/min of spread by exchange names|ex|
+38|groupby:1|single:frequent|advanced|calculate weighted average spread, deviation/max/min of spread by exchange names|ex|
+39|groupby:1|single:infrequent|advanced|calculate weighted average spread, deviation/max/min of spread by exchange names|ex|same as query 13 but measures impact of manual optimization (calculate spread once)
+40|groupby:1|single:frequent|advanced|calculate weighted average spread, deviation/max/min of spread by exchange names|ex|same as query 13 but measures impact of manual optimization (calculate spread once)
+41|groupby:2|multi:50|advanced|calculate weighted average spread and deviation of spread by exchange names and instrument|sym,ex|
+42|groupby:2|multi:1000infreq|advanced|calculate weighted average spread and deviation of spread by exchange names and instrument|sym,ex|
+43|groupby:1|all|advanced|calculate weighted average spread and deviation of spread by exchange names for quotes without short sale restriction on UTP (Short Sale Restriction Indicator is "0")|ex|
+44||all|simple|find unique sym/exchange pairs where trade size exceeds 700,000. Order results as they appear in the input|idx|
+45|groupby:1|multi:50|simple|calculate size weighted bid and offer prices by instrument for a set of instruments|sym|
+46|groupby:1|multi:1000infreq|simple|calculate size weighted bid and offer prices by instrument for a set of instruments|sym|
+47||single:infrequent|advanced|calculate 20-trade rolling average price for an instrument (provided as a parameter)|time,idx|
+48||single:frequent|advanced|calculate 20-trade rolling average price for an instrument (provided as a parameter)|time,idx|
+49|groupby:1|multi:50|advanced|calculate rolling average liquidity-weighted mid quote and combined size (window=5) by instrument for a set of instruments|sym,time,idx|
+50|groupby:1|multi:1000infreq|advanced|calculate rolling average liquidity-weighted mid quote and combined size (window=5) by instrument for a set of instruments|sym,time,idx|
+51||single:infrequent|advanced|select cummulative trade sizes for a given instrument|time,idx|
+52||single:frequent|advanced|select cummulative trade sizes for a given instrument|time,idx|
+53||all|advanced|calculate cumulative trade size for illiquid exchange "L"|time,idx|
+54|timefilter,groupby:1|all|complex|calculate moving volume weighted average price by instrument within a time range|time,idx|
+55||all|advanced|calculate cumulative trade size for liquid exchange "T"|time,idx|
+56|rawcolumn,groupby:1|all|advanced|select largest trades on all exchanges|time,idx|
+57|groupby:1|single:infrequent|advanced|select all rows from quote when a given instrument first reaches its daily maximal bid price or daily minimal ask price. Introduce a new `tag` column that can take either value `maxbid` or `minask`|tag,time,idx|
+58|groupby:1|single:frequent|advanced|select all rows from quote when a given instrument first reaches its daily maximal bid price or daily minimal ask price. Introduce a new `tag` column that can take either value `maxbid` or `minask`|tag,time,idx|
+59|groupby:2|all|advanced|select trades with the smallest size per exchange-symbol combination. The result order must match the input order|time,idx|
+60|groupby:1|all|advanced|select trades with the smallest size per exchange-symbol combination. The result must be ordered by sym and withing sym by time, idx|sym,time,idx|
+61|groupby:1|all|advanced|select the indices of all rows in which the sequence number decreases for the instrument|sym,seqDecr|
+62|groupby:2|all|complex|custom time bucket (e.g. before 9:00 is preopen), sort result by instrumentID and time bucket|ex,timeBucketIdx|
+63|groupby:2|all|complex|custom time bucket (e.g. before 9:00 is preopen)|ex,timeBucket|
+64|groupby:2|multi:50|simple|calculate 5-minute open/high/low/close/volume bars for a set of instruments filtered to non-UTP trades (field stop is not null)|sym,minute|
+65|groupby:2|multi:1000infreq|simple|calculate 5-minute open/high/low/close/volume bars for a set of instruments filtered to non-UTP trades (field stop is not null)|sym,minute|
+66|groupby:1|single:infrequent|simple|calculate 1-minute first bid/ask sizes with order imbalance for an instrument|minute|
+67|groupby:1|single:frequent|simple|calculate 1-minute first bid/ask sizes with order imbalance for an instrument|minute|
+68|groupby:1|multi:50|advanced|calculate size weighted ask/bid quotes, size standard deviations, and price/size correlations for a set of instruments|sym|
+69|groupby:1|multi:1000infreq|advanced|calculate size weighted ask/bid quotes, size standard deviations, and price/size correlations for a set of instruments|sym|
+70|rawcolumn,groupby:1|all|advanced|trades with the smallest price for all instruments|time,idx|
+71|groupby:1|single:infrequent|complex|We want to calculate how much volume was transacted at each price. Whenever the price changes, we want to restart the count. We only want to consider prices for the same instrument|pricegroup|
+72|groupby:1|single:frequent|complex|We want to calculate how much volume was transacted at each price. Whenever the price changes, we want to restart the count. We only want to consider prices for the same instrument|pricegroup|
+73|groupby:2|multi:50|complex|We want to calculate how much volume was transacted at each price. Whenever the price changes, we want to restart the count. We only want to consider prices for the same instrument|sym,pricegroup|
+74|groupby:2|multi:1000infreq|complex|We want to calculate how much volume was transacted at each price. Whenever the price changes, we want to restart the count. We only want to consider prices for the same instrument|sym,pricegroup|
+75|groupby:2|all|complex|We want to calculate how much volume was transacted at each price. Whenever the price changes, we want to restart the count. We only want to consider prices for the same instrument|sym,pricegroup|
+76||single:infrequent|simple|calculate median bid+ask size for an instrument||
+77||single:frequent|simple|calculate median bid+ask size for an instrument||
+78|groupby:1|all|simple|calculate median trade size by exchange|ex|
+79|asofjoin,rawcolumn|multi:50|advanced|as-of join trades with quotes for a set of instruments to get prevailing quote at trade time|time,idx|
+80|asofjoin,rawcolumn|multi:1000infreq|advanced|as-of join trades with quotes for a set of instruments to get prevailing quote at trade time|time,idx|
+81|asofjoin,rawcolumn|single:infrequent|advanced|as-of join trades with quotes for an instrument to get prevailing quote at trade time|time,idx|
+82|asofjoin,rawcolumn|single:frequent|advanced|as-of join trades with quotes for an instrument to get prevailing quote at trade time|time,idx|
+83|asofjoin,rawcolumn|all|advanced|as-of join large trades (size > 500,000) with quotes by sym+exchange to get prevailing quote at trade time|time,idx|
+84|asofjoin,timefilter,rawcolumn|all|advanced|as-of join pre close trades (time between 0D16:20 and 0D16:30) with quotes by sym+exchange to get prevailing quote at trade time|time,idx|

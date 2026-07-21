@@ -2,3 +2,4 @@ results
 /pysrc/**/__pycache__/
 external
 DATA
+test/testdb

@@ -339,7 +339,9 @@ has the columns:
 | `parameter` | Comma-separated names of parameters injected into the query (e.g. `datadate`, `aFreqInstr`, `twentyInstrs`, `timeBuckets`). Empty if the query takes none. |
 
 Engine-independent metadata lives in `artifacts/queries/inmemory/querymeta.psv`
-(`idx|tags|instrument|description|sortby|comment`). The `instrument` column is
+(`idx|tags|instrument|complexity|description|sortby|comment`). The `complexity`
+column rates how involved the query logic is: `simple`, `advanced`, or
+`complex`. The `instrument` column is
 **mandatory** and states how many instruments the query works on: `single`,
 `multi`, or `all` (no instrument filter). Single-instrument queries are further
 split by instrument frequency into `single:infrequent` and `single:frequent`
@@ -368,8 +370,8 @@ its `.txt` file to every size directory and load it in both
 
 1. Add a row with the next free `idx` to each engine query file, expressing the
    same logical query in that engine's syntax.
-2. Add a matching row (same `idx`) to `querymeta.psv` with a `description` and
-   tags.
+2. Add a matching row (same `idx`) to `querymeta.psv` with a `description`,
+   `instrument` and `complexity` values, and tags.
 
 **Inserting a query in the middle** (existing indices must shift): because
 indices are sequential, inserting renumbers every query after the insertion

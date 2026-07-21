@@ -187,19 +187,23 @@ captureTableStats: {[tableStatsDir:`s]
   h "proprietary: 'yes'\n";
   h "engineversion: '", string[.z.k], "'\n";
   h {[h; tName]
+    rowCount: $[99h ~ type value tName; sum count each value tName; count value tName];
+    columns: cols $[99h ~ type value tName; first;] value tName;
+
     h (string tName), ":\n";
     h "  name: ", (string tName), "\n";
     h "  size (MB): ", (string (.mem.objsize[value tName] div 1024) % 1024), "\n";
-    h "  rowCount: ", (string count value tName), "\n";
-    h "  columnCount: ", (string count cols tName), "\n";
+    h "  rowCount: ", (string rowCount), "\n";
+    h "  columnCount: ", (string $[99h ~ type value tName;1+;]count columns), "\n";
     h "  columns: \n";
     {[h;tName;c]
       / enums stored as 'symbol'
-      t: $[0h ~ type tName c; `string; "s" ~ .Q.ty tName c; `symbol; key tName c];
+      t: $[99h ~ type value tName;first;] value tName;
+      ty: $[0h ~ type t c; `string; "s" ~ .Q.ty t c; `symbol; key t c];
       h "  - name: ", (string c), "\n";
-      h "    type: ", (string t), "\n";
-      h "    attr: ", (string meta[tName][c;`a]), "\n";
-      }[h; tName] each cols tName}' `master`trade`quote;
+      h "    type: ", (string ty), "\n";
+      h "    attr: ", (string meta[t][c;`a]), "\n";
+      }[h; tName] each columns}' `master`trade`quote;
   h "sortcols: '", ("," sv string SORTCOLS), "'\n";
   hclose h
   }

@@ -34,11 +34,13 @@ rm -rf ${TESTDB}/parquet/rowgroup
 SIZE=full DATAFORMAT=kdb ./generateDB.sh ${TESTPSV} ${TESTDB}/kdb ${TESTDBDATE}
 SIZE=full SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${TESTPSV} ${TESTDB}/parquet/rowgroup ${TESTDBDATE}
 
-# Run the benchmarks.
 rm -rf ${RESULTDIR}
 
+# Run the benchmarks.
 PARAM_DIR=./artifacts/parameters/test
-./benchmarks/inmemory/queryEngines.sh --db-dir ${TESTDB} --param-dir ${PARAM_DIR} --date ${TESTDBDATE} --threads "4 16" --result-dir ${RESULTDIR}
-./benchmarks/inmemory/kdbAttributes.sh --db-dir ${TESTDB} --param-dir ${PARAM_DIR} --date ${TESTDBDATE} --threads "4 16" --result-dir ${RESULTDIR}
+./benchmarks/inmemory/queryEngines.sh --db-dir ${TESTDB} --param-dir ${PARAM_DIR} --datadate ${TESTDBDATE} --threads "4 16" --result-dir ${RESULTDIR}
+./benchmarks/inmemory/kdbAttributes.sh --db-dir ${TESTDB} --param-dir ${PARAM_DIR} --datadate ${TESTDBDATE} --threads "4 16" --result-dir ${RESULTDIR}
+
+python3 ./pysrc/convertToClickBenchFormat.py ${RESULTDIR} ${RESULTDIR}/data.generated.js
 
 popd
