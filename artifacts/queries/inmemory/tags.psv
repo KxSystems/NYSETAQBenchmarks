@@ -1,0 +1,11 @@
+tag|description|comment
+asofjoin|the query performs an as-of join between tables (e.g. trades with prevailing quotes)|
+emptyresult|the query returns empty result|
+groupby:1|the query aggregates with a group-by on one column|
+groupby:2|the query aggregates with a group-by on two columns|
+manydummyfilters|the query contains multiple filters that do not filter out anything|
+pivot|the query pivots the result (one column per group value)|
+rawcolumn|the query returns raw column values without aggregation|
+sort|the query sorts the result|
+timefilter|the query filters on the time column|
+unnecessarycolumnfetch|the query fetches columns that are immediately thrown away|measures impact of avoidable column reads
