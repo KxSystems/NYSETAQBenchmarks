@@ -1020,12 +1020,36 @@ async function loadQueryMeta() {
         selector.addEventListener('click', e => toggle(e, value, 'complexity'));
     });
 
+    /// Tag descriptions from tags.psv, shown as hover tooltips on the tag selectors.
+    /// Same fetch / file:// fallback dance as querymeta.psv above.
+    let tags_text = null;
+    try {
+        const response = await fetch('artifacts/queries/inmemory/tags.psv');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        tags_text = await response.text();
+    } catch (e) {
+        if (typeof tags_psv !== 'undefined') tags_text = tags_psv;
+    }
+    const tag_descriptions = {};
+    if (tags_text !== null) {
+        const lines = tags_text.trim().split('\n');
+        const header = lines[0].split('|');
+        const idx_tag = header.indexOf('tag');
+        const idx_desc = header.indexOf('description');
+        lines.slice(1).forEach(line => {
+            const fields = line.split('|');
+            const tag = (fields[idx_tag] ?? '').trim();
+            if (tag) tag_descriptions[tag] = (fields[idx_desc] ?? '').trim();
+        });
+    }
+
     [[tag_includes, 'tag_include'], [tag_excludes, 'tag_exclude']].forEach(([container, selectors_key]) => {
         all_tags.forEach(tag => {
             const active = selectors_key === 'tag_exclude' && default_excluded_tags.includes(tag);
             let selector = document.createElement('a');
             selector.className = active ? 'selector selector-active' : 'selector';
             selector.appendChild(document.createTextNode(tag));
+            if (tag_descriptions[tag]) selector.title = tag_descriptions[tag];
             container.appendChild(selector);
             selectors[selectors_key][tag] = active;
             selector.addEventListener('click', e => toggle(e, tag, selectors_key));
