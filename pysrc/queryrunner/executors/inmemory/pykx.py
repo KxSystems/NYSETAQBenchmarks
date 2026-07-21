@@ -22,6 +22,8 @@ class QueryExecutorPyKXInMemory:
         kx.q['timeBucketsStep'] = kx.q('{`s#value[x]!key x}', param['timeBuckets'])
         kx.q._register("./src/pivot")
         kx.pivot = kx.q('.pvt.pivot')
+        kx.q._register("./src/memusage")
+        kx.objsize = kx.q('.mem.objsize')
         self.eval_context: dict[str, Any] = {
             "kx": kx,
             "timedelta": timedelta,
@@ -79,8 +81,8 @@ class QueryExecutorPyKXInMemory:
 
 
     @staticmethod
-    def get_table_size(df) -> None:
-        return None
+    def get_table_size(df) -> int:
+        return kx.objsize(df).py() // 1024  # convert to KB
 
     def get_table_stats(self) -> dict[str, Any]:
         table_stats_dict = {"proprietary": "yes", "engineversion": kx.__version__}
@@ -88,7 +90,7 @@ class QueryExecutorPyKXInMemory:
             df = self.eval_context[t_name]
             table_stats = {
                 "name": t_name,
-                "size (MB)": (s / 1024 if (s := self.get_table_size(df)) is not None else None),
+                "size (MB)": self.get_table_size(df) / 1024,
                 "rowCount": len(df),
                 "columnCount": df.shape[1].py(),
                 "columns": [{"name": n.py(), "type": t.py().decode()} for n, t in zip(df.dtypes["columns"], df.dtypes["datatypes"])],
