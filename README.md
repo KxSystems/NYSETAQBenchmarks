@@ -79,6 +79,21 @@ The following statistics are based on data from 2026-04-01:
 Use `tiny` when running the benchmark with KDB-X Community Edition, which
 enforces a memory limit.
 
+> [!WARNING]
+> The `tiny` and `small` sizes are not representative of the data volumes
+> financial industry clients work with, so do not draw conclusions from their
+> query results. These `SIZE` values are intended mainly for testing that the
+> benchmark pipeline works end-to-end.
+
+<details>
+<summary>Custom sizes</summary>
+
+You are not limited to the predefined sizes. The underlying parsers —
+[taqToKDB.q](src/taqToKDB.q) and [main.py](pysrc/taqToParquet/main.py) — accept
+an arbitrary first-letter interval via their `-letters` option, e.g. `C-G`.
+
+</details>
+
 ## Step 2: Obtaining the PSV Files
 
 Although you can download, decompress, and prepare the PSV files manually, we recommend using the `getPSVs.sh` script from the [KDB-X taq module](https://code.kx.com/kdb-x/modules/taq/overview.html#key-features). The taq repository is included as a git submodule; initialize it with:
@@ -196,12 +211,37 @@ And the following optional parameters:
 The `NUMANODE` environment variable is also honoured: when set, every engine is launched
 under `numactl -N ${NUMANODE} -m ${NUMANODE}` to pin CPU and memory allocation to that NUMA node.
 
+<details>
+<summary>Why pin to a NUMA node for performance testing?</summary>
 
-To pin a specific library version, edit the inline script metadata in `pysrc/queryrunner/main.py`. For example:
+On multi-socket machines, each CPU has its own local memory; accessing memory
+attached to another CPU goes over the inter-socket interconnect. Pinning both
+CPU and memory allocation to a single node is recommended for two reasons:
 
-```python
-#   "pykx==4.0.0",
-```
+1. **Remote memory latency** — without pinning, a thread may run on one node
+   while its data resides on another. Remote accesses have noticeably higher
+   latency and lower bandwidth than local ones, penalising memory-bound
+   queries.
+2. **Consistency** — the OS scheduler may migrate threads between nodes and
+   allocate pages wherever space is available, so the local/remote access mix
+   varies between runs. Pinning removes this source of run-to-run variance,
+   making results reproducible and comparable across engines.
+
+The downside is that the process can only allocate from that node's share of
+the physical memory (roughly `total / number of nodes`), so large `SIZE`
+values may not fit even though the machine as a whole has enough RAM.
+
+</details>
+
+> [!TIP]
+> You can easily test different versions of a library: `uv` resolves the
+> dependencies of the Python query runner from the inline script metadata in
+> `pysrc/queryrunner/main.py`, so pinning a version there is all it takes.
+> For example:
+>
+> ```python
+> #   "pykx==4.0.0",
+> ```
 
 #### Engine-Specific Environment Variables
 
