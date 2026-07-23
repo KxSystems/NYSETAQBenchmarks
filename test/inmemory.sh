@@ -14,10 +14,10 @@ script_dir=$(dirname "${BASH_SOURCE[0]}")
 pushd "${script_dir}/.."
 
 TESTDB=${script_dir}/testdb
-TESTDBDATE=20250701
+TESTDBDATE=20260401
 
 # Test PSV files are available in the TAQ submodule directory.
-TESTPSV=./external/kx/taq/testdata
+TESTPSV=./external/kx/taq/test/data
 RESULTDIR=${script_dir}/results/inmemory
 
 # Remove the generated database and results on exit, even if a benchmark fails.

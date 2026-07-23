@@ -324,7 +324,7 @@ reads the kdb+ database instead.
 
 6. **Test your solution.** You don't need to download real TAQ data: small test
    PSV files ship with the TAQ submodule in
-   [external/kx/taq/testdata/](./external/kx/taq/testdata/). The scripts in the
+   [external/kx/taq/test/data/](./external/kx/taq/test/data/). The scripts in the
    [test/](./test/) directory use them — [test/inmemory.sh](./test/inmemory.sh)
    generates a smaller than tiny kdb+ and Parquet database from the test PSVs and runs both
    benchmark scripts against it end-to-end. Run it after wiring in your engine
