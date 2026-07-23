@@ -72,6 +72,10 @@ system "l src/memusage.q" / This is also available as a DI module
 system "l src/util.q"
 
 DB: o `db
+DATE: "D"$o `date
+if[not count key hsym `$DB, "/", string DATE;
+  -2 "Data directory ", DB, "/", string[DATE], " does not exist";
+  exit 3]
 PARAMDIR: hsym `$o`paramdir
 
 
@@ -421,11 +425,11 @@ $[STORAGE_BACKEND ~ "memory"; [
   WriterFN:: writeRes[resultH; (STORAGE_BACKEND; compparm; ENGINE; FORMAT; INDEXON)];
   $[FORMAT = `TABLEDICT; [
     / For now we only support a single table dicitonary format and attr is ignored
-    loadKDBPartitionIntoMemoryTableDict[hsym `$DB; Device; WriterFN; "D"$o `date];
+    loadKDBPartitionIntoMemoryTableDict[hsym `$DB; Device; WriterFN; DATE];
     normalize: {cnt: count each x; ([] sym: where cnt) ,' raze x}]; / convert table dictionary to normal table
    [
     attrib: getAttrib[INDEXON; SORTCOLS];
-    loadKDBPartitionIntoMemory[hsym `$DB; Device; WriterFN; "D"$o `date; SORTCOLS; attrib]]
+    loadKDBPartitionIntoMemory[hsym `$DB; Device; WriterFN; DATE; SORTCOLS; attrib]]
    ]];
   [
     $[FORMAT like "PARQUET*"; [
