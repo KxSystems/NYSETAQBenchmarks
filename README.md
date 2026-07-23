@@ -189,7 +189,7 @@ And the following optional parameters:
 | `-t`, `--threads` | Space-separated list of secondary-thread counts to test, e.g. `"0 4 16 64"`. Each engine runs once per value. Default: `"1 4"`. |
 | `-e`, `--engines` | Comma-separated subset of engines to run. Valid values: `kdb`, `kdbxsql`, `duckdb`, `polars`, `pykx`, `pandas`. Default: all of them. |
 | `-i`, `--idx` | Filter queries by index: single (`42`), comma-separated list (`32,42,50`), or range (`40-44`). Default: run all queries. |
-| `-r`, `--result-dir` | Single PSV file that all per-engine results are merged into. The individual per-engine files are written to a temporary directory and removed afterwards. Default: `./results/inmemory`. |
+| `-r`, `--result-dir` | Directory to persist merged results. Default: `./results/inmemory`. |
 | `-q`, `--query-output-dir` | Directory to persist query outputs. Each engine writes its results as `queryoutput_<idx>.csv` into a per-engine subdirectory, for cross-engine correctness checks (see [Verifying Query Output Correctness](#verifying-query-output-correctness)). Default: outputs are not persisted. |
 | `-h`, `--help` | Show usage and exit. |
 
@@ -228,7 +228,6 @@ The file starts with a header row. The columns are:
 | `runner` | The harness driving the engine, e.g. `KDB-X` or `Python`. |
 | `engine` | The query engine, e.g. `pykx`, `duckdb_con`, `polars`, `pandas`. |
 | `format` | Data format. |
-| `sortcols` | Columns the `trade`/`quote` tables were sorted by before querying, e.g. `time` or `sym,time`. Empty if unsorted. |
 | `indexon` | Columns an index/attribute was applied to, e.g. `sym`. Empty if none. |
 | `idx` | Query index. Positive integers are benchmark queries; non-positive values are setup steps: `0` = load a partition into memory, `-1` = transform, `-2` = sort, `-3` = index. |
 | `query` | The query text that was executed (or a short description for setup rows). |
@@ -323,6 +322,17 @@ reads the kdb+ database instead.
    environment variable, set it inline as the existing engines do (e.g.
    `POLARS_MAX_THREADS`, `DUCKDB_THREADS`, `OMP_NUM_THREADS`).
 
+6. **Test your solution.** You don't need to download real TAQ data: small test
+   PSV files ship with the TAQ submodule in
+   [external/kx/taq/testdata/](./external/kx/taq/testdata/). The scripts in the
+   [test/](./test/) directory use them — [test/inmemory.sh](./test/inmemory.sh)
+   generates a smaller than tiny kdb+ and Parquet database from the test PSVs and runs both
+   benchmark scripts against it end-to-end. Run it after wiring in your engine
+   to verify the whole pipeline; then check your engine's query outputs against
+   an existing engine with a `--query-output-dir` run and
+   [src/compareOutput.q](./src/compareOutput.q) (see
+   [Verifying Query Output Correctness](#verifying-query-output-correctness)).
+
 ### Extending the Query Set with New Queries
 
 Queries are defined **per engine** in PSV files under
@@ -341,19 +351,25 @@ has the columns:
 Engine-independent metadata lives in `artifacts/queries/inmemory/querymeta.psv`
 (`idx|tags|instrument|complexity|description|sortby|comment`). The `complexity`
 column rates how involved the query logic is: `simple`, `advanced`, or
-`complex`. The `instrument` column is
-**mandatory** and states how many instruments the query works on: `single`,
-`multi`, or `all` (no instrument filter). Single-instrument queries are further
-split by instrument frequency into `single:infrequent` and `single:frequent`
-(using the `infreqInstr` and `freqInstr` parameters), and multi-instrument
-queries by instrument-set size into `multi:50` and `multi:1000infreq` (using the
-`fiftyInstrs` and `thousandInfreqInstrs` parameters), so each single and multi
-query appears twice. Both runners accept an optional `-instrument`
-parameter that runs only the queries with that scope; a base scope like `single`
-or `multi` also matches its variants, or you can select one exactly with e.g.
-`single:frequent` or `multi:50` (others are reported as `instrumentfiltered`). At
-runtime the runners join each query to its meta row by `idx` and **abort on any
-index mismatch** between a query file and `querymeta.psv` or on a
+`complex`.
+
+The `instrument` column is **mandatory** and states how many instruments the
+query works on: `single`, `multi`, or `all` (no instrument filter). Each single
+and multi query appears twice, split into variants:
+
+* single-instrument queries by instrument frequency — `single:infrequent` and
+  `single:frequent` (using the `infreqInstr` and `freqInstr` parameters);
+* multi-instrument queries by instrument-set size — `multi:50` and
+  `multi:1000infreq` (using the `fiftyInstrs` and `thousandInfreqInstrs`
+  parameters).
+
+Both runners accept an optional `-instrument` parameter that runs only the
+queries with that scope. A base scope like `single` or `multi` also matches its
+variants, or you can select one exactly with e.g. `single:frequent` or
+`multi:50` (others are reported as `instrumentfiltered`).
+
+At runtime the runners join each query to its meta row by `idx` and **abort on
+any index mismatch** between a query file and `querymeta.psv` or on a
 missing/invalid `instrument` value (see the checks in
 [main.py](./pysrc/queryrunner/main.py) and
 [src/runQueries.q](./src/runQueries.q)). Consequently, every query you add must
