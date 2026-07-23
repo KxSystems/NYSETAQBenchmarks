@@ -1,0 +1,25 @@
+[project]
+name = "nysetaqbenchmarks"
+version = "1.0.0"
+description = "Benchmark suite for NYSE TAQ data"
+readme = "README.md"
+requires-python = ">=3.10"
+# Union of the PEP 723 inline dependencies of pysrc/queryrunner/main.py and
+# pysrc/taqToParquet/main.py (those blocks stay authoritative for `uv run`),
+# plus pyyaml for pysrc/convertToJSFormat.py.
+dependencies = [
+    "duckdb>=1.4",
+    "numexpr",
+    "numpy>=1.26",
+    "pandas>=2.3",
+    "polars>=1.35",
+    "psutil>=7.1",
+    "pyarrow>=13.0.0",
+    "pykx>=4.0.0",
+    "pyyaml",
+    "toolz>=0.8.0",
+]
+
+[tool.uv]
+# This repo is a collection of scripts run via `uv run`, not an installable package.
+package = false
