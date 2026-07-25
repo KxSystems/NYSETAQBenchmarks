@@ -77,8 +77,8 @@ idx|tags|instrument|complexity|description|sortby|comment
 76||single:infrequent|simple|calculate median bid+ask size for an instrument||
 77||single:frequent|simple|calculate median bid+ask size for an instrument||
 78|groupby:1|all|simple|calculate median trade size by exchange|ex|
-79|asofjoin,rawcolumn|multi:50|advanced|as-of join trades with quotes for a set of instruments to get prevailing quote at trade time|time,idx|
-80|asofjoin,rawcolumn|multi:1000infreq|advanced|as-of join trades with quotes for a set of instruments to get prevailing quote at trade time|time,idx|
+79|asofjoin,rawcolumn|multi:50|advanced|as-of join trades with quotes for a set of instruments to get prevailing quote at trade time|time,idx|When multiple prevailing quotes share the same (sym, time), take the one with the largest rowid (last inserted)
+80|asofjoin,rawcolumn|multi:1000infreq|advanced|as-of join trades with quotes for a set of instruments to get prevailing quote at trade time|time,idx|When multiple prevailing quotes share the same (sym, time), take the one with the largest rowid (last inserted)
 81|asofjoin,rawcolumn|single:infrequent|advanced|as-of join trades with quotes for an instrument to get prevailing quote at trade time|time,idx|
 82|asofjoin,rawcolumn|single:frequent|advanced|as-of join trades with quotes for an instrument to get prevailing quote at trade time|time,idx|
 83|asofjoin,rawcolumn|all|advanced|as-of join large trades (size > 500,000) with quotes by sym+exchange to get prevailing quote at trade time|time,idx|
