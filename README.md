@@ -451,9 +451,12 @@ point. Rather than renumbering by hand, use
 A benchmark is only meaningful if every engine computes the **same result** for
 each query. This is a hard requirement: a query added to a new engine must return
 output equivalent to the existing engines (same rows, columns, and values), so
-that timings compare like for like. Equivalence is exact for most types; floating
--point columns are compared within a small tolerance (`FLOATDIFFTHREASHOLD`, see
-below).
+that timings compare like for like. For integer and categorical/enum columns
+(symbols, dates, times, etc.) equivalence is **exact** — any difference, in even
+a single cell, fails the verification. Floating-point columns are the tricky
+exception: engines may legitimately differ in the last bits due to summation
+order and intermediate precision, so they are compared within a small tolerance
+(`FLOATDIFFTHREASHOLD`, see below) rather than bit-for-bit.
 
 To check this, persist each engine's query outputs and compare them:
 
@@ -473,8 +476,11 @@ To check this, persist each engine's query outputs and compare them:
 2. **Compare two engines.** Point [src/compareOutput.q](./src/compareOutput.q) at
    the two per-engine output directories. For every query in the metadata file it
    checks row count, column count, column names, and then compares content
-   cell-by-cell (floats within `FLOATDIFFTHREASHOLD`, char columns via `like`,
-   everything else by exact match), logging the first mismatch per column:
+   cell-by-cell, logging the first mismatch per column. Integer and
+   categorical/enum columns must match exactly — any difference is a failure.
+   Only floats get slack: they compare within `FLOATDIFFTHREASHOLD` (and char
+   columns via `like`), since floating-point results can drift slightly across
+   engines:
 
    ```bash
    q src/compareOutput.q -querymeta ./artifacts/queries/inmemory/querymeta.psv \
