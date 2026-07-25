@@ -1,0 +1,26 @@
+KDB-X 5.0 2026.07.06 Copyright (C) 1993-2026 Kx Systems
+l64/ 64()core 514976MB kx gnrsp1 192.168.1.213 EXPIRE 2027.07.13 fbodon@kx.com KDBX #106797
+
+	Command being timed: "q ./src/runQueries.q -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/large -db /home/kx/nysetaqdata/large/kdb -sortcols time -indexon sym -queryfile ./artifacts/queries/inmemory/kdb.psv -s 64 -result ./results/inmemory/large/20260725_1419/tmp/KDB-X_64Threads.psv -tableStatsDir ./results/inmemory/large/20260725_1419/KDB-X"
+	User time (seconds): 10372.36
+	System time (seconds): 873.65
+	Percent of CPU this job got: 1801%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 10:24.21
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 213873400
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 658915
+	Minor (reclaiming a frame) page faults: 46832024
+	Voluntary context switches: 5379807
+	Involuntary context switches: 537268
+	Swaps: 0
+	File system inputs: 156361536
+	File system outputs: 3608
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
