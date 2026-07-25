@@ -572,7 +572,18 @@
             filter: contrast(10%);
         }
     </style>
-    <script type="text/javascript" src="results/inmemory/data.generated.js"></script>
+    <script type="text/javascript">
+        /// Results are published per data size under results/inmemory/<size>/,
+        /// each with its own data.generated.js declaring the same globals, so
+        /// only one of them can be loaded per page. The selected size travels
+        /// in the ?size= query parameter (the rest of the selector state lives
+        /// in the URL hash) and switching size reloads the page.
+        const available_sizes = ['large', 'xlarge'];  /// sizes with published results
+        const default_size = 'large';
+        const size_param = new URLSearchParams(window.location.search).get('size');
+        const selected_size = available_sizes.includes(size_param) ? size_param : default_size;
+        document.write(`<script type="text/javascript" src="results/inmemory/${selected_size}/data.generated.js"><\/script>`);
+    </script>
     <!-- Fallback copy of querymeta.psv for when the page is opened via file:// and fetch() is blocked.
          Refreshed by pysrc/convertToJSFormat.py -->
     <script type="text/javascript" src="artifacts/queries/inmemory/querymeta.generated.js"></script>
@@ -637,6 +648,11 @@
         <th>Machine: </th>
         <td>
             <span class="inline-filter" id="selectors_machine"></span>
+            <span class="inline-filter-separator"></span>
+            <span class="inline-filter" title="Amount of TAQ data loaded (see the README for what each size covers); switching reloads the page with that size's results.">
+                <span class="inline-filter-label">Size:</span>
+                <span id="selectors_size"></span>
+            </span>
             <span class="inline-filter-separator"></span>
             <span class="inline-filter">
                 <span class="inline-filter-label">Data date:</span>
@@ -788,6 +804,11 @@ const complexity_values = {
 /// Tags excluded by default; queries carrying them are hidden until deselected.
 const default_excluded_tags = ['manydummyfilters', 'unnecessarycolumnfetch'];
 
+/// Solutions selected on first load (when the URL carries no saved state);
+/// ones absent from the loaded data size are simply skipped. Everything else
+/// starts deselected but can be toggled on.
+const default_solutions = ['DuckDB (Index)', 'KDB-X', 'KDB-X (Manual Opt)', 'Pandas', 'Polars'];
+
 const default_baseline = 'KDB-X';
 const default_threads = '4';
 const default_metric = 'cold';
@@ -830,6 +851,7 @@ if (new_theme && new_theme != theme) {
 
 let solutions = document.getElementById('selectors_solution');
 let machines = document.getElementById('selectors_machine');
+let sizes = document.getElementById('selectors_size');
 let dates = document.getElementById('selectors_date');
 let threads = document.getElementById('selectors_threads');
 let baselines = document.getElementById('selectors_baseline');
@@ -839,6 +861,21 @@ let tag_includes = document.getElementById('selectors_tag_include');
 let tag_excludes = document.getElementById('selectors_tag_exclude');
 
 let unique_solutions = [... new Set(data.map(elem => elem.solution))].sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
+
+/// The size selector stands apart from the others: each size's results are a
+/// separate data.generated.js picked in <head>, so instead of re-rendering it
+/// reloads the page with the new ?size= parameter. The URL hash (and with it
+/// the rest of the selector state) survives the navigation.
+available_sizes.forEach(value => {
+    let selector = document.createElement('a');
+    selector.className = value == selected_size ? 'selector selector-active' : 'selector';
+    selector.appendChild(document.createTextNode(value));
+    sizes.appendChild(selector);
+    selector.addEventListener('click', e => {
+        if (value == selected_size) { return; }
+        window.location.search = '?size=' + value;
+    });
+});
 
 /// The selector map is addressed by key at click time: decoding the URL hash replaces
 /// the whole `selectors` object, so a map reference captured at build time goes stale.
@@ -873,13 +910,13 @@ function toggleAll(e, selectors_key) {
 
 unique_solutions.map(elem => {
     let selector = document.createElement('a');
-    selector.className = 'selector selector-active';
+    selectors.solution[elem] = default_solutions.includes(elem) && data.some(entry => entry.solution == elem && !entry.hide);
+    selector.className = selectors.solution[elem] ? 'selector selector-active' : 'selector';
     selector.appendChild(document.createTextNode(elem));
     const versions = [... new Set(data.filter(entry => entry.solution == elem)
         .map(entry => entry.engineversion).filter(Boolean))];
     if (versions.length) { selector.title = `Engine version: ${versions.join(', ')}`; }
     solutions.appendChild(selector);
-    selectors.solution[elem] = data.some(entry => entry.solution == elem && !entry.hide);
     selector.addEventListener('click', e => toggle(e, elem, 'solution'));
 
     /// Highlighting summary rows and table columns on hovering over the solution selector.
