@@ -229,9 +229,19 @@
             gap: 2rem;
         }
 
+        /* The geo mean chart and the query failures chart split the row 75% / 25% */
         .summary-table {
-            flex: 1 1 auto;
+            flex: 3 1 0;
             min-width: 0;
+        }
+
+        #failures-panel {
+            flex: 1 1 0;
+            min-width: 0;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .summary-charts {
@@ -250,7 +260,7 @@
             align-items: center;
         }
 
-        #winners-title, #memory-title, #datasize-title {
+        #winners-title, #memory-title, #datasize-title, #failures-title {
             font-weight: bold;
             text-align: center;
             padding-bottom: 0.5rem;
@@ -260,17 +270,17 @@
             padding-top: 1.5rem;
         }
 
-        #winners-hint, #memory-hint, #datasize-hint {
+        #winners-hint, #memory-hint, #datasize-hint, #failures-hint {
             font-weight: normal;
             font-size: 80%;
             filter: contrast(10%);
         }
 
-        #memory-table, #datasize-table {
+        #memory-table, #datasize-table, #failures-table {
             width: 100%;
         }
 
-        #memory-table tr:nth-child(odd), #datasize-table tr:nth-child(odd) {
+        #memory-table tr:nth-child(odd), #datasize-table tr:nth-child(odd), #failures-table tr:nth-child(odd) {
             background: var(--summary-every-other-row-color);
         }
 
@@ -566,10 +576,15 @@
             fill: var(--link-hover-color);
         }
 
-        #scale_hint {
+        #scale_hint, #geomean-footnote {
             font-weight: normal;
             font-size: 80%;
             filter: contrast(10%);
+        }
+
+        /* Footnote of the geometric mean chart, at the bottom of the page */
+        #geomean-footnote {
+            padding: 1rem 0 2rem 0;
         }
     </style>
     <script type="text/javascript">
@@ -700,7 +715,7 @@
                     Solution
                 </th>
                 <th colspan="2">
-                    Geometric mean of per-query time ratios relative to <span id="baseline-name"></span> (lower is better).<br/>
+                    Geometric mean<sup><a id="goto-footnote" href="#geomean-footnote">[1]</a></sup> of per-query time ratios relative to <span id="baseline-name"></span> (lower is better).<br/>
                     <span id="scale_hint"></span>
                 </th>
             </tr>
@@ -708,6 +723,12 @@
         <tbody id="summary">
         </tbody>
     </table>
+    <div id="failures-panel">
+        <div id="failures-title">Query Failures<br/>
+            <span id="failures-hint">number of null execution times (☠)</span>
+        </div>
+        <table id="failures-table" aria-label="Bar chart of query failures per solution"></table>
+    </div>
 </div>
 
 <div class="stick-left comparison summary-charts">
@@ -758,11 +779,14 @@
     </tbody>
 </table>
 
+<div class="stick-left comparison" id="geomean-footnote" tabindex="-1">
+    [1] A failed query is counted in the geometric mean with a penalty ratio: twice the worst time ratio posted for that query by any of the compared solutions.
+</div>
+
 <script type="text/javascript">
 
 const constant_time_add = 0.01;
 const missing_result_penalty = 2;
-const missing_result_time = 300;
 const ns_to_s = 1e-9;
 
 const load_phase_order = ['load a partition into memory', 'transform', 'sort', 'index'];
@@ -840,6 +864,16 @@ function setTheme(new_theme) {
 }
 
 document.getElementById('toggle-theme').addEventListener('click', e => setTheme(theme == 'dark' ? 'light' : 'dark'));
+
+/// The [1] marker jumps to the footnote at the page bottom. The default anchor
+/// navigation must not run: the URL hash carries the encoded selector state,
+/// which "#geomean-footnote" would overwrite.
+document.getElementById('goto-footnote').addEventListener('click', e => {
+    e.preventDefault();
+    const footnote = document.getElementById('geomean-footnote');
+    footnote.scrollIntoView({behavior: 'smooth', block: 'center'});
+    footnote.focus({preventScroll: true});
+});
 
 let new_theme = window.localStorage.getItem('theme');
 if (new_theme && new_theme != theme) {
@@ -1369,9 +1403,9 @@ function selectRun(timings, metric) {
 }
 
 /// Geometric mean of per-query time ratios against the baseline solution.
-function relativeQueryTime(num_queries, baseline_runs, runs, metric) {
-    const fallback_timing = missing_result_penalty * Math.max(missing_result_time, ...runs.map(timings => selectRun(timings, metric)).filter(x => x !== null));
-
+/// worst_times[i] is the worst time across the compared solutions for query i,
+/// used to penalize failed queries (footnote [1] at the page bottom).
+function relativeQueryTime(num_queries, baseline_runs, runs, metric, worst_times) {
     let accumulator = 0;
     let used_queries = 0;
 
@@ -1382,8 +1416,11 @@ function relativeQueryTime(num_queries, baseline_runs, runs, metric) {
             const baseline_timing = selectRun(baseline_runs[i], metric);
             /// Skip queries the baseline solution fails on - there is no ratio to take.
             if (baseline_timing === null || !isFinite(baseline_timing)) continue;
-            const curr_timing = selectRun(runs[i], metric) ?? fallback_timing;
-            const ratio = (constant_time_add + curr_timing) / (constant_time_add + baseline_timing);
+            const curr_timing = selectRun(runs[i], metric);
+            /// Failed query: twice the worst ratio across the compared solutions for
+            /// this query (footnote [1] at the page bottom).
+            const ratio = (constant_time_add + (curr_timing ?? worst_times[i])) / (constant_time_add + baseline_timing)
+                * (curr_timing === null ? missing_result_penalty : 1);
             accumulator += Math.log(ratio);
             ++used_queries;
         }
@@ -1492,7 +1529,8 @@ function renderBarChart(table_id, entries, value_of, format_value, tooltip_suffi
     const with_value = entries.filter(elem => value_of(elem) != null);
     if (!with_value.length) { return false; }
 
-    const max_value = Math.max(...with_value.map(value_of));
+    /// All-zero values (e.g. no query failures at all) still need a valid bar width.
+    const max_value = Math.max(...with_value.map(value_of)) || 1;
     [...with_value].sort((a, b) => value_of(a) - value_of(b)).forEach(elem => {
         const value = value_of(elem);
         let tr = document.createElement('tr');
@@ -1526,6 +1564,29 @@ function renderBarChart(table_id, entries, value_of, format_value, tooltip_suffi
     return true;
 }
 
+/// Bar chart of how many of the compared queries each solution fails on (no result
+/// for the selected run, shown as ☠ in the details table). Absolute counts, no ratios;
+/// like the pie, it honors the query checkboxes and tag filters.
+function renderFailuresChart(filtered_data) {
+    const num_queries = filtered_data[0].runs.length;
+    const no_queries_selected = selectors.queries.filter(x => x).length == 0;
+    const failures = new Map(filtered_data.map(elem => [elem.solution, 0]));
+
+    for (let i = 0; i < num_queries; ++i) {
+        if (!((no_queries_selected || selectors.queries[i]) && queryPassesTagFilters(i))) continue;
+        filtered_data.forEach(elem => {
+            if (selectRun(elem.runs[i], selectors.metric) === null) {
+                failures.set(elem.solution, failures.get(elem.solution) + 1);
+            }
+        });
+    }
+
+    renderBarChart('failures-table', filtered_data,
+        elem => failures.get(elem.solution),
+        value => value.toLocaleString('en-US'),
+        'failed queries');
+}
+
 /// Bar charts of each solution's peak memory use (max_res_mem_kb) and in-memory data
 /// size. Both describe the whole benchmark run, so unlike the pie they are not
 /// affected by the query filters.
@@ -1555,12 +1616,19 @@ function renderSummary(filtered_data, baseline_runs) {
 
     /// The algorithm: for each of the queries,
     /// - if there is a result - take query duration, add 10 ms, and divide it to the corresponding value of the baseline solution,
-    /// - if there is no result - take the worst query duration across all query runs for this solution and multiply by 2.
+    /// - if there is no result - take the worst time ratio across the compared solutions for this query and multiply by 2.
     /// Take geometric mean across the queries.
 
     const num_queries = baseline_runs.length;
 
-    const summaries = filtered_data.map(elem => relativeQueryTime(num_queries, baseline_runs, elem.runs, selectors.metric));
+    /// Worst per-query time across the compared solutions (and the baseline, so the
+    /// value is defined whenever the query is compared at all), feeding the penalty
+    /// ratio of failed queries.
+    const worst_times = [...Array(num_queries).keys()].map(i =>
+        Math.max(...[...filtered_data.map(elem => elem.runs[i]), baseline_runs[i]]
+            .map(timings => selectRun(timings, selectors.metric)).filter(x => x !== null)));
+
+    const summaries = filtered_data.map(elem => relativeQueryTime(num_queries, baseline_runs, elem.runs, selectors.metric, worst_times));
 
     const sorted_indices = [...summaries.keys()].sort((a, b) => summaries[a] - summaries[b]);
 
@@ -1643,6 +1711,7 @@ function renderSummary(filtered_data, baseline_runs) {
         table.appendChild(tr);
     });
 
+    renderFailuresChart(filtered_data);
     renderWinnersPie(filtered_data);
     renderMemoryCharts(filtered_data);
 
