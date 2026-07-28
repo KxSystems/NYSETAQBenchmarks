@@ -126,11 +126,34 @@ The `getPSVs.sh` script:
    1. Removes trailing lines.
    1. Adds the correct extension (`.psv`).
 
+<details>
+<summary>NYSE DAILY TAQ Specification</summary>
+You can read the NYSE TAQ specification (of version 4.3) at https://www.nyse.com/publicdocs/nyse/data/Daily_TAQ_Client_Spec_v4.3.pdf
+</details>
+
 ## Step 3: Converting PSV Files to Binary Data Formats
 
 The PSV files must be converted to a binary format that the query engines can read directly. Both kdb+ and Parquet formats are supported. Each benchmark has its own data format requirement, so example commands are only provided in [Step 4](#step-4-selecting-and-running-a-benchmark).
 
 The `./generateDB.sh` script wraps the underlying TAQ parsers. Each parser has its own dependencies.
+
+<details>
+<summary>Data Types</summary>
+
+Once the binary databases are generated (see, you can investigate the data types of a table, e.g. `quote`. For the Parquet data, use
+[parquet-tools](https://pypi.org/project/parquet-tools/):
+
+```bash
+parquet-tools inspect ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup/quote/date=${DATADATE:0:4}-${DATADATE:4:2}-${DATADATE:6:2}/part-0.parquet
+```
+
+For the kdb+ data:
+
+```bash
+q ${NYSEBENCHMARKDIR}/${SIZE}/kdb <<< 'meta quote'
+```
+
+</details>
 
 ### kdb+ Parser
 

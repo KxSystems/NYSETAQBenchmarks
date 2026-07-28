@@ -4,3 +4,4 @@ external
 DATA
 test/testdb
 .vscode/
+.DS_Store
