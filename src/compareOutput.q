@@ -56,7 +56,7 @@ types: tradeTypes, quoteTypes, ([mid: "f"; avgLiqWMid: "f"]),
  ([weightedBidPrice: "f"; weightedOfferPrice: "f"]),
  ([movingLiqWMid: "f"; movingsize: "f"; movingvwap: "f"; tag: "s"; seqDecr: "i"]),
  ([timeBucket: "s"; cnt: "j"]),
- ([o: "e"; h: "e"; l: "e"; c: "e"; s: "i"]),
+ ([o: "e"; h: "e"; l: "e"; c: "e"; s: "e"]),
  ([minute: "u"; inbal: "f"]),
  ([wsumAsk: "f"; wsumBid: "f"; sdevasksize: "f"; sdevbid: "f"; corPrice: "f"; corSize: "f"]),
  ([pricegroup: "i"; FirstTime: "n"; LastTime: "n"; medMidSize: "f"; medSize: "f"; quotecond: "c"; quoteex: "c"])
@@ -112,7 +112,5 @@ compare: {[idx: `j; tags: `C]
   }
 
 (compare . value@) each querymeta;
-
-.log.info "ALL OK"
 
 if[not `debug in key o; exit 0];
