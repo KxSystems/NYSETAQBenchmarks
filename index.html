@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PG938LS"></script>
     <script>
@@ -9,584 +9,15 @@
     </script>
 
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>KX NYSE TAQ Benchmark — In-Memory Query Engines</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
-    <style>
-        /* Color values are the developer.kx.com design tokens (styles-*.css):
-           neutral / blue / yellow scales, light theme accented in blue-50/60,
-           dark theme accented in yellow-20, as on the KX developer portal. */
-        :root {
-            --color: #404651;                                   /* text-neutral-default: neutral-70 */
-            --title-color: #1A1D22;                             /* text-neutral-strongest: neutral-90 */
-            --background-color: #F9FAFB;                        /* background-neutral-default: neutral-025 */
-
-            --link-color: #2159B2;                              /* text-link-default: blue-60 */
-            --link-hover-color: #3272D9;                        /* text-link-hover: blue-50 */
-            --hashed-link-lightness: 0.5;
-
-            --selector-text-color: #404651;                     /* neutral-70 */
-            --selector-active-text-color: #112E5D;              /* blue-80 */
-            --selector-background-color: #E7E9ED;               /* background-neutral-strongest: neutral-10 */
-            --selector-active-background-color: #DAE6F9;        /* background-brand-default: blue-10 */
-            --selector-passive-text-color: #2159B2;             /* blue-60 */
-            --selector-passive-background-color: #F1F6FD;       /* background-brand-weak: blue-05 */
-            --selector-hover-text-color: #1A1D22;               /* neutral-90 */
-            --selector-hover-background-color: #B3CBF1;         /* blue-20 */
-
-            --summary-every-other-row-color: #F4F5F7;           /* background-neutral-strong: neutral-05 */
-            --highlight-color: #E7E9ED;                         /* neutral-10 */
-
-            --bar-color1: #3272D9;                              /* background-brand-strongest: blue-50 */
-            --bar-color2: #B3CBF1;                              /* blue-20 */
-
-            --tooltip-text-color: #F9FAFB;                      /* text-tooltip-color: neutral-025 */
-            --tooltip-background-color: #1A1D22;                /* background-tooltip: neutral-90 */
-
-            --nothing-selected-color: #CBCFD6;                  /* neutral-20 */
-            --shadow-color: #A5ABB8;                            /* neutral-30 */
-        }
-
-        [data-theme="dark"] {
-            --color: #F4F5F7;                                   /* text-neutral-default: neutral-05 */
-            --title-color: #FFFFFF;                             /* text-neutral-strongest: neutral-00 */
-            --background-color: #2B2F38;                        /* neutral-90 */
-
-            --link-color: #FFCB22;                              /* text-link-default: yellow-20 */
-            --link-hover-color: #FFFFFF;                        /* text-link-hover: neutral-00 */
-            --hashed-link-lightness: 0.82;
-
-            --selector-text-color: #F4F5F7;                     /* neutral-05 */
-            --selector-active-text-color: #1A1D22;              /* neutral-90 on yellow */
-            --selector-background-color: #404651;               /* background-neutral-strong: neutral-70 */
-            --selector-active-background-color: #FFCB22;        /* background-brand-strongest: yellow-20 */
-            --selector-passive-text-color: #FFE799;             /* yellow-10 */
-            --selector-passive-background-color: #584300;       /* background-brand-default: yellow-70 */
-            --selector-hover-text-color: #1A1D22;               /* neutral-90 */
-            --selector-hover-background-color: #FFE799;         /* yellow-10 */
-
-            --summary-every-other-row-color: #22252C;           /* background-neutral-weakest: neutral-85 */
-            --highlight-color: #2B2F38;                         /* background-neutral-weak: neutral-80 */
-
-            --bar-color1: #FFCB22;                              /* yellow-20 */
-            --bar-color2: #745900;                              /* yellow-60 */
-
-            --tooltip-text-color: #1A1D22;                      /* text-tooltip-color: neutral-90 */
-            --tooltip-background-color: #FFFFFF;                /* background-tooltip: neutral-01 */
-
-            --nothing-selected-color: #565E6E;                  /* neutral-60 */
-            --shadow-color: black;
-        }
-
-        html, body {
-            color: var(--color);
-            background-color: var(--background-color);
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            overflow: auto;
-            box-sizing: border-box;
-        }
-
-        body {
-            /* Euclid Square is the KX brand font (licensed, not on Google Fonts);
-               it is used when installed locally, Inter is the webfont fallback. */
-            font-family: 'Euclid Square', 'Inter', sans-serif;
-            padding: 1% 3% 0 3%;
-        }
-
-        ::selection {
-            background: var(--link-color);
-            color: var(--tooltip-text-color);
-        }
-
-        h1 {
-            color: var(--title-color);
-        }
-
-        table {
-             border-spacing: 1px;
-        }
-
-        .stick-left {
-            position: sticky;
-            left: 0px;
-        }
-
-        .selectors-container {
-            padding: 2rem 0 2rem 0;
-            user-select: none;
-            /* Paint above the later stick-left siblings (each is its own
-               stacking context), so the machine environment tooltip is not
-               covered by the summary rows it opens over. */
-            z-index: 1;
-        }
-
-        .selectors-container th {
-            text-align: left;
-            vertical-align: top;
-            white-space: nowrap;
-            padding-top: 0.5rem;
-            padding-right: 1rem;
-            font-weight: bold;
-        }
-
-        .inline-filter {
-            display: inline-block;
-            margin-right: 1.5rem;
-            white-space: nowrap;
-        }
-
-        .inline-filter-label {
-            font-weight: bold;
-            margin-right: 0.25rem;
-        }
-
-        .inline-filter-separator {
-            display: inline-block;
-            width: 1px;
-            height: 1.1em;
-            background: color-mix(in srgb, var(--color) 25%, transparent);
-            margin-right: 1.5rem;
-            vertical-align: middle;
-        }
-
-        .selector-separator td {
-            border-bottom: 1px solid color-mix(in srgb, var(--color) 25%, transparent);
-            padding: 0.4rem 0 0 0;
-        }
-
-        .selector-separator + tr th, .selector-separator + tr td {
-            padding-top: 0.9rem;
-        }
-
-        .selector-group-title th {
-            padding-top: 0.9rem;
-            padding-bottom: 0;
-        }
-
-        .selector {
-            display: inline-block;
-            margin-left: 0.1rem;
-            padding: 0.2rem 0.5rem 0.2rem 0.5rem;
-            background: var(--selector-background-color);
-            color: var(--selector-text-color);
-            border: 0.2rem solid var(--background-color);
-            border-radius: 4px; /* KX components use a 4px corner radius */
-        }
-
-        .selector-active {
-            color: var(--selector-active-text-color);
-            background: var(--selector-active-background-color);
-        }
-
-        .selector-passive {
-            color: var(--selector-passive-text-color);
-            background: var(--selector-passive-background-color);
-        }
-
-        /* Frequency sub-selectors are inert while `single` itself is deselected. */
-        .selector-disabled {
-            opacity: 0.4;
-            pointer-events: none;
-        }
-
-        a, .selector, #toggle-theme {
-            transition: color 200ms cubic-bezier(0.22, 1, 0.36, 1),
-                        background-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
-        }
-
-        a, a:visited {
-            text-decoration: none;
-            color: var(--link-color);
-            cursor: pointer;
-        }
-
-        a:hover {
-            color: var(--link-hover-color);
-        }
-
-        .selector:hover {
-            color: var(--selector-hover-text-color) !important;
-            background: var(--selector-background-color);
-        }
-
-        .selector-active:hover, .selector-passive:hover {
-            background: var(--selector-hover-background-color);
-        }
-
-        #summary tr:nth-child(odd) {
-            background: var(--summary-every-other-row-color);
-        }
-
-        .summary-container {
-            display: flex;
-            align-items: flex-start;
-            gap: 2rem;
-        }
-
-        /* The geo mean chart and the query failures chart split the row 75% / 25% */
-        .summary-table {
-            flex: 3 1 0;
-            min-width: 0;
-        }
-
-        #failures-panel {
-            flex: 1 1 0;
-            min-width: 0;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .summary-charts {
-            display: flex;
-            align-items: flex-start;
-            gap: 2rem;
-            padding-top: 1.5rem;
-        }
-
-        #winners-panel, #memory-panel {
-            flex: 1 1 50%;
-            max-width: 50%;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        #winners-title, #memory-title, #datasize-title, #failures-title {
-            font-weight: bold;
-            text-align: center;
-            padding-bottom: 0.5rem;
-        }
-
-        #datasize-title {
-            padding-top: 1.5rem;
-        }
-
-        #winners-hint, #memory-hint, #datasize-hint, #failures-hint {
-            font-weight: normal;
-            font-size: 80%;
-            filter: contrast(10%);
-        }
-
-        #memory-table, #datasize-table, #failures-table {
-            width: 100%;
-        }
-
-        #memory-table tr:nth-child(odd), #datasize-table tr:nth-child(odd), #failures-table tr:nth-child(odd) {
-            background: var(--summary-every-other-row-color);
-        }
-
-        #winners-pie {
-            width: 100%;
-            max-width: 18rem;
-            height: auto;
-        }
-
-        #winners-legend {
-            padding-top: 0.75rem;
-            font-size: 90%;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            column-gap: 1.25rem;
-            row-gap: 0.25rem;
-        }
-
-        .winners-legend-entry {
-            white-space: nowrap;
-        }
-
-        .winners-swatch {
-            display: inline-block;
-            width: 0.8em;
-            height: 0.8em;
-            border-radius: 0.2em;
-            margin-right: 0.35em;
-        }
-
-        .summary-name {
-            white-space: nowrap;
-            text-align: right;
-            padding-right: 1rem;
-            position: relative;
-        }
-
-        .summary-bar-cell {
-            width: 100%;
-            position: relative;
-        }
-
-        .summary-date {
-            position: absolute;
-            right: 0.5rem;
-            top: 0;
-            bottom: 0;
-            display: flex;
-            align-items: center;
-            font-size: 80%;
-            text-stroke: 2px var(--background-color);
-            -webkit-text-stroke: 2px var(--background-color);
-            paint-order: stroke fill;
-            pointer-events: none;
-            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; /* KX code font stack */
-        }
-
-        .summary-bar {
-            height: 1rem;
-            width: 100%;
-        }
-
-        .summary-number {
-            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; /* KX code font stack */
-            text-align: right;
-            padding-left: 1rem;
-            white-space: nowrap;
-        }
-
-        th {
-            padding-bottom: 0.5rem;
-        }
-
-        .th-entry-hilite {
-            background: var(--highlight-color);
-            font-weight: bold;
-        }
-
-        .summary-row:hover, .summary-row-hilite {
-            background: var(--highlight-color) !important;
-            font-weight: bold;
-        }
-
-        .remove-system {
-            visibility: hidden;
-            cursor: pointer;
-            color: var(--link-color);
-            user-select: none;
-            position: absolute;
-            left: -1rem;
-            padding-right: 1.5rem;
-        }
-
-        .summary-row:hover .remove-system {
-            visibility: visible;
-        }
-
-        .remove-system:hover {
-            color: var(--link-hover-color);
-        }
-
-        #details, #load_times {
-            padding-bottom: 1rem;
-        }
-
-        #details th, #load_times th {
-            vertical-align: bottom;
-            white-space: pre;
-        }
-
-        #details td, #load_times td {
-            white-space: pre;
-            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; /* KX code font stack */
-            text-align: right;
-            padding: 0.1rem 0.5rem 0.1rem 0.5rem;
-        }
-
-        /* Anchor for the per-cell engine query tooltips */
-        #details td {
-            position: relative;
-        }
-
-        #details td:hover > .tooltip-engine-query {
-            visibility: visible;
-        }
-
-        .shadow:hover {
-            box-shadow: 0 0 1rem var(--shadow-color);
-            position: relative;
-        }
-
-        #nothing-selected {
-            display: none;
-            font-size: 32pt;
-            font-weight: bold;
-            color: var(--nothing-selected-color);
-        }
-
-        .note {
-            position: relative;
-            display: inline-block;
-        }
-
-        .tooltip {
-            position: absolute;
-            bottom: calc(100% + 0.5rem);
-            visibility: hidden;
-            background-color: var(--tooltip-background-color);
-            color: var(--tooltip-text-color);
-            box-shadow: 0 0 1rem var(--shadow-color);
-            padding: 0.5rem 0.75rem;
-            border-radius: 4px; /* KX components use a 4px corner radius */
-            z-index: 1;
-            text-align: left;
-            white-space: normal;
-        }
-
-        .tooltip-result {
-            left: calc(50% - 0.25rem);
-            width: 20rem;
-            margin-left: -10rem;
-        }
-
-        .tooltip-query {
-            left: 0;
-            width: 40rem;
-            margin-left: -3rem;
-        }
-
-        .note:hover .tooltip, .note:active .tooltip {
-            visibility: visible;
-        }
-
-        .tooltip::after {
-            content: " ";
-            position: absolute;
-            top: 100%;
-            border-width: 0.5rem;
-            border-style: solid;
-            border-color: var(--tooltip-background-color) transparent transparent transparent;
-        }
-
-        .tooltip-result::after {
-            left: 50%;
-            margin-left: -1rem;
-        }
-
-        .tooltip-query::after {
-            left: 3rem;
-            margin-left: 0.5rem;
-        }
-
-        /* The engine query of one result cell; anchored on the cell edge away
-           from the nearer side of the table so it stays on screen. */
-        .tooltip-engine-query {
-            right: 0;
-            width: max-content;
-            max-width: 44rem;
-            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; /* KX code font stack */
-            font-size: 90%;
-            font-weight: normal;
-            white-space: pre;
-            text-align: left;
-        }
-
-        .tooltip-engine-query::after {
-            right: 1rem;
-        }
-
-        .tooltip-engine-query-left {
-            left: 0;
-            right: auto;
-        }
-
-        .tooltip-engine-query-left::after {
-            left: 1rem;
-            right: auto;
-        }
-
-        /* Anchor for the per-machine environment.yaml tooltips */
-        #selectors_machine .selector {
-            position: relative;
-        }
-
-        #selectors_machine .selector:hover .tooltip-machine-env {
-            visibility: visible;
-        }
-
-        /* The environment.yaml of the machine's latest run; opens below the
-           selector because the selectors sit near the top of the page. */
-        .tooltip-machine-env {
-            top: calc(100% + 0.5rem);
-            bottom: auto;
-            left: 0;
-            width: max-content;
-            max-width: 44rem;
-            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; /* KX code font stack */
-            font-size: 85%;
-            font-weight: normal;
-            white-space: pre;
-            text-align: left;
-            pointer-events: none;
-        }
-
-        .tooltip-machine-env::after {
-            top: auto;
-            bottom: 100%;
-            left: 1rem;
-            border-color: transparent transparent var(--tooltip-background-color) transparent;
-        }
-
-        .nowrap {
-            text-wrap: none;
-        }
-
-        .themes {
-            float: right;
-            padding-top: 0.5rem;
-        }
-
-        /* Theme toggle: icon button with the Material `contrast` icon,
-           as in the developer.kx.com navigation bar. */
-        #toggle-theme {
-            background: none;
-            border: none;
-            color: var(--color);
-            cursor: pointer;
-            padding: 0.5rem;
-            border-radius: 50%;
-            line-height: 0;
-        }
-
-        #toggle-theme:hover {
-            background: var(--highlight-color);
-        }
-
-        #toggle-theme svg {
-            width: 24px;
-            height: 24px;
-            fill: currentColor;
-        }
-
-        /* The KX mark from the developer.kx.com logo, sized to the h1 text */
-        .kx-logo {
-            height: 0.78em;
-            width: auto;
-            fill: var(--title-color);
-            margin-right: 0.1em;
-        }
-
-        a:hover .kx-logo {
-            fill: var(--link-hover-color);
-        }
-
-        #scale_hint, #geomean-footnote {
-            font-weight: normal;
-            font-size: 80%;
-            filter: contrast(10%);
-        }
-
-        /* Footnote of the geometric mean chart, at the bottom of the page */
-        #geomean-footnote {
-            padding: 1rem 0 2rem 0;
-        }
-    </style>
+    <link rel="stylesheet" href="assets/css/benchmark.css">
     <script type="text/javascript">
         /// Results are published per data size under results/inmemory/<size>/,
         /// each with its own data.generated.js declaring the same globals, so
@@ -604,17 +35,35 @@
     <script type="text/javascript" src="artifacts/queries/inmemory/querymeta.generated.js"></script>
 </head>
 <body>
+<a class="skip-link" href="#main-content">Skip to benchmark results</a>
 
-<div class="header stick-left">
+<header class="header stick-left">
     <span class="nowrap themes">
         <button id="toggle-theme" aria-label="Change theme" title="Dark/Light View">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm40-83q119-15 199.5-104.5T800-480q0-123-80.5-212.5T520-797v634Z"/></svg>
         </button>
     </span>
-    <h1><a href="https://kx.com" target="_blank" rel="noopener" title="kx.com"><svg class="kx-logo" viewBox="0 0 48 26" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="KX"><path d="M0 25.5H7.1488V0.5H0V25.5Z"/><path d="M15.3193 0.500002L7.14881 12.9983V13.0016L15.3193 25.5H23.4897L15.3193 12.9983L23.4897 0.500002H15.3193Z"/><path d="M39.8299 0.500002L35.7449 6.74937L31.6599 0.500002H23.4897L31.6599 12.9988L23.4897 25.5H31.6599L35.7449 19.2506L39.8299 25.5H48L39.8299 12.9988L48 0.500027L39.8299 0.500002Z"/></svg></a> NYSE TAQ Benchmark — In-Memory Query Engines</h1>
-    <a href="https://kx.com/blog/the-kx-nyse-taq-benchmark/">Motivation</a> | <a href="https://github.com/KxSystems/NYSETAQBenchmarks">Reproduce and Validate the Results</a> | <a href="https://github.com/KxSystems/NYSETAQBenchmarks#adding-a-new-python-based-in-memory-query-engine">Add a Solution</a>
-</div>
+    <h1><a href="https://kx.com" target="_blank" rel="noopener noreferrer" title="kx.com"><svg class="kx-logo" viewBox="0 0 48 26" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="KX"><path d="M0 25.5H7.1488V0.5H0V25.5Z"/><path d="M15.3193 0.500002L7.14881 12.9983V13.0016L15.3193 25.5H23.4897L15.3193 12.9983L23.4897 0.500002H15.3193Z"/><path d="M39.8299 0.500002L35.7449 6.74937L31.6599 0.500002H23.4897L31.6599 12.9988L23.4897 25.5H31.6599L35.7449 19.2506L39.8299 25.5H48L39.8299 12.9988L48 0.500027L39.8299 0.500002Z"/></svg></a> NYSE TAQ Benchmark — In-Memory Query Engines</h1>
+    <nav class="resource-nav" aria-label="Benchmark resources">
+        <a href="https://kx.com/blog/the-kx-nyse-taq-benchmark/">Methodology and motivation</a>
+        <a href="https://github.com/KxSystems/NYSETAQBenchmarks">Reproduce and validate results</a>
+        <a href="https://github.com/KxSystems/NYSETAQBenchmarks#adding-a-new-python-based-in-memory-query-engine">Add a solution</a>
+    </nav>
+</header>
 
+<main id="main-content">
+<section class="benchmark-intro" aria-labelledby="benchmark-intro-title">
+    <h2 id="benchmark-intro-title">Compare in-memory query engines</h2>
+    <p>Results show query (and data load) performance statistics of various query engines. Filters update the summary charts and detailed comparison below.</p>
+    <p id="results-status" role="status" aria-live="polite"></p>
+    <div class="benchmark-actions">
+        <button class="action-button" type="button" id="reset-filters">Reset filters</button>
+        <button class="action-button" type="button" id="copy-comparison-link">Copy comparison link</button>
+    </div>
+</section>
+
+<section aria-labelledby="filters-heading">
+<h2 id="filters-heading">Benchmark filters</h2>
 <table class="selectors-container stick-left">
     <tr>
         <th>Solution: </th>
@@ -622,8 +71,11 @@
             <a id="select-all-solutions" class="selector selector-active">All</a>
         </td>
     </tr>
-    <tr>
-        <td colspan="2">
+    <tr class="top-filter-row">
+        <th>
+            <span class="sr-only">Additional filters</span>
+        </th>
+        <td>
             <span class="inline-filter" id="selectors_opensource">
                 <span class="inline-filter-label">Open source:</span>
                 <a id="selector-opensource-yes" class="selector selector-active">Yes</a>
@@ -706,8 +158,11 @@
     </tr>
     <tr class="selector-separator"><td colspan="2"></td></tr>
 </table>
+</section>
 
-<div class="stick-left comparison summary-container">
+<section aria-labelledby="summary-heading">
+<h2 id="summary-heading">Benchmark summary</h2>
+<div class="stick-left comparison summary-container results-content">
     <table class="summary-table">
         <thead>
             <tr>
@@ -731,7 +186,7 @@
     </div>
 </div>
 
-<div class="stick-left comparison summary-charts">
+<div class="stick-left comparison summary-charts results-content">
     <div id="winners-panel">
         <div id="winners-title">Wins per solution<br/>
             <span id="winners-hint">on how many of the compared queries the solution posts the fastest time</span>
@@ -751,37 +206,69 @@
     </div>
 </div>
 
-<div id="nothing-selected" class="stick-left">Nothing selected</div>
+<div id="nothing-selected" class="stick-left" hidden>
+    No results match the selected filters. Select a solution above or use Reset filters.
+</div>
 
-<div class="stick-left comparison">
+<div class="stick-left comparison results-content">
     <h2>Detailed Comparison</h2>
 </div>
 
-<table id="details">
-    <thead>
-        <tr id="details_head">
-        </tr>
-    </thead>
-    <tbody id="details_body">
-    </tbody>
-</table>
+<div
+    class="table-scroll results-content"
+    tabindex="0"
+    role="region"
+    aria-label="Scrollable detailed comparison table"
+>
+    <table id="details" class="responsive-data-table">
+        <thead>
+            <tr id="details_head"></tr>
+        </thead>
+        <tbody id="details_body"></tbody>
+    </table>
+</div>
+</section>
 
+<section id="load-times-section" class="results-content" aria-labelledby="load-times-heading-text">
 <div class="stick-left comparison" id="load-times-heading">
-    <h2>Load Times</h2>
+    <h2 id="load-times-heading-text">Load Times</h2>
 </div>
 
-<table id="load_times">
-    <thead>
-        <tr id="load_times_head">
-        </tr>
-    </thead>
-    <tbody id="load_times_body">
-    </tbody>
-</table>
+<div
+    class="table-scroll"
+    tabindex="0"
+    role="region"
+    aria-label="Scrollable load-times table"
+>
+    <table id="load_times" class="responsive-data-table">
+        <thead>
+            <tr id="load_times_head"></tr>
+        </thead>
+        <tbody id="load_times_body"></tbody>
+    </table>
+</div>
+</section>
 
-<div class="stick-left comparison" id="geomean-footnote" tabindex="-1">
+<div class="stick-left comparison results-content" id="geomean-footnote" tabindex="-1">
     [1] A failed query is counted in the geometric mean with a penalty ratio: twice the worst time ratio posted for that query by any of the compared solutions.
 </div>
+</main>
+<footer class="site-footer">
+    <div class="footer-lower">
+        <div class="footer-copyright">
+            ©2026 KX. All Rights Reserved. KX® and kdb+ are registered trademarks of KX Systems, Inc., a subsidiary of KX Software Limited.
+        </div>
+
+        <nav id="footer-navigation" class="footer-navigation" aria-label="Footer menu">
+            <ul class="footer-menu">
+                <li><a href="https://kx.com/privacy-policy/">Privacy Policy</a></li>
+                <li>
+                    <button type="button" class="footer-cookie-settings" id="footer-cookie-settings">Cookie Settings</button>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</footer>
 
 <script type="text/javascript">
 
@@ -861,6 +348,7 @@ function setTheme(new_theme) {
     document.documentElement.setAttribute('data-theme', theme);
     window.localStorage.setItem('theme', theme);
     render();
+    requestAnimationFrame(applyAccessibilityEnhancements);
 }
 
 document.getElementById('toggle-theme').addEventListener('click', e => setTheme(theme == 'dark' ? 'light' : 'dark'));
@@ -1442,20 +930,21 @@ function addNote(text) {
     return note;
 }
 
-function nameToColor(str) {
-    let x = 0;
-    for (let i = 0; i < str.length; i++) {
-        x += str.charCodeAt(i);
-        x *= 0xff51afd7;
-        x ^= x >> 17;
-    }
+const chartSeriesColors = [
+    'var(--series-1)',
+    'var(--series-2)',
+    'var(--series-3)',
+    'var(--series-4)',
+    'var(--series-5)',
+    'var(--series-6)',
+    'var(--series-7)',
+    'var(--series-8)',
+];
 
-    return 60 + Math.abs(x % 240);
-}
-
-/// The stable per-solution color, shared by the summary links and the pie chart slices.
+/// Stable, distinct per-solution colours from the controlled chart palette.
 function solutionColor(solution) {
-    return `oklch(var(--hashed-link-lightness) 0.2018 ${nameToColor(solution.split(' ')[0])})`;
+    const index = unique_solutions.indexOf(solution);
+    return chartSeriesColors[(index >= 0 ? index : 0) % chartSeriesColors.length];
 }
 
 /// Pie chart of how many of the compared queries each solution wins (has the fastest time).
@@ -1502,7 +991,7 @@ function renderWinnersPie(filtered_data) {
         slice.style.fill = solutionColor(solution);
         /// Surface-colored gap between the slices
         slice.style.stroke = 'var(--background-color)';
-        slice.style.strokeWidth = '0.02';
+        slice.style.strokeWidth = '0.035';
 
         let title = document.createElementNS(svg_ns, 'title');
         title.textContent = `${solution}: ${count} wins (${Math.round(count / total * 100)}%)`;
@@ -1648,10 +1137,16 @@ function renderSummary(filtered_data, baseline_runs) {
         let td_name = document.createElement('td');
         td_name.className = 'summary-name';
 
-        let remove = document.createElement('span');
+        let remove = document.createElement('button');
+        remove.type = 'button';
         remove.className = 'remove-system';
-        remove.textContent = '✕';
-        remove.title = 'Remove this solution from the selection';
+        remove.setAttribute('aria-label', `Remove ${elem.solution} from the comparison`);
+        remove.title = `Remove ${elem.solution} from the comparison`;
+
+        let removeIcon = document.createElement('span');
+        removeIcon.setAttribute('aria-hidden', 'true');
+        removeIcon.textContent = '×';
+        remove.appendChild(removeIcon);
         remove.addEventListener('click', e => {
             e.preventDefault();
             e.stopPropagation();
@@ -1688,12 +1183,14 @@ function renderSummary(filtered_data, baseline_runs) {
         let bar = document.createElement('div');
 
         bar.className = `summary-bar`;
+        const scale1 = Math.min(100, percentage);
+        const scale2 = Math.min(100, percentage * 10);
         bar.style.background = `linear-gradient(to right,
-            var(--bar-color1) 0%,
-            var(--bar-color1) ${Math.min(100, percentage)}%,
-            var(--bar-color2) ${Math.min(100, percentage)}%,
-            var(--bar-color2) ${Math.min(100, percentage * 10)}%,
-            transparent ${Math.min(100, percentage * 10)}%,
+            var(--chart-scale-1) 0%,
+            var(--chart-scale-1) ${scale1}%,
+            var(--chart-scale-2) ${scale1}%,
+            var(--chart-scale-2) ${scale2}%,
+            transparent ${scale2}%,
             transparent 100%)`;
 
         td_bar.appendChild(bar);
@@ -1719,62 +1216,31 @@ function renderSummary(filtered_data, baseline_runs) {
 }
 
 function colorize(elem, ratio) {
-    /// ratio from 0.9 to 1.1 - neutral: no background, on-par with the baseline
-    /// ratio below 0.9 - green, the smaller the ratio the darker (mirrors the
-    ///                   slow side on the inverse ratio: pale green to green to
-    ///                   dark green to near-black green)
-    /// ratio from 1.1 to 2 - pale yellow to yellow
-    /// ratio from 2 to 10 - yellow to red
-    /// ratio from 10 to 1000 to infinity - red to brown to black
+    elem.classList.remove('result-much-faster', 'result-faster', 'result-similar',
+        'result-slower', 'result-much-slower', 'result-failed');
 
-    /// Note: we are using RGB space without proper gamma correction. Read more: https://www.handprint.com/HP/WCL/color1.html
-
-    if (ratio !== null && ratio >= 0.9 && ratio <= 1.1) {
-        /// The best result is highlighted
-        if (ratio == 1) {
-            elem.style.fontWeight = 'bold';
-        }
-        return;
-    }
-
-    let [r, g, b] = [0, 0, 0];
-
-    if (ratio !== null) {
-        if (ratio < 0.9) {
-            const inv = 1 / ratio;
-            if (inv <= 2) {
-                g = 255;
-                r = b = (2 - inv) / (2 - 1 / 0.9) * 232;
-            } else if (inv <= 10) {
-                g = 100 + (10 - inv) / 8 * 155;
-            } else {
-                g = (1 - ((inv - 10) / ((inv - 10) + 1000))) * 100;
-            }
-        } else if (ratio <= 2) {
-            r = 255;
-            g = 255;
-            b = (2 - ratio) / (2 - 1.1) * 232;
-        } else if (ratio <= 10) {
-            g = (10 - ratio) / 8 * 255;
-            r = 255;
-        } else {
-            r = (1 - ((ratio - 10) / ((ratio - 10) + 1000))) * 255;
-        }
-    }
-
-    if (document.documentElement.getAttribute('data-theme') == 'dark') {
-        r /= 1.5;
-        g /= 1.5;
-        b /= 1.5;
-    }
-
-    elem.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-    if (ratio === null || ratio > 10 || ratio < 0.1) {
-        /// This will look better on dark backgrounds
-        elem.style.color = 'white';
+    let description;
+    if (ratio === null || !isFinite(ratio)) {
+        elem.classList.add('result-failed');
+        description = 'Query failed or no comparable result';
+    } else if (ratio < 0.5) {
+        elem.classList.add('result-much-faster');
+        description = `${Math.round((1 - ratio) * 100)} percent faster than baseline`;
+    } else if (ratio < 0.9) {
+        elem.classList.add('result-faster');
+        description = `${Math.round((1 - ratio) * 100)} percent faster than baseline`;
+    } else if (ratio <= 1.1) {
+        elem.classList.add('result-similar');
+        description = 'Approximately equal to baseline';
+        if (ratio === 1) elem.style.fontWeight = 'bold';
+    } else if (ratio <= 2) {
+        elem.classList.add('result-slower');
+        description = `${Math.round((ratio - 1) * 100)} percent slower than baseline`;
     } else {
-        elem.style.color = 'black';
+        elem.classList.add('result-much-slower');
+        description = `${ratio.toFixed(2)} times the baseline execution time`;
     }
+    elem.setAttribute('aria-label', `${elem.textContent.trim()}. ${description}.`);
 }
 
 function render() {
@@ -1810,15 +1276,18 @@ function render() {
 
     rebuildDynamicSelectors(new Set(baseline_entry ? [...filtered_data.map(elem => elem.solution), baseline_entry.solution] : []));
 
-    let nothing_selected_elem = document.getElementById('nothing-selected');
-    if (filtered_data.length == 0) {
-        nothing_selected_elem.style.display = 'block';
-        [...document.querySelectorAll('.comparison')].map(e => e.style.display = 'none');
+    const nothingSelectedElement = document.getElementById('nothing-selected');
+    const resultsContent = [...document.querySelectorAll('.results-content')];
+
+    if (filtered_data.length === 0) {
+        nothingSelectedElement.hidden = false;
+        resultsContent.forEach(element => { element.hidden = true; });
+        requestAnimationFrame(applyAccessibilityEnhancements);
         return;
     }
-    nothing_selected_elem.style.display = 'none';
-    /// Reset to the stylesheet display value (the summary container is a flexbox, not a block).
-    [...document.querySelectorAll('.comparison')].map(e => e.style.display = '');
+
+    nothingSelectedElement.hidden = true;
+    resultsContent.forEach(element => { element.hidden = false; });
 
     const baseline_runs = baseline_entry.result[selectors.threads];
     document.getElementById('baseline-name').innerText = baseline_entry.solution;
@@ -1858,7 +1327,7 @@ function render() {
     const load_phases = load_phase_order.filter(phase =>
         filtered_data.some(elem => elem.load_time?.[phase]?.[selectors.threads] != null));
 
-    document.getElementById('load-times-heading').style.display = load_phases.length ? '' : 'none';
+    document.getElementById('load-times-section').style.display = load_phases.length ? '' : 'none';
 
     if (load_phases.length) {
         load_times_head.appendChild(document.createElement('th'));
@@ -1948,10 +1417,22 @@ function render() {
             const engine_query = filtered_data[idx].queries_tooltip?.[query_num];
             if (engine_query) {
                 let tooltip = document.createElement('span');
-                tooltip.className = 'tooltip tooltip-engine-query'
-                    + (col * 2 < sorted_indices.length ? ' tooltip-engine-query-left' : '');
+                tooltip.className = 'tooltip tooltip-engine-query';
                 tooltip.appendChild(document.createTextNode(engine_query));
                 td.appendChild(tooltip);
+
+                const positionEngineTooltip = () => {
+                    tooltip.classList.remove('tooltip-engine-query-flipped');
+                    const rect = tooltip.getBoundingClientRect();
+                    const viewportPadding = 16;
+
+                    if (rect.right > window.innerWidth - viewportPadding) {
+                        tooltip.classList.add('tooltip-engine-query-flipped');
+                    }
+                };
+
+                td.addEventListener('mouseenter', positionEngineTooltip);
+                td.addEventListener('focusin', positionEngineTooltip);
             }
 
             tr.appendChild(td);
@@ -1963,7 +1444,8 @@ function render() {
     findPassiveSelectors(filtered_data);
 
     /// The small hint below the column heading
-    document.getElementById("scale_hint").textContent = 'Different colors on the bar chart represent the same values shown at different scales (1x, 10x zoom)';
+    document.getElementById("scale_hint").textContent = 'Each colour band shows the same ratio range at a different scale: 1x and 10x.';
+    requestAnimationFrame(applyAccessibilityEnhancements);
 }
 
 function isSubsequence(str, subseq) {
@@ -2105,7 +1587,160 @@ window.onpopstate = function(event) {
     applyStateDefaults();
     updateSelectors();
     render();
+    requestAnimationFrame(applyAccessibilityEnhancements);
 };
+
+
+function prepareExternalLinks(root = document) {
+    root.querySelectorAll('a[href]').forEach(link => {
+        const href = link.getAttribute('href');
+
+        if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+            return;
+        }
+
+        let targetUrl;
+        try {
+            targetUrl = new URL(link.href, window.location.href);
+        } catch {
+            return;
+        }
+
+        const isHttpLink = targetUrl.protocol === 'http:' || targetUrl.protocol === 'https:';
+        const isDifferentHostname = targetUrl.hostname !== window.location.hostname;
+
+        if (isHttpLink && isDifferentHostname) {
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+        }
+    });
+}
+
+function applyAccessibilityEnhancements() {
+    document.querySelectorAll('.selector').forEach(selector => {
+        selector.setAttribute('role', 'button');
+        selector.setAttribute('tabindex', selector.classList.contains('selector-disabled') ? '-1' : '0');
+        selector.setAttribute('aria-pressed', selector.classList.contains('selector-active') ? 'true' : 'false');
+        if (selector.classList.contains('selector-passive') || selector.classList.contains('selector-disabled')) {
+            selector.setAttribute('aria-disabled', 'true');
+        } else {
+            selector.removeAttribute('aria-disabled');
+        }
+        if (!selector.dataset.keyboardBound) {
+            selector.addEventListener('keydown', event => {
+                if ((event.key === 'Enter' || event.key === ' ') && selector.getAttribute('aria-disabled') !== 'true') {
+                    event.preventDefault();
+                    selector.click();
+                }
+            });
+            selector.dataset.keyboardBound = 'true';
+        }
+    });
+
+    const themeButton = document.getElementById('toggle-theme');
+    themeButton.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+    themeButton.setAttribute('aria-label', theme === 'dark' ? 'Use light theme' : 'Use dark theme');
+
+    const allCheckbox = document.querySelector('#details_head input[type="checkbox"]');
+    const queryCheckboxes = [...document.querySelectorAll('.query-checkbox')];
+    if (allCheckbox) {
+        allCheckbox.setAttribute('aria-label', 'Select all displayed queries');
+        const selected = queryCheckboxes.filter(input => input.checked).length;
+        allCheckbox.indeterminate = selected > 0 && selected < queryCheckboxes.length;
+    }
+    queryCheckboxes.forEach((input, index) => {
+        input.setAttribute('aria-label', `Include query ${index + 1} in the summary`);
+    });
+
+    document.querySelectorAll('.note').forEach((note, index) => {
+        note.setAttribute('tabindex', '0');
+        const tooltip = note.querySelector('.tooltip');
+        if (tooltip) {
+            if (!tooltip.id) tooltip.id = `tooltip-${index + 1}`;
+            note.setAttribute('aria-describedby', tooltip.id);
+            tooltip.setAttribute('role', 'tooltip');
+        }
+    });
+
+    document.querySelectorAll('#details td').forEach((cell, index) => {
+        const tooltip = cell.querySelector('.tooltip-engine-query');
+        if (tooltip) {
+            cell.setAttribute('tabindex', '0');
+            if (!tooltip.id) tooltip.id = `engine-query-tooltip-${index + 1}`;
+            cell.setAttribute('aria-describedby', tooltip.id);
+            tooltip.setAttribute('role', 'tooltip');
+        }
+    });
+
+    document.querySelectorAll('.winners-legend-entry').forEach(entry => entry.setAttribute('role', 'listitem'));
+    document.getElementById('winners-legend')?.setAttribute('role', 'list');
+
+    const details = document.getElementById('details');
+    if (details && !details.querySelector('caption')) {
+        const caption = document.createElement('caption');
+        caption.textContent = 'Execution time and ratio to the selected baseline for each query and solution';
+        details.prepend(caption);
+    }
+    const load = document.getElementById('load_times');
+    if (load && !load.querySelector('caption')) {
+        const caption = document.createElement('caption');
+        caption.textContent = 'Load phase duration and ratio to the selected baseline';
+        load.prepend(caption);
+    }
+    document.querySelectorAll('#details_head th, #load_times_head th').forEach(th => th.setAttribute('scope', 'col'));
+
+    const visibleSolutions = document.querySelectorAll('#summary .summary-row').length;
+    const visibleQueries = document.querySelectorAll('#details_body tr').length;
+    const status = document.getElementById('results-status');
+    if (status) {
+        status.textContent = visibleSolutions
+            ? `${visibleSolutions} solutions and ${visibleQueries} queries displayed. Baseline: ${document.getElementById('baseline-name').textContent}.`
+            : 'No results match the selected filters.';
+    }
+
+    prepareExternalLinks();
+}
+
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+        document.querySelectorAll('.tooltip').forEach(tooltip => tooltip.classList.add('force-hidden'));
+        document.activeElement?.blur();
+    }
+});
+
+document.addEventListener('focusin', () => {
+    document.querySelectorAll('.tooltip.force-hidden').forEach(tooltip => tooltip.classList.remove('force-hidden'));
+});
+
+document.getElementById('reset-filters').addEventListener('click', () => {
+    window.location.href = window.location.pathname + '?size=' + selected_size;
+});
+
+document.getElementById('copy-comparison-link').addEventListener('click', async event => {
+    const button = event.currentTarget;
+    try {
+        await navigator.clipboard.writeText(window.location.href);
+        button.textContent = 'Link copied';
+    } catch {
+        window.prompt('Copy this comparison link:', window.location.href);
+    }
+    setTimeout(() => { button.textContent = 'Copy comparison link'; }, 2000);
+});
+
+const cookieSettingsButton = document.getElementById('footer-cookie-settings');
+cookieSettingsButton?.addEventListener('click', () => {
+    if (window.OneTrust && typeof window.OneTrust.ToggleInfoDisplay === 'function') {
+        window.OneTrust.ToggleInfoDisplay();
+        return;
+    }
+
+    if (window.Optanon && typeof window.Optanon.ToggleInfoDisplay === 'function') {
+        window.Optanon.ToggleInfoDisplay();
+        return;
+    }
+
+    console.warn('OneTrust Preference Center is unavailable. Confirm that the OneTrust CMP script is loaded and published for this domain.');
+});
 
 async function init() {
     /// The tag selectors must exist before the URL hash is decoded,
@@ -2121,9 +1756,16 @@ async function init() {
 
     updateSelectors();
     render();
+    prepareExternalLinks();
 }
 
-init();
+init().catch(error => {
+    console.error('Benchmark initialisation failed:', error);
+    const status = document.getElementById('results-status');
+    if (status) {
+        status.textContent = 'The benchmark data could not be displayed. Check the browser console and confirm the site is being served over HTTP.';
+    }
+});
 
 </script>
 </body>
