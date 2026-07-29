@@ -209,7 +209,7 @@ Once the on-disk data has been generated, you can start the benchmark. Python li
 
 ```bash
 export NUMANODE=0
-./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE}  --threads "0 4 16 64" --result-dir ./results/inmemory/${SIZE}/$(date +%Y%m%d_%H:%M)
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE}  --threads "0 4 16 64" --result-dir ./results/inmemory/${SIZE}/$(date +%Y%m%d_%H%M)
 ```
 
 The script accepts the following mandatory parameters:
