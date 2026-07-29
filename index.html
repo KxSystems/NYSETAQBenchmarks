@@ -1195,13 +1195,6 @@ function renderSummary(filtered_data, baseline_runs) {
 
         td_bar.appendChild(bar);
 
-        if (elem.datadate) {
-            let date_span = document.createElement('span');
-            date_span.className = 'summary-date';
-            date_span.textContent = elem.datadate;
-            td_bar.appendChild(date_span);
-        }
-
         tr.appendChild(td_name);
         tr.appendChild(td_bar);
         tr.appendChild(td_number);
