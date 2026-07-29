@@ -1,0 +1,176 @@
+solution: Polars
+proprietary: 'no'
+engineversion: 1.41.2
+master:
+  name: master
+  size (MB): 0.4619140625
+  rowCount: 4184
+  columnCount: 39
+  columns:
+  - name: sym
+    type: Categorical
+  - name: description
+    type: String
+  - name: cusip
+    type: Categorical
+  - name: securityType
+    type: Categorical
+  - name: SIPSymbol
+    type: Categorical
+  - name: oldSym
+    type: Categorical
+  - name: testSymFlag
+    type: Boolean
+  - name: ex
+    type: Categorical
+  - name: tap
+    type: Categorical
+  - name: unit
+    type: UInt16
+  - name: roundLot
+    type: UInt16
+  - name: NYSEIndustryCode
+    type: Categorical
+  - name: sharesOutstanding
+    type: Float64
+  - name: haltDelayReason
+    type: Categorical
+  - name: specialistClearingAgent
+    type: Categorical
+  - name: specialistClearingNumber
+    type: Categorical
+  - name: specialistPostNumber
+    type: Int16
+  - name: specialistPanel
+    type: Categorical
+  - name: tradedOnNYSEMKT
+    type: Boolean
+  - name: tradedOnNASDAQBX
+    type: Boolean
+  - name: tradedOnNSX
+    type: Boolean
+  - name: tradedOnFINRA
+    type: Boolean
+  - name: tradedOnISE
+    type: Boolean
+  - name: tradedOnEdgeA
+    type: Boolean
+  - name: tradedOnEdgeX
+    type: Boolean
+  - name: tradedOnNYSETexas
+    type: Boolean
+  - name: tradedOnNYSE
+    type: Boolean
+  - name: tradedOnArca
+    type: Boolean
+  - name: tradedOnNasdaq
+    type: Boolean
+  - name: tradedOnCBOE
+    type: Boolean
+  - name: tradedOnPSX
+    type: Boolean
+  - name: tradedOnBATSY
+    type: Boolean
+  - name: tradedOnBATS
+    type: Boolean
+  - name: tradedOnIEX
+    type: Boolean
+  - name: tickPilotIndicator
+    type: Categorical
+  - name: effectiveDate
+    type: Datetime(time_unit='ms', time_zone=None)
+  - name: tradedOnLTSE
+    type: Boolean
+  - name: tradedOnMEMX
+    type: Boolean
+  - name: tradedOnMIAX
+    type: Boolean
+trade:
+  name: trade
+  size (MB): 3412.8330078125
+  rowCount: 50941143
+  columnCount: 15
+  columns:
+  - name: time
+    type: Duration(time_unit='ns')
+  - name: ex
+    type: Categorical
+  - name: sym
+    type: Categorical
+  - name: cond
+    type: Categorical
+  - name: size
+    type: Float32
+  - name: price
+    type: Float32
+  - name: stop
+    type: Categorical
+  - name: corr
+    type: UInt16
+  - name: seq
+    type: Int32
+  - name: tradeId
+    type: UInt64
+  - name: source
+    type: Categorical
+  - name: tradeReportingFacility
+    type: Categorical
+  - name: participantTimestamp
+    type: Duration(time_unit='ns')
+  - name: tradeReportingFacilityTRFTimestamp
+    type: Duration(time_unit='ns')
+  - name: tradeThroughExemptIndicator
+    type: Boolean
+quote:
+  name: quote
+  size (MB): 127423.130859375
+  rowCount: 1283196520
+  columnCount: 23
+  columns:
+  - name: time
+    type: Duration(time_unit='ns')
+  - name: ex
+    type: Categorical
+  - name: sym
+    type: Categorical
+  - name: bid
+    type: Float32
+  - name: bsize
+    type: Int32
+  - name: ask
+    type: Float32
+  - name: asize
+    type: Int32
+  - name: cond
+    type: Categorical
+  - name: seq
+    type: Int32
+  - name: nationalBBOIndicator
+    type: Categorical
+  - name: finraBBOIndicator
+    type: Categorical
+  - name: finraADFMpidIndicator
+    type: Categorical
+  - name: corr
+    type: Categorical
+  - name: source
+    type: Categorical
+  - name: retailInterestIndicator
+    type: Categorical
+  - name: shortSaleRestrictionIndicator
+    type: Categorical
+  - name: LULDBBOIndicator
+    type: Categorical
+  - name: SIPGeneratedMessageIdentifier
+    type: Categorical
+  - name: nationalBBOLULDIndicator
+    type: Categorical
+  - name: participantTimestamp
+    type: Duration(time_unit='ns')
+  - name: FINRAADFTimestamp
+    type: Duration(time_unit='ns')
+  - name: FINRAADFMarketParticipantQuoteIndicator
+    type: Categorical
+  - name: securityStatusIndicator
+    type: Categorical
+sortcols: time
