@@ -1,0 +1,176 @@
+solution: PyKX
+proprietary: 'yes'
+engineversion: 4.0.0
+master:
+  name: master
+  size (MB): 2.208984375
+  rowCount: 12453
+  columnCount: 39
+  columns:
+  - name: sym
+    type: kx.SymbolAtom
+  - name: description
+    type: kx.CharVector
+  - name: cusip
+    type: kx.SymbolAtom
+  - name: securityType
+    type: kx.SymbolAtom
+  - name: SIPSymbol
+    type: kx.SymbolAtom
+  - name: oldSym
+    type: kx.SymbolAtom
+  - name: testFlag
+    type: kx.BooleanAtom
+  - name: ex
+    type: kx.CharAtom
+  - name: tape
+    type: kx.CharAtom
+  - name: unit
+    type: kx.ShortAtom
+  - name: roundLot
+    type: kx.ShortAtom
+  - name: NYSEIndustryCode
+    type: kx.SymbolAtom
+  - name: sharesOutstanding
+    type: kx.FloatAtom
+  - name: haltDelayReason
+    type: kx.CharAtom
+  - name: specialistClearingAgent
+    type: kx.SymbolAtom
+  - name: specialistClearingNumber
+    type: kx.SymbolAtom
+  - name: specialistPostNumber
+    type: kx.ShortAtom
+  - name: specialistPanel
+    type: kx.CharAtom
+  - name: tradedOnNYSEMKT
+    type: kx.BooleanAtom
+  - name: tradedOnNASDAQBX
+    type: kx.BooleanAtom
+  - name: tradedOnNSX
+    type: kx.BooleanAtom
+  - name: tradedOnFINRA
+    type: kx.BooleanAtom
+  - name: tradedOnISE
+    type: kx.BooleanAtom
+  - name: tradedOnEdgeA
+    type: kx.BooleanAtom
+  - name: tradedOnEdgeX
+    type: kx.BooleanAtom
+  - name: tradedOnNYSETexas
+    type: kx.BooleanAtom
+  - name: tradedOnNYSE
+    type: kx.BooleanAtom
+  - name: tradedOnArca
+    type: kx.BooleanAtom
+  - name: tradedOnNasdaq
+    type: kx.BooleanAtom
+  - name: tradedOnCBOE
+    type: kx.BooleanAtom
+  - name: tradedOnPSX
+    type: kx.BooleanAtom
+  - name: tradedOnBATSY
+    type: kx.BooleanAtom
+  - name: tradedOnBATS
+    type: kx.BooleanAtom
+  - name: tradedOnIEX
+    type: kx.BooleanAtom
+  - name: tickPilotIndicator
+    type: kx.CharAtom
+  - name: effectiveDate
+    type: kx.DateAtom
+  - name: tradedOnLTSE
+    type: kx.BooleanAtom
+  - name: tradedOnMEMX
+    type: kx.BooleanAtom
+  - name: tradedOnMIAX
+    type: kx.BooleanAtom
+trade:
+  name: trade
+  size (MB): 18199.1201171875
+  rowCount: 140460972
+  columnCount: 15
+  columns:
+  - name: time
+    type: kx.TimespanAtom
+  - name: ex
+    type: kx.CharAtom
+  - name: sym
+    type: kx.SymbolAtom
+  - name: cond
+    type: kx.SymbolAtom
+  - name: size
+    type: kx.RealAtom
+  - name: price
+    type: kx.RealAtom
+  - name: stop
+    type: kx.SymbolAtom
+  - name: corr
+    type: kx.ShortAtom
+  - name: seq
+    type: kx.IntAtom
+  - name: tradeId
+    type: kx.LongAtom
+  - name: source
+    type: kx.CharAtom
+  - name: tradeReportingFacility
+    type: kx.SymbolAtom
+  - name: participantTimestamp
+    type: kx.TimespanAtom
+  - name: tradeReportingFacilityTRFTimestamp
+    type: kx.TimespanAtom
+  - name: tradeThroughExemptIndicator
+    type: kx.BooleanAtom
+quote:
+  name: quote
+  size (MB): 285302.3388671875
+  rowCount: 2860612301
+  columnCount: 23
+  columns:
+  - name: time
+    type: kx.TimespanAtom
+  - name: ex
+    type: kx.CharAtom
+  - name: sym
+    type: kx.SymbolAtom
+  - name: bid
+    type: kx.RealAtom
+  - name: bsize
+    type: kx.IntAtom
+  - name: ask
+    type: kx.RealAtom
+  - name: asize
+    type: kx.IntAtom
+  - name: cond
+    type: kx.CharAtom
+  - name: seq
+    type: kx.IntAtom
+  - name: nationalBBOIndicator
+    type: kx.CharAtom
+  - name: finraBBOIndicator
+    type: kx.CharAtom
+  - name: finraADFMpidIndicator
+    type: kx.CharAtom
+  - name: corr
+    type: kx.CharAtom
+  - name: source
+    type: kx.CharAtom
+  - name: retailInterestIndicator
+    type: kx.CharAtom
+  - name: shortSaleRestrictionIndicator
+    type: kx.CharAtom
+  - name: LULDBBOIndicator
+    type: kx.CharAtom
+  - name: SIPGeneratedMessageIdentifier
+    type: kx.CharAtom
+  - name: nationalBBOLULDIndicator
+    type: kx.CharAtom
+  - name: participantTimestamp
+    type: kx.TimespanAtom
+  - name: FINRAADFTimestamp
+    type: kx.TimespanAtom
+  - name: FINRAADFMarketParticipantQuoteIndicator
+    type: kx.CharAtom
+  - name: securityStatusIndicator
+    type: kx.CharAtom
+sortcols: time

@@ -24,8 +24,8 @@
         /// only one of them can be loaded per page. The selected size travels
         /// in the ?size= query parameter (the rest of the selector state lives
         /// in the URL hash) and switching size reloads the page.
-        const available_sizes = ['large', 'xlarge'];  /// sizes with published results
-        const default_size = 'xlarge';
+        const available_sizes = ['full', 'xlarge', 'large'];  /// sizes with published results
+        const default_size = 'full';
         const size_param = new URLSearchParams(window.location.search).get('size');
         const selected_size = available_sizes.includes(size_param) ? size_param : default_size;
         document.write(`<script type="text/javascript" src="results/inmemory/${selected_size}/data.generated.js"><\/script>`);
