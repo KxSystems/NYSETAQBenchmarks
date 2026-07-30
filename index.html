@@ -24,8 +24,8 @@
         /// only one of them can be loaded per page. The selected size travels
         /// in the ?size= query parameter (the rest of the selector state lives
         /// in the URL hash) and switching size reloads the page.
-        const available_sizes = ['large', 'xlarge'];  /// sizes with published results
-        const default_size = 'xlarge';
+        const available_sizes = ['full', 'xlarge', 'large'];  /// sizes with published results
+        const default_size = 'full';
         const size_param = new URLSearchParams(window.location.search).get('size');
         const selected_size = available_sizes.includes(size_param) ? size_param : default_size;
         document.write(`<script type="text/javascript" src="results/inmemory/${selected_size}/data.generated.js"><\/script>`);
@@ -1366,6 +1366,39 @@ function render() {
         });
     }
 
+    /// Total load time per solution. A missing phase counts as zero, so the total is
+    /// always a number, even for a solution that reported no load times at all.
+    const loadTotal = elem => load_phases.reduce(
+        (sum, phase) => sum + (elem.load_time?.[phase]?.[selectors.threads] ?? 0), 0) * ns_to_s;
+
+    /// Without any baseline load time there is nothing to compare against, so the
+    /// totals are shown without a ratio rather than against a zero-second baseline.
+    const hasLoadTimes = elem => load_phases.some(phase => elem.load_time?.[phase]?.[selectors.threads] != null);
+
+    if (load_phases.length) {
+        let tr = document.createElement('tr');
+        tr.className = 'shadow load-times-total';
+
+        let td_title = document.createElement('td');
+        td_title.appendChild(document.createTextNode('Total: '));
+        tr.appendChild(td_title);
+
+        const baseline_total = hasLoadTimes(baseline_entry) ? loadTotal(baseline_entry) : null;
+
+        sorted_indices.map(idx => {
+            const curr_total = loadTotal(filtered_data[idx]);
+            const ratio = baseline_total !== null ? (constant_time_add + curr_total) / (constant_time_add + baseline_total) : null;
+
+            let td = document.createElement('td');
+            appendTimingWithRatio(td, curr_total, ratio);
+
+            colorize(td, ratio);
+            tr.appendChild(td);
+        });
+
+        load_times_body.appendChild(tr);
+    }
+
     load_phases.forEach(phase => {
         let tr = document.createElement('tr');
         tr.className = 'shadow';
@@ -1378,9 +1411,9 @@ function render() {
         const baseline_timing = baseline_ns != null ? baseline_ns * ns_to_s : null;
 
         sorted_indices.map(idx => {
-            const curr_ns = filtered_data[idx].load_time?.[phase]?.[selectors.threads];
-            const curr_timing = curr_ns != null ? curr_ns * ns_to_s : null;
-            const ratio = curr_timing !== null && baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
+            /// A phase a solution does not report costs it nothing, so it shows as 0.000s.
+            const curr_timing = (filtered_data[idx].load_time?.[phase]?.[selectors.threads] ?? 0) * ns_to_s;
+            const ratio = baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
 
             let td = document.createElement('td');
             appendTimingWithRatio(td, curr_timing, ratio);
@@ -1446,14 +1479,34 @@ function render() {
                 tooltip.appendChild(document.createTextNode(engine_query));
                 td.appendChild(tooltip);
 
+                /// Puts the tooltip on whichever side of the cell has room for it. The
+                /// scrolling table clips anything outside its box, so the room available
+                /// is bounded by that box as well as by the viewport, and the tooltip is
+                /// capped to what it gets - otherwise a wide query on a right-hand column
+                /// flips leftwards and has its left half cut off.
                 const positionEngineTooltip = () => {
                     tooltip.classList.remove('tooltip-engine-query-flipped');
-                    const rect = tooltip.getBoundingClientRect();
-                    const viewportPadding = 16;
+                    tooltip.style.maxWidth = '';
 
-                    if (rect.right > window.innerWidth - viewportPadding) {
-                        tooltip.classList.add('tooltip-engine-query-flipped');
-                    }
+                    /// On narrow screens the tooltip is a fixed, full-width panel instead.
+                    if (getComputedStyle(tooltip).position === 'fixed') { return; }
+
+                    const viewportPadding = 16;
+                    const tooltipGap = 8; /* the 0.5rem offset from the cell */
+                    const scroller = td.closest('.table-scroll');
+                    const bounds = scroller ? scroller.getBoundingClientRect() : null;
+                    const limit_left = Math.max(viewportPadding, bounds ? bounds.left : 0);
+                    const limit_right = Math.min(window.innerWidth - viewportPadding, bounds ? bounds.right : window.innerWidth);
+
+                    const cell = td.getBoundingClientRect();
+                    const room_right = limit_right - cell.right - tooltipGap;
+                    const room_left = cell.left - tooltipGap - limit_left;
+
+                    if (tooltip.offsetWidth <= room_right) { return; }
+
+                    const flip = room_left > room_right;
+                    if (flip) { tooltip.classList.add('tooltip-engine-query-flipped'); }
+                    tooltip.style.maxWidth = `${Math.floor(Math.max(flip ? room_left : room_right, 0))}px`;
                 };
 
                 td.addEventListener('mouseenter', positionEngineTooltip);

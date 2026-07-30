@@ -267,6 +267,8 @@ loadKDBPartitionIntoMemory: {[db: `s; device: `C; writerFN; d: `d; sortCols:`S; 
   ts: .z.p-s;
   io,: getKBRead[device]`kB_read;
   writerFN[0; "load a partition into memory"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj; 0Nj)];
+  / no transformation, but we want to record the time and memory usage of the transformation step
+  writerFN[-1; "transform"; ("success"; 0D, 2#0Nn; 0j; 0j, 2#0Nj; 0Nj)];
 
   if[count sortCols;
     io: (), getKBRead[device]`kB_read;
