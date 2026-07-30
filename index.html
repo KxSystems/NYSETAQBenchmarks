@@ -1207,6 +1207,29 @@ function renderSummary(filtered_data, baseline_runs) {
     return sorted_indices;
 }
 
+/// Appends "<time>s (×<ratio>)" to a cell, or ☠ when the query produced no timing.
+/// Speedups read better inverted: a ratio of 0.5 is shown as ×2.0<sup>-1</sup>.
+/// The inverse gets one decimal so the extra exponent does not widen the column.
+function appendTimingWithRatio(elem, curr_timing, ratio) {
+    if (curr_timing === null) {
+        elem.appendChild(document.createTextNode('☠'));
+        return;
+    }
+
+    elem.appendChild(document.createTextNode(`${curr_timing.toFixed(3)}s`));
+    if (ratio === null) { return; }
+
+    if (isFinite(ratio) && ratio > 0 && ratio < 1) {
+        elem.appendChild(document.createTextNode(` (×${(1 / ratio).toFixed(1)}`));
+        let sup = document.createElement('sup');
+        sup.appendChild(document.createTextNode('-1'));
+        elem.appendChild(sup);
+        elem.appendChild(document.createTextNode(')'));
+    } else {
+        elem.appendChild(document.createTextNode(` (×${ratio.toFixed(2)})`));
+    }
+}
+
 function colorize(elem, ratio) {
     elem.classList.remove('result-much-faster', 'result-faster', 'result-similar',
         'result-slower', 'result-much-slower', 'result-failed');
@@ -1350,7 +1373,7 @@ function render() {
             const ratio = curr_timing !== null && baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
 
             let td = document.createElement('td');
-            td.appendChild(document.createTextNode(curr_timing !== null ? `${curr_timing.toFixed(3)}s${ratio !== null ? ` (×${ratio.toFixed(2)})` : ''}` : '☠'));
+            appendTimingWithRatio(td, curr_timing, ratio);
 
             colorize(td, ratio);
             tr.appendChild(td);
@@ -1400,7 +1423,7 @@ function render() {
             const ratio = curr_timing !== null && baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
 
             let td = document.createElement('td');
-            td.appendChild(document.createTextNode(curr_timing !== null ? `${curr_timing.toFixed(3)}s${ratio !== null ? ` (×${ratio.toFixed(2)})` : ''}` : '☠'));
+            appendTimingWithRatio(td, curr_timing, ratio);
 
             colorize(td, ratio);
 
