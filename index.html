@@ -1479,14 +1479,34 @@ function render() {
                 tooltip.appendChild(document.createTextNode(engine_query));
                 td.appendChild(tooltip);
 
+                /// Puts the tooltip on whichever side of the cell has room for it. The
+                /// scrolling table clips anything outside its box, so the room available
+                /// is bounded by that box as well as by the viewport, and the tooltip is
+                /// capped to what it gets - otherwise a wide query on a right-hand column
+                /// flips leftwards and has its left half cut off.
                 const positionEngineTooltip = () => {
                     tooltip.classList.remove('tooltip-engine-query-flipped');
-                    const rect = tooltip.getBoundingClientRect();
-                    const viewportPadding = 16;
+                    tooltip.style.maxWidth = '';
 
-                    if (rect.right > window.innerWidth - viewportPadding) {
-                        tooltip.classList.add('tooltip-engine-query-flipped');
-                    }
+                    /// On narrow screens the tooltip is a fixed, full-width panel instead.
+                    if (getComputedStyle(tooltip).position === 'fixed') { return; }
+
+                    const viewportPadding = 16;
+                    const tooltipGap = 8; /* the 0.5rem offset from the cell */
+                    const scroller = td.closest('.table-scroll');
+                    const bounds = scroller ? scroller.getBoundingClientRect() : null;
+                    const limit_left = Math.max(viewportPadding, bounds ? bounds.left : 0);
+                    const limit_right = Math.min(window.innerWidth - viewportPadding, bounds ? bounds.right : window.innerWidth);
+
+                    const cell = td.getBoundingClientRect();
+                    const room_right = limit_right - cell.right - tooltipGap;
+                    const room_left = cell.left - tooltipGap - limit_left;
+
+                    if (tooltip.offsetWidth <= room_right) { return; }
+
+                    const flip = room_left > room_right;
+                    if (flip) { tooltip.classList.add('tooltip-engine-query-flipped'); }
+                    tooltip.style.maxWidth = `${Math.floor(Math.max(flip ? room_left : room_right, 0))}px`;
                 };
 
                 td.addEventListener('mouseenter', positionEngineTooltip);

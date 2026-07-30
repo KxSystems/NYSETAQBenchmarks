@@ -992,6 +992,16 @@ a:hover {
   background: var(--background-color);
 }
 
+/*
+ * The query tooltip is painted inside the sticky query-number cell, so while it is
+ * open that cell has to out-stack the checkbox column and the sticky header -
+ * otherwise their opaque backgrounds cover the parts of the tooltip they overlap.
+ */
+#details td:nth-child(2):hover,
+#details td:nth-child(2):focus-within {
+  z-index: 22;
+}
+
 #details thead th {
   position: sticky;
   top: 0;
@@ -1057,6 +1067,17 @@ a:hover {
 
 #load_times thead th:first-child {
   text-align: left;
+}
+
+/* The Total row aggregates the phases under it, so it is ruled off from them. */
+#load_times tbody tr.load-times-total td {
+  border-bottom: 2px solid var(--border-color);
+  font-weight: 700;
+  padding-bottom: 0.55rem;
+}
+
+#load_times tbody tr.load-times-total + tr td {
+  padding-top: 0.55rem;
 }
 
 .result-much-faster,
