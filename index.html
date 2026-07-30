@@ -25,7 +25,7 @@
         /// in the ?size= query parameter (the rest of the selector state lives
         /// in the URL hash) and switching size reloads the page.
         const available_sizes = ['large', 'xlarge'];  /// sizes with published results
-        const default_size = 'large';
+        const default_size = 'xlarge';
         const size_param = new URLSearchParams(window.location.search).get('size');
         const selected_size = available_sizes.includes(size_param) ? size_param : default_size;
         document.write(`<script type="text/javascript" src="results/inmemory/${selected_size}/data.generated.js"><\/script>`);
