@@ -1,0 +1,23 @@
+	Command being timed: "env DUCKDB_THREADS=64 uv run pysrc/queryrunner/main.py -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/xlarge -db /mnt/nvme3p2/nysetaq/xlarge/parquet/rowgroup -engine duckdb_con -sortcols time -indexon sym -queryfile ./artifacts/queries/inmemory/duckdb.psv -result ./results/inmemory/xlarge/20260729_1617/tmp/DuckDB_Index__64Threads.psv -tableStatsDir ./results/inmemory/xlarge/20260729_1617/DuckDB_Index_"
+	User time (seconds): 32702.45
+	System time (seconds): 2356.36
+	Percent of CPU this job got: 3251%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 17:58.32
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 852099224
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 310657712
+	Voluntary context switches: 160884435
+	Involuntary context switches: 63011
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 352
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
