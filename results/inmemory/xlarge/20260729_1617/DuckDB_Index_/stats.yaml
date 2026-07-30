@@ -1,0 +1,176 @@
+solution: DuckDB (Index)
+proprietary: 'no'
+engineversion: 1.5.4
+master:
+  name: master
+  size (MB): null
+  rowCount: 7106
+  columnCount: 39
+  columns:
+  - name: sym
+    type: ENUM
+  - name: description
+    type: VARCHAR
+  - name: cusip
+    type: VARCHAR
+  - name: securityType
+    type: VARCHAR
+  - name: SIPSymbol
+    type: VARCHAR
+  - name: oldSym
+    type: VARCHAR
+  - name: testSymFlag
+    type: BOOLEAN
+  - name: ex
+    type: VARCHAR
+  - name: tap
+    type: VARCHAR
+  - name: unit
+    type: USMALLINT
+  - name: roundLot
+    type: USMALLINT
+  - name: NYSEIndustryCode
+    type: VARCHAR
+  - name: sharesOutstanding
+    type: DOUBLE
+  - name: haltDelayReason
+    type: VARCHAR
+  - name: specialistClearingAgent
+    type: VARCHAR
+  - name: specialistClearingNumber
+    type: VARCHAR
+  - name: specialistPostNumber
+    type: SMALLINT
+  - name: specialistPanel
+    type: VARCHAR
+  - name: tradedOnNYSEMKT
+    type: BOOLEAN
+  - name: tradedOnNASDAQBX
+    type: BOOLEAN
+  - name: tradedOnNSX
+    type: BOOLEAN
+  - name: tradedOnFINRA
+    type: BOOLEAN
+  - name: tradedOnISE
+    type: BOOLEAN
+  - name: tradedOnEdgeA
+    type: BOOLEAN
+  - name: tradedOnEdgeX
+    type: BOOLEAN
+  - name: tradedOnNYSETexas
+    type: BOOLEAN
+  - name: tradedOnNYSE
+    type: BOOLEAN
+  - name: tradedOnArca
+    type: BOOLEAN
+  - name: tradedOnNasdaq
+    type: BOOLEAN
+  - name: tradedOnCBOE
+    type: BOOLEAN
+  - name: tradedOnPSX
+    type: BOOLEAN
+  - name: tradedOnBATSY
+    type: BOOLEAN
+  - name: tradedOnBATS
+    type: BOOLEAN
+  - name: tradedOnIEX
+    type: BOOLEAN
+  - name: tickPilotIndicator
+    type: VARCHAR
+  - name: effectiveDate
+    type: TIMESTAMP
+  - name: tradedOnLTSE
+    type: BOOLEAN
+  - name: tradedOnMEMX
+    type: BOOLEAN
+  - name: tradedOnMIAX
+    type: BOOLEAN
+trade:
+  name: trade
+  size (MB): null
+  rowCount: 84643907
+  columnCount: 15
+  columns:
+  - name: time
+    type: TIMESTAMP_NS
+  - name: participantTimestamp
+    type: TIMESTAMP_NS
+  - name: tradeReportingFacilityTRFTimestamp
+    type: TIMESTAMP_NS
+  - name: ex
+    type: VARCHAR
+  - name: sym
+    type: ENUM
+  - name: cond
+    type: VARCHAR
+  - name: size
+    type: FLOAT
+  - name: price
+    type: FLOAT
+  - name: stop
+    type: VARCHAR
+  - name: corr
+    type: USMALLINT
+  - name: seq
+    type: INTEGER
+  - name: tradeId
+    type: UBIGINT
+  - name: source
+    type: VARCHAR
+  - name: tradeReportingFacility
+    type: VARCHAR
+  - name: tradeThroughExemptIndicator
+    type: BOOLEAN
+quote:
+  name: quote
+  size (MB): null
+  rowCount: 1901235410
+  columnCount: 23
+  columns:
+  - name: time
+    type: TIMESTAMP_NS
+  - name: participantTimestamp
+    type: TIMESTAMP_NS
+  - name: FINRAADFTimestamp
+    type: TIMESTAMP_NS
+  - name: ex
+    type: VARCHAR
+  - name: sym
+    type: ENUM
+  - name: bid
+    type: FLOAT
+  - name: bsize
+    type: INTEGER
+  - name: ask
+    type: FLOAT
+  - name: asize
+    type: INTEGER
+  - name: cond
+    type: VARCHAR
+  - name: seq
+    type: INTEGER
+  - name: nationalBBOIndicator
+    type: VARCHAR
+  - name: finraBBOIndicator
+    type: VARCHAR
+  - name: finraADFMpidIndicator
+    type: VARCHAR
+  - name: corr
+    type: VARCHAR
+  - name: source
+    type: VARCHAR
+  - name: retailInterestIndicator
+    type: VARCHAR
+  - name: shortSaleRestrictionIndicator
+    type: VARCHAR
+  - name: LULDBBOIndicator
+    type: VARCHAR
+  - name: SIPGeneratedMessageIdentifier
+    type: VARCHAR
+  - name: nationalBBOLULDIndicator
+    type: VARCHAR
+  - name: FINRAADFMarketParticipantQuoteIndicator
+    type: VARCHAR
+  - name: securityStatusIndicator
+    type: VARCHAR
+sortcols: time
