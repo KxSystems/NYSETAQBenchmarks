@@ -1366,6 +1366,39 @@ function render() {
         });
     }
 
+    /// Total load time per solution. A missing phase counts as zero, so the total is
+    /// always a number, even for a solution that reported no load times at all.
+    const loadTotal = elem => load_phases.reduce(
+        (sum, phase) => sum + (elem.load_time?.[phase]?.[selectors.threads] ?? 0), 0) * ns_to_s;
+
+    /// Without any baseline load time there is nothing to compare against, so the
+    /// totals are shown without a ratio rather than against a zero-second baseline.
+    const hasLoadTimes = elem => load_phases.some(phase => elem.load_time?.[phase]?.[selectors.threads] != null);
+
+    if (load_phases.length) {
+        let tr = document.createElement('tr');
+        tr.className = 'shadow load-times-total';
+
+        let td_title = document.createElement('td');
+        td_title.appendChild(document.createTextNode('Total: '));
+        tr.appendChild(td_title);
+
+        const baseline_total = hasLoadTimes(baseline_entry) ? loadTotal(baseline_entry) : null;
+
+        sorted_indices.map(idx => {
+            const curr_total = loadTotal(filtered_data[idx]);
+            const ratio = baseline_total !== null ? (constant_time_add + curr_total) / (constant_time_add + baseline_total) : null;
+
+            let td = document.createElement('td');
+            appendTimingWithRatio(td, curr_total, ratio);
+
+            colorize(td, ratio);
+            tr.appendChild(td);
+        });
+
+        load_times_body.appendChild(tr);
+    }
+
     load_phases.forEach(phase => {
         let tr = document.createElement('tr');
         tr.className = 'shadow';
@@ -1378,9 +1411,9 @@ function render() {
         const baseline_timing = baseline_ns != null ? baseline_ns * ns_to_s : null;
 
         sorted_indices.map(idx => {
-            const curr_ns = filtered_data[idx].load_time?.[phase]?.[selectors.threads];
-            const curr_timing = curr_ns != null ? curr_ns * ns_to_s : null;
-            const ratio = curr_timing !== null && baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
+            /// A phase a solution does not report costs it nothing, so it shows as 0.000s.
+            const curr_timing = (filtered_data[idx].load_time?.[phase]?.[selectors.threads] ?? 0) * ns_to_s;
+            const ratio = baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
 
             let td = document.createElement('td');
             appendTimingWithRatio(td, curr_timing, ratio);
