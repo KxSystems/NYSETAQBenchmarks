@@ -1174,7 +1174,11 @@ function renderSummary(filtered_data, baseline_runs) {
 
         let td_number = document.createElement('td');
         td_number.className = 'summary-number';
-        td_number.appendChild(document.createTextNode(ratio !== null ? `×${ratio.toFixed(2)}` : '—'));
+        if (ratio !== null) {
+            appendRatio(td_number, ratio);
+        } else {
+            td_number.appendChild(document.createTextNode('—'));
+        }
 
         let td_bar = document.createElement('td');
         td_bar.className = 'summary-bar-cell';
@@ -1207,9 +1211,21 @@ function renderSummary(filtered_data, baseline_runs) {
     return sorted_indices;
 }
 
+/// Appends a ratio as "×<n>". Speedups read better inverted, so a ratio of 0.5
+/// becomes ×2.0<sup>-1</sup>; the inverse gets one decimal so the extra exponent
+/// does not widen the column.
+function appendRatio(elem, ratio) {
+    if (isFinite(ratio) && ratio > 0 && ratio < 1) {
+        elem.appendChild(document.createTextNode(`×${(1 / ratio).toFixed(1)}`));
+        let sup = document.createElement('sup');
+        sup.appendChild(document.createTextNode('-1'));
+        elem.appendChild(sup);
+    } else {
+        elem.appendChild(document.createTextNode(`×${ratio.toFixed(2)}`));
+    }
+}
+
 /// Appends "<time>s (×<ratio>)" to a cell, or ☠ when the query produced no timing.
-/// Speedups read better inverted: a ratio of 0.5 is shown as ×2.0<sup>-1</sup>.
-/// The inverse gets one decimal so the extra exponent does not widen the column.
 function appendTimingWithRatio(elem, curr_timing, ratio) {
     if (curr_timing === null) {
         elem.appendChild(document.createTextNode('☠'));
@@ -1219,15 +1235,9 @@ function appendTimingWithRatio(elem, curr_timing, ratio) {
     elem.appendChild(document.createTextNode(`${curr_timing.toFixed(3)}s`));
     if (ratio === null) { return; }
 
-    if (isFinite(ratio) && ratio > 0 && ratio < 1) {
-        elem.appendChild(document.createTextNode(` (×${(1 / ratio).toFixed(1)}`));
-        let sup = document.createElement('sup');
-        sup.appendChild(document.createTextNode('-1'));
-        elem.appendChild(sup);
-        elem.appendChild(document.createTextNode(')'));
-    } else {
-        elem.appendChild(document.createTextNode(` (×${ratio.toFixed(2)})`));
-    }
+    elem.appendChild(document.createTextNode(' ('));
+    appendRatio(elem, ratio);
+    elem.appendChild(document.createTextNode(')'));
 }
 
 function colorize(elem, ratio) {
