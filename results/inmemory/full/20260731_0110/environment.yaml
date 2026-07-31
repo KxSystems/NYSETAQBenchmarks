@@ -1,0 +1,38 @@
+test date: "2026-07-31"
+test time: "01:10:30"
+parameters:
+  db-dir: "/mnt/nvme3p2/nysetaq/full"
+  datadate: "20260401"
+envvars:
+  NUMANODE: "0"
+system:
+  os:
+    name: "Linux"
+    kernel: "5.14.0-503.40.1.el9_5.x86_64"
+    TransparentHugePages: "always"
+    TransparentHugePagesDefrag: "madvise"
+    NumaBalancing: "1"
+  cpu:
+    Arch: "x86_64"
+    Model: "AMD EPYC 9575F 64-Core Processor"
+    SocketNr: 2
+    CoresPerSocket: 64
+    ThreadsPerCore: 1
+    SimultaneousMultithreading: "0"
+    NumaNodeNr: "2"
+    L1dCache: "6 MiB (128 instances)"
+    L2Cache: "128 MiB (128 instances)"
+    L3Cache: "512 MiB (16 instances)"
+    FrequencyScaling:
+        ScalingGovernor: "performance"
+        Boost: "1"
+        EnergyPerformancePreference: ""
+        MaxFreqMHz: "5008"
+  memory:
+    TotalGB: 2266
+    DIMMCount: "24"
+    DIMMSize: "96 GB"
+    Type: "DDR5"
+    Speed: "6400 MT/s"
+    ConfiguredSpeed: "6000 MT/s"
+    ZoneReclaimMode: "0"
