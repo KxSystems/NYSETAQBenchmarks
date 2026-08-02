@@ -323,6 +323,14 @@ tags — and shows aggregates such as the geometric mean of per-query time ratio
 relative to a baseline solution of your choice, so you can read off how many
 times faster one solution is than another.
 
+A second page, [hardware/index.html](./hardware/index.html), turns the comparison
+around: it puts KDB-X side by side on the machines it was benchmarked on, with the
+same query filters and a baseline machine of your choice, so you can read off how
+much of a difference the hardware makes. Both pages are configuration on top of one
+shared dashboard engine, [assets/js/benchmark.js](./assets/js/benchmark.js); what
+differs is only the `page` object at the bottom of each HTML file, which says
+whether the compared series are the solutions or the machines.
+
 KX also publishes its own curated results with this dashboard at
 [benchmark.kx.com](https://benchmark.kx.com).
 
@@ -357,6 +365,9 @@ You may then need to adjust the small configuration block at the top of
   `['tiny']`).
 * The `data.generated.js` location is derived from the selected size as
   `results/inmemory/<size>/data.generated.js`. Change that path if you keep your generated file elsewhere.
+* [hardware/index.html](./hardware/index.html) has the same block (loading
+  `../results/inmemory/<size>/data.generated.js`), with `default_size` set to the
+  largest size benchmarked on more than one machine.
 
 ### 2. In-Memory KDB-X Attribute Benchmark — `benchmarks/inmemory/kdbAttributes.sh`
 

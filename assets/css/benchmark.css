@@ -249,6 +249,12 @@ a:hover {
   align-items: center;
 }
 
+/* The hardware comparison shows no memory charts, so the pie has the row to itself */
+.summary-charts > #winners-panel:only-child {
+  flex: 1 1 100%;
+  max-width: 100%;
+}
+
 #winners-title, #memory-title, #datasize-title, #failures-title {
   font-weight: bold;
   text-align: center;
