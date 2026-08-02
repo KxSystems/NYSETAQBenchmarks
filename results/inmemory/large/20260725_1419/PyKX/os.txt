@@ -1,4 +1,4 @@
-	Command being timed: "env QARGS=-s 64 uv run pysrc/queryrunner/main.py -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/large -db /home/kx/nysetaqdata/large/kdb -engine pykx -sortcols time -indexon sym -queryfile ./artifacts/queries/inmemory/pykx.psv -result ./results/inmemory/large/20260725_1419/tmp/PyKX_64Threads.psv -tableStatsDir ./results/inmemory/large/20260725_1419/PyKX"
+	Command being timed: "env QARGS=-s 64 uv run pysrc/queryrunner/main.py -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/large -db /home/kx/nysetaqdata/large/kdb -engine pykx -sortcols time -indexon sym -queryfile ./artifacts/queries/inmemory/pykx.psv -result ./results/inmemory/large/20260725_1419/tmp/PyKX_64Threads.psv -tableStatsDir ./results/inmemory/large/20260725_1419/pykx"
 	User time (seconds): 11404.06
 	System time (seconds): 424.73
 	Percent of CPU this job got: 2091%

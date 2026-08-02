@@ -107,8 +107,8 @@ function execute_queries () {
             fi
         fi
         if engine_enabled pykx; then
-            if solution_enabled "PyKX"; then
-                run_solution "PyKX" env QARGS="-s ${s}" uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/kdb -engine pykx -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/pykx.psv
+            if solution_enabled "pykx"; then
+                run_solution "pykx" env QARGS="-s ${s}" uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/kdb -engine pykx -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/pykx.psv
             fi
         fi
         if engine_enabled pandas; then
