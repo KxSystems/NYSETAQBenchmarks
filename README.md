@@ -79,6 +79,21 @@ The following statistics are based on data from 2026-04-01:
 Use `tiny` when running the benchmark with KDB-X Community Edition, which
 enforces a memory limit.
 
+> [!WARNING]
+> The `tiny` and `small` sizes are not representative of the data volumes
+> financial industry clients work with, so do not draw conclusions from their
+> query results. These `SIZE` values are intended mainly for testing that the
+> benchmark pipeline works end-to-end.
+
+<details>
+<summary>Custom sizes</summary>
+
+You are not limited to the predefined sizes. The underlying parsers —
+[taqToKDB.q](src/taqToKDB.q) and [main.py](pysrc/taqToParquet/main.py) — accept
+an arbitrary first-letter interval via their `-letters` option, e.g. `C-G`.
+
+</details>
+
 ## Step 2: Obtaining the PSV Files
 
 Although you can download, decompress, and prepare the PSV files manually, we recommend using the `getPSVs.sh` script from the [KDB-X taq module](https://code.kx.com/kdb-x/modules/taq/overview.html#key-features). The taq repository is included as a git submodule; initialize it with:
@@ -111,11 +126,34 @@ The `getPSVs.sh` script:
    1. Removes trailing lines.
    1. Adds the correct extension (`.psv`).
 
+<details>
+<summary>NYSE DAILY TAQ Specification</summary>
+You can read the NYSE TAQ specification (of version 4.3) at https://www.nyse.com/publicdocs/nyse/data/Daily_TAQ_Client_Spec_v4.3.pdf
+</details>
+
 ## Step 3: Converting PSV Files to Binary Data Formats
 
 The PSV files must be converted to a binary format that the query engines can read directly. The suite supports kdb+ and Parquet, plus Rayforce's native splayed format for the optional Rayforce engine. Each benchmark has its own data format requirement, so example commands are provided in [Step 4](#step-4-selecting-and-running-a-benchmark).
 
 The `./generateDB.sh` script wraps the underlying TAQ parsers. Each parser has its own dependencies.
+
+<details>
+<summary>Data Types</summary>
+
+Once the binary databases are generated (see, you can investigate the data types of a table, e.g. `quote`. For the Parquet data, use
+[parquet-tools](https://pypi.org/project/parquet-tools/):
+
+```bash
+parquet-tools inspect ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup/quote/date=${DATADATE:0:4}-${DATADATE:4:2}-${DATADATE:6:2}/part-0.parquet
+```
+
+For the kdb+ data:
+
+```bash
+q ${NYSEBENCHMARKDIR}/${SIZE}/kdb <<< 'meta quote'
+```
+
+</details>
 
 ### kdb+ Parser
 
@@ -194,7 +232,7 @@ SIZE=${SIZE} DATAFORMAT=rayforce ./generateDB.sh \
   --db-dir ${NYSEBENCHMARKDIR}/${SIZE} \
   --param-dir ./artifacts/parameters/${SIZE} \
   --datadate ${DATADATE} --threads "0 4 16 64" \
-  --engines rayforce \
+  --engines rayforce --solutions ALL \
   --result-dir ./results/inmemory/${SIZE}/rayforce
 ```
 
@@ -202,7 +240,7 @@ Once the on-disk data has been generated, you can start the benchmark. Python li
 
 ```bash
 export NUMANODE=0
-./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE}  --threads "0 4 16 64" --result-dir ./results/inmemory/${SIZE}/$(date +%Y%m%d_%H:%M)
+./benchmarks/inmemory/queryEngines.sh --db-dir ${NYSEBENCHMARKDIR}/${SIZE} --param-dir ./artifacts/parameters/${SIZE} --datadate ${DATADATE}  --threads "0 4 16 64" --result-dir ./results/inmemory/${SIZE}/$(date +%Y%m%d_%H%M)
 ```
 
 The script accepts the following mandatory parameters:
@@ -219,6 +257,7 @@ And the following optional parameters:
 | --- | --- |
 | `-t`, `--threads` | Space-separated list of secondary-thread counts to test, e.g. `"0 4 16 64"`. Each engine runs once per value. Default: `"1 4"`. |
 | `-e`, `--engines` | Comma-separated subset of engines to run. Valid values: `kdb`, `kdbxsql`, `duckdb`, `polars`, `pykx`, `pandas`, `rayforce`. Default: all except the optional `rayforce` engine. |
+| `-s`, `--solutions` | Comma-separated subset of solutions to run, or `"ALL"` to run all available solutions. Solutions are named variants of engines with different attributes/indexes, including `Rayforce` and `Rayforce Parted`. Default: `"KDB-X,DuckDB (Index),Polars,Pandas"`. Examples: `-s "KDB-X,KDB-X (Parted),Polars"` or `-s "ALL"`. |
 | `-i`, `--idx` | Filter queries by index: single (`42`), comma-separated list (`32,42,50`), or range (`40-44`). Default: run all queries. |
 | `-r`, `--result-dir` | Directory for `results.psv`, per-solution statistics, OS measurements, and environment metadata. Temporary per-engine PSV files are removed after they are merged. Default: `./results/inmemory`. |
 | `-q`, `--query-output-dir` | Directory to persist query outputs. Each engine writes its results as `queryoutput_<idx>.csv` into a per-engine subdirectory, for cross-engine correctness checks (see [Verifying Query Output Correctness](#verifying-query-output-correctness)). Default: outputs are not persisted. |
@@ -227,12 +266,37 @@ And the following optional parameters:
 The `NUMANODE` environment variable is also honoured: when set, every engine is launched
 under `numactl -N ${NUMANODE} -m ${NUMANODE}` to pin CPU and memory allocation to that NUMA node.
 
+<details>
+<summary>Why pin to a NUMA node for performance testing?</summary>
 
-To pin a specific library version, edit the inline script metadata in `pysrc/queryrunner/main.py`. For example:
+On multi-socket machines, each CPU has its own local memory; accessing memory
+attached to another CPU goes over the inter-socket interconnect. Pinning both
+CPU and memory allocation to a single node is recommended for two reasons:
 
-```python
-#   "pykx==4.0.0",
-```
+1. **Remote memory latency** — without pinning, a thread may run on one node
+   while its data resides on another. Remote accesses have noticeably higher
+   latency and lower bandwidth than local ones, penalising memory-bound
+   queries.
+2. **Consistency** — the OS scheduler may migrate threads between nodes and
+   allocate pages wherever space is available, so the local/remote access mix
+   varies between runs. Pinning removes this source of run-to-run variance,
+   making results reproducible and comparable across engines.
+
+The downside is that the process can only allocate from that node's share of
+the physical memory (roughly `total / number of nodes`), so large `SIZE`
+values may not fit even though the machine as a whole has enough RAM.
+
+</details>
+
+> [!TIP]
+> You can easily test different versions of a library: `uv` resolves the
+> dependencies of the Python query runner from the inline script metadata in
+> `pysrc/queryrunner/main.py`, so pinning a version there is all it takes.
+> For example:
+>
+> ```python
+> #   "pykx==4.0.0",
+> ```
 
 #### Engine-Specific Environment Variables
 
@@ -267,9 +331,7 @@ The file starts with a header row. The columns are:
 | `runner` | The harness driving the engine, e.g. `KDB-X`, `Python`, or `Rayforce`. |
 | `engine` | The query engine, e.g. `pykx`, `duckdb_con`, `polars`, `pandas`, or `rayforce`. |
 | `format` | Data format. |
-| `sortcols` | Columns the `trade`/`quote` tables were sorted by before querying, e.g. `time` or `sym,time`. Empty if unsorted. |
 | `indexon` | Columns an index/attribute was applied to, e.g. `sym`. Empty if none. |
-| `engineversion` | Version string of the engine library, e.g. `1.5.4`. |
 | `idx` | Query index. Positive integers are benchmark queries; non-positive values are setup steps: `0` = load a partition into memory, `-1` = transform, `-2` = sort, `-3` = index. |
 | `query` | The query text that was executed (or a short description for setup rows). |
 | `status` | Outcome: `success`, `error` (query raised an exception), `idxfiltered` (skipped by the `--idx` filter), `tagfiltered` (skipped by the `--tags` filter), or `instrumentfiltered` (skipped by the `--instrument` filter). |
@@ -285,6 +347,55 @@ The file starts with a header row. The columns are:
 Each benchmark query is run three times (one cold run followed by two warm runs); columns are
 empty when a value does not apply (e.g. timing/IO columns for an `error` row, or warm-run
 columns for setup rows).
+
+#### Result Dashboard and benchmark.kx.com
+
+The raw PSV files are complete but hard to work with: with several engines,
+thread counts, machines and dozens of queries per run, slicing the numbers and
+comparing solutions in a text file (or a spreadsheet) quickly becomes tedious.
+
+To make the results consumable, the repository ships an interactive dashboard,
+[index.html](./index.html), that you can point at **your own** results. It lets
+you slice and dice the measurements — filter by solution, thread count, machine,
+data size, data date, cold/hot run, query complexity, instrument scope and query
+tags — and shows aggregates such as the geometric mean of per-query time ratios
+relative to a baseline solution of your choice, so you can read off how many
+times faster one solution is than another.
+
+KX also publishes its own curated results with this dashboard at
+[benchmark.kx.com](https://benchmark.kx.com).
+
+To use the dashboard locally, first convert your PSV results into the JavaScript
+format the page loads (`data.generated.js`) using
+[pysrc/convertToJSFormat.py](./pysrc/convertToJSFormat.py):
+
+```bash
+uv run pysrc/convertToJSFormat.py ./results/inmemory/${SIZE} ./results/inmemory/${SIZE}/data.generated.js
+```
+
+Your machine's CPU model must be listed in the `machines` mapping of
+[results/mappings.yaml](./results/mappings.yaml) (override the path with
+`--mappings`); the script stops with an explanatory message if it is not, since
+the dashboard groups results by machine.
+
+The script scans the input directory recursively for benchmark runs — any
+directory holding both `results.psv` and `environment.yaml`, plus the
+per-solution `<solution>/stats.yaml` files — merges the thread counts of the same
+(data date, machine, solution) triple, and keeps the latest measurement when
+runs overlap. It also refreshes
+`artifacts/queries/inmemory/querymeta.generated.js`, the fallback copy of the
+query metadata used when the page is opened via `file://` (browsers block
+`fetch()` for local files).
+
+You may then need to adjust the small configuration block at the top of
+[index.html](./index.html):
+
+* `available_sizes` lists the data sizes with published results, and
+  `default_size` the one shown initially. KX only publishes `full`, `xlarge` and
+  `large` results, so set these to the sizes you actually generated (e.g.
+  `['tiny']`).
+* The `data.generated.js` location is derived from the selected size as
+  `results/inmemory/<size>/data.generated.js`. Change that path if you keep your generated file elsewhere.
 
 ### 2. In-Memory KDB-X Attribute Benchmark — `benchmarks/inmemory/kdbAttributes.sh`
 
@@ -337,12 +448,12 @@ reads the kdb+ database instead.
    | `get_parameters(self, parameter)` | Pre-process the raw `parameter` string into whatever `execute_query` expects (excluded from the measured time). |
    | `execute_query(self, idx, tags, query_str, params, runidx)` | Execute the query and return the result object. |
    | `get_table_size(df)` (static) | Result/table size in KB, or `None` if unavailable. |
-   | `get_table_stats(self)` | Per-table stats dict written to the `--stats-dir` YAML files. |
+   | `get_table_stats(self)` | Per-table stats dict written to the `--stats-dir` YAML files. Must include the top-level `proprietary` and `engineversion` (version string of the engine library) keys. |
    | `write_csv(self, res, out_file)` | Serialize a result to CSV for cross-engine output comparison. The CSV must be in **kdb+-loadable format**, so values need special formatting: booleans as `1`/`0` (not `true`/`false`), and temporal values as kdb+ literals (e.g. timespans like `0D09:30:00.000000000`). See the `write_csv` implementations in [polars.py](./pysrc/queryrunner/executors/inmemory/polars.py) and [pandas.py](./pysrc/queryrunner/executors/inmemory/pandas.py) for the duration/boolean conversions. |
 
 2. **Wire it into the runner.** In [main.py](./pysrc/queryrunner/main.py), add an
    `elif engine == "<name>":` branch inside the `inmemory` block that imports and
-   instantiates your class as `runner` and sets `threadnr` and `engineversion`.
+   instantiates your class as `runner` and sets `threadnr`.
    Also add `"<name>"` to the `-engine` argument's `choices` list in
    `build_parser`.
 
@@ -363,6 +474,17 @@ reads the kdb+ database instead.
    environment variable, set it inline as the existing engines do (e.g.
    `POLARS_MAX_THREADS`, `DUCKDB_THREADS`, `OMP_NUM_THREADS`).
 
+6. **Test your solution.** You don't need to download real TAQ data: small test
+   PSV files ship with the TAQ submodule in
+   [external/kx/taq/test/data/](./external/kx/taq/test/data/). The scripts in the
+   [test/](./test/) directory use them — [test/inmemory.sh](./test/inmemory.sh)
+   generates a smaller than tiny kdb+ and Parquet database from the test PSVs and runs both
+   benchmark scripts against it end-to-end. Run it after wiring in your engine
+   to verify the whole pipeline; then check your engine's query outputs against
+   an existing engine with a `--query-output-dir` run and
+   [src/compareOutput.q](./src/compareOutput.q) (see
+   [Verifying Query Output Correctness](#verifying-query-output-correctness)).
+
 ### Extending the Query Set with New Queries
 
 Queries are defined **per engine** in PSV files under
@@ -379,19 +501,27 @@ has the columns:
 | `parameter` | Comma-separated names of parameters injected into the query (e.g. `datadate`, `aFreqInstr`, `twentyInstrs`, `timeBuckets`). Empty if the query takes none. |
 
 Engine-independent metadata lives in `artifacts/queries/inmemory/querymeta.psv`
-(`idx|tags|instrument|description|sortby|comment`). The `instrument` column is
-**mandatory** and states how many instruments the query works on: `single`,
-`multi`, or `all` (no instrument filter). Single-instrument queries are further
-split by instrument frequency into `single:infrequent` and `single:frequent`
-(using the `infreqInstr` and `freqInstr` parameters), and multi-instrument
-queries by instrument-set size into `multi:50` and `multi:1000infreq` (using the
-`fiftyInstrs` and `thousandInfreqInstrs` parameters), so each single and multi
-query appears twice. Both runners accept an optional `-instrument`
-parameter that runs only the queries with that scope; a base scope like `single`
-or `multi` also matches its variants, or you can select one exactly with e.g.
-`single:frequent` or `multi:50` (others are reported as `instrumentfiltered`). At
-runtime the runners join each query to its meta row by `idx` and **abort on any
-index mismatch** between a query file and `querymeta.psv` or on a
+(`idx|tags|instrument|complexity|description|sortby|comment`). The `complexity`
+column rates how involved the query logic is: `simple`, `advanced`, or
+`complex`.
+
+The `instrument` column is **mandatory** and states how many instruments the
+query works on: `single`, `multi`, or `all` (no instrument filter). Each single
+and multi query appears twice, split into variants:
+
+* single-instrument queries by instrument frequency — `single:infrequent` and
+  `single:frequent` (using the `infreqInstr` and `freqInstr` parameters);
+* multi-instrument queries by instrument-set size — `multi:50` and
+  `multi:1000infreq` (using the `fiftyInstrs` and `thousandInfreqInstrs`
+  parameters).
+
+Both runners accept an optional `-instrument` parameter that runs only the
+queries with that scope. A base scope like `single` or `multi` also matches its
+variants, or you can select one exactly with e.g. `single:frequent` or
+`multi:50` (others are reported as `instrumentfiltered`).
+
+At runtime the runners join each query to its meta row by `idx` and **abort on
+any index mismatch** between a query file and `querymeta.psv` or on a
 missing/invalid `instrument` value (see the checks in
 [main.py](./pysrc/queryrunner/main.py) and
 [src/runQueries.q](./src/runQueries.q)). Consequently, every query you add must
@@ -408,8 +538,8 @@ its `.txt` file to every size directory and load it in both
 
 1. Add a row with the next free `idx` to each engine query file, expressing the
    same logical query in that engine's syntax.
-2. Add a matching row (same `idx`) to `querymeta.psv` with a `description` and
-   tags.
+2. Add a matching row (same `idx`) to `querymeta.psv` with a `description`,
+   `instrument` and `complexity` values, and tags.
 
 **Inserting a query in the middle** (existing indices must shift): because
 indices are sequential, inserting renumbers every query after the insertion
@@ -433,9 +563,12 @@ point. Rather than renumbering by hand, use
 A benchmark is only meaningful if every engine computes the **same result** for
 each query. This is a hard requirement: a query added to a new engine must return
 output equivalent to the existing engines (same rows, columns, and values), so
-that timings compare like for like. Equivalence is exact for most types; floating
--point columns are compared within a small tolerance (`FLOATDIFFTHREASHOLD`, see
-below).
+that timings compare like for like. For integer and categorical/enum columns
+(symbols, dates, times, etc.) equivalence is **exact** — any difference, in even
+a single cell, fails the verification. Floating-point columns are the tricky
+exception: engines may legitimately differ in the last bits due to summation
+order and intermediate precision, so they are compared within a small tolerance
+(`FLOATDIFFTHREASHOLD`, see below) rather than bit-for-bit.
 
 To check this, persist each engine's query outputs and compare them:
 
@@ -455,8 +588,11 @@ To check this, persist each engine's query outputs and compare them:
 2. **Compare two engines.** Point [src/compareOutput.q](./src/compareOutput.q) at
    the two per-engine output directories. For every query in the metadata file it
    checks row count, column count, column names, and then compares content
-   cell-by-cell (floats within `FLOATDIFFTHREASHOLD`, char columns via `like`,
-   everything else by exact match), logging the first mismatch per column:
+   cell-by-cell, logging the first mismatch per column. Integer and
+   categorical/enum columns must match exactly — any difference is a failure.
+   Only floats get slack: they compare within `FLOATDIFFTHREASHOLD` (and char
+   columns via `like`), since floating-point results can drift slightly across
+   engines:
 
    ```bash
    q src/compareOutput.q -querymeta ./artifacts/queries/inmemory/querymeta.psv \

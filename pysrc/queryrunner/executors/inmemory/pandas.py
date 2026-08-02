@@ -85,7 +85,7 @@ class QueryExecutorPandas:
         return int(df.memory_usage(deep=True).sum() / 1024)
 
     def get_table_stats(self) -> dict[str, Any]:
-        table_stats_dict = {"proprietary": "no"}
+        table_stats_dict = {"proprietary": "no", "engineversion": pd.__version__}
         for t_name in ["master", "trade", "quote"]:
             df = self.eval_context[t_name]
             table_stats = {

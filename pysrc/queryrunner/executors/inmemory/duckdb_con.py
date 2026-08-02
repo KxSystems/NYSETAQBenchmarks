@@ -67,12 +67,12 @@ class QueryExecutorDuckDBCon:
         logger.info("applying transformations")
         sym_enum_by_table = os.getenv('SYMENUMBYTABLE', 'false').lower() in ('true', '1', 'yes')
         if sym_enum_by_table:
-            self.con.execute("CREATE TYPE sym_master_enum AS ENUM (SELECT DISTINCT sym FROM master)")
-            self.con.execute("CREATE TYPE sym_trade_enum AS ENUM (SELECT DISTINCT sym FROM trade)")
-            self.con.execute("CREATE TYPE sym_quote_enum AS ENUM (SELECT DISTINCT sym FROM quote)")
+            self.con.execute("CREATE TYPE sym_master_enum AS ENUM (SELECT DISTINCT sym FROM master ORDER BY sym)")
+            self.con.execute("CREATE TYPE sym_trade_enum AS ENUM (SELECT DISTINCT sym FROM trade ORDER BY sym)")
+            self.con.execute("CREATE TYPE sym_quote_enum AS ENUM (SELECT DISTINCT sym FROM quote ORDER BY sym)")
             master_enum, trade_enum, quote_enum = "sym_master_enum", "sym_trade_enum", "sym_quote_enum"
         else:
-            self.con.execute("CREATE TYPE sym_enum AS ENUM (SELECT DISTINCT sym FROM master UNION SELECT DISTINCT sym FROM trade UNION SELECT DISTINCT sym FROM quote)")
+            self.con.execute("CREATE TYPE sym_enum AS ENUM (SELECT * FROM (SELECT DISTINCT sym FROM master UNION SELECT DISTINCT sym FROM trade UNION SELECT DISTINCT sym FROM quote) ORDER BY sym)")
             master_enum = trade_enum = quote_enum = "sym_enum"
         self.con.execute(f"ALTER TABLE master ALTER sym TYPE {master_enum}")
         master=self.con.table("master")
@@ -135,7 +135,7 @@ class QueryExecutorDuckDBCon:
         return None
 
     def get_table_stats(self) -> dict[str, Any]:
-        table_stats_dict = {"proprietary": "no"}
+        table_stats_dict = {"proprietary": "no", "engineversion": duckdb.__version__}
         for t_name in ["master", "trade", "quote"]:
             df = self.con.table(t_name)
             table_stats = {

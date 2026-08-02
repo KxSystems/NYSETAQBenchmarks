@@ -26,7 +26,7 @@ usage() {
 
 # 1. Argument Validation
 if [[ $# -eq 0 ]]; then
-    usage
+    usage >&2
     exit "$EXIT_ERR_ARGS"
 fi
 
@@ -39,15 +39,20 @@ fi
 
 # 2. OS Check
 if [[ "$(uname -s)" == "Darwin" ]]; then
-    echo "disk0"  # TODO: Implement accurate macOS disk resolution (e.g., using diskutil)
+    # TODO: Implement accurate macOS disk resolution (e.g., using diskutil)
+    printf "[WARN] macOS disk resolution not implemented; assuming disk0.\n" >&2
+    echo "disk0"
     exit "$EXIT_SUCCESS"
 fi
 
 # 3. Resolve Filesystem Info
-if ! FSTYPE=$(findmnt -n -o FSTYPE --target "$TARGET_PATH" 2>/dev/null); then
+if ! FSINFO=$(findmnt -n -o FSTYPE,SOURCE --target "$TARGET_PATH" 2>/dev/null); then
     log_error "Could not determine filesystem for '$TARGET_PATH'."
     exit "$EXIT_ERR_GENERIC"
 fi
+read -r FSTYPE MOUNT_SOURCE <<< "$FSINFO"
+# btrfs reports subvolume sources as /dev/sda1[/subvol]; strip the suffix for lsblk
+MOUNT_SOURCE="${MOUNT_SOURCE%%\[*}"
 
 
 # 4. Handle Specific Filesystems
@@ -61,32 +66,29 @@ case "$FSTYPE" in
         exit "$EXIT_ERR_UNSUPPORTED"
         ;;
     zfs)
-        # Attempt to find the ZFS pool name
-        POOL_SOURCE=$(findmnt -n -o SOURCE --target "$TARGET_PATH")
-        # Extract pool name (text before the first slash)
-        POOL_NAME="${POOL_SOURCE%%/*}"
+        # The mount source is <pool>[/dataset...]; the pool name is the text
+        # before the first slash.
+        POOL_NAME="${MOUNT_SOURCE%%/*}"
 
-        # Get the first physical device associated with the pool.
-        # Note: This is a heuristic; ZFS pools can span multiple disks.
-        if ! ZFS_DEV=$(zpool list -vHP "$POOL_NAME" 2>/dev/null | tail -n 1 | awk '{print $1}'); then
-             log_error "Could not resolve ZFS pool device."
-             exit "$EXIT_ERR_GENERIC"
+        # List the pool's vdevs (-H: script mode, -P: full device paths) and
+        # keep the /dev/* lines (the pool line itself has the pool name in $1).
+        if ! ZFS_DEVS=$(zpool list -vHP "$POOL_NAME" 2>/dev/null | awk '$1 ~ /^\/dev\// { print $1 }'); then
+            log_error "Could not list devices for ZFS pool '$POOL_NAME'."
+            exit "$EXIT_ERR_GENERIC"
         fi
-        if [[ -z "$ZFS_DEV" ]]; then
-             log_error "Could not resolve ZFS pool device."
-             exit "$EXIT_ERR_GENERIC"
+        if [[ -z "$ZFS_DEVS" ]]; then
+            log_error "No physical devices found for ZFS pool '$POOL_NAME'."
+            exit "$EXIT_ERR_GENERIC"
         fi
 
-        # Return the ZFS device immediately
-        basename "$ZFS_DEV"
-        exit "$EXIT_SUCCESS"
+        # Take the first data vdev and fall through to the physical device
+        # resolution below. Note: this is a heuristic; ZFS pools can span
+        # multiple disks.
+        MOUNT_SOURCE="${ZFS_DEVS%%$'\n'*}"
         ;;
     *)
-        # Standard block devices (ext4, xfs, btrfs, etc.)
-        MOUNT_SOURCE=$(findmnt -n -o SOURCE --target "$TARGET_PATH")
-        # A bind mount can be reported as /dev/sda1[/path/inside/fs].  lsblk
-        # accepts the device path, not findmnt's optional bracketed root.
-        MOUNT_SOURCE="${MOUNT_SOURCE%%\[*}"
+        # Standard block devices (ext4, xfs, btrfs, etc.); MOUNT_SOURCE is
+        # already set from findmnt above.
         ;;
 esac
 

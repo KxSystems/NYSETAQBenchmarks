@@ -1,512 +1,68 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PG938LS"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    </script>
+
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>KX NYSE TAQ Benchmark — In-Memory Query Engines</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
-
-    <style>
-        :root {
-            --color: black;
-            --title-color: black;
-            --background-color: white;
-
-            --link-color: #08F;
-            --link-hover-color: #F40;
-            --hashed-link-lightness: 0.5;
-
-            --selector-text-color: black;
-            --selector-active-text-color: black;
-            --selector-background-color: #EEE;
-            --selector-active-background-color: #FFCB80;
-            --selector-passive-background-color: #EEDDCC;
-            --selector-hover-text-color: black;
-            --selector-hover-background-color: #FDB;
-
-            --summary-every-other-row-color: #F8F8F8;
-            --highlight-color: #EEE;
-
-            --bar-color1: oklch(calc(0.9 - 0.6) 0.1 calc(90 - 60));
-            --bar-color2: oklch(calc(0.9 - 0.4) 0.1 calc(90 - 40));
-            --bar-color3: oklch(calc(0.9 - 0.1) 0.1 calc(90 - 20));
-            --bar-color4: oklch(0.9 0.1 90);
-
-            --tooltip-text-color: white;
-            --tooltip-background-color: black;
-
-            --nothing-selected-color: #CCC;
-            --shadow-color: grey;
-        }
-
-        [data-theme="dark"] {
-            --color: #CCC;
-            --title-color: white;
-            --background-color: #04293A;
-
-            --link-color: #8CF;
-            --link-hover-color: #FFF;
-            --hashed-link-lightness: 0.82;
-
-            --selector-text-color: white;
-            --selector-background-color: #444;
-            --selector-active-text-color: white;
-            --selector-active-background-color: #088;
-            --selector-passive-background-color: #566;
-            --selector-hover-text-color: black;
-            --selector-hover-background-color: white;
-
-            --summary-every-other-row-color: #042e41;
-            --highlight-color: #064663;
-
-            --bar-color1: oklch(calc(0.4 + 0.6) 0.1 calc(250 - 180));
-            --bar-color2: oklch(calc(0.4 + 0.4) 0.1 calc(250 - 120));
-            --bar-color3: oklch(calc(0.4 + 0.2) 0.1 calc(250 - 60));
-            --bar-color4: oklch(0.4 0.1 250);
-
-            --tooltip-text-color: white;
-            --tooltip-background-color: #444;
-
-            --nothing-selected-color: #666;
-            --shadow-color: black;
-        }
-
-        html, body {
-            color: var(--color);
-            background-color: var(--background-color);
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            overflow: auto;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            padding: 1% 3% 0 3%;
-        }
-
-        h1 {
-            color: var(--title-color);
-        }
-
-        table {
-             border-spacing: 1px;
-        }
-
-        .stick-left {
-            position: sticky;
-            left: 0px;
-        }
-
-        .selectors-container {
-            padding: 2rem 0 2rem 0;
-            user-select: none;
-        }
-
-        .selectors-container th {
-            text-align: left;
-            vertical-align: top;
-            white-space: nowrap;
-            padding-top: 0.5rem;
-            padding-right: 1rem;
-            font-weight: bold;
-        }
-
-        .inline-filter {
-            display: inline-block;
-            margin-right: 1.5rem;
-            white-space: nowrap;
-        }
-
-        .inline-filter-label {
-            font-weight: bold;
-            margin-right: 0.25rem;
-        }
-
-        .inline-filter-separator {
-            display: inline-block;
-            width: 1px;
-            height: 1.1em;
-            background: color-mix(in srgb, var(--color) 25%, transparent);
-            margin-right: 1.5rem;
-            vertical-align: middle;
-        }
-
-        .selector-separator td {
-            border-bottom: 1px solid color-mix(in srgb, var(--color) 25%, transparent);
-            padding: 0.4rem 0 0 0;
-        }
-
-        .selector-separator + tr th, .selector-separator + tr td {
-            padding-top: 0.9rem;
-        }
-
-        .selector-group-title th {
-            padding-top: 0.9rem;
-            padding-bottom: 0;
-        }
-
-        .selector {
-            display: inline-block;
-            margin-left: 0.1rem;
-            padding: 0.2rem 0.5rem 0.2rem 0.5rem;
-            background: var(--selector-background-color);
-            color: var(--selector-text-color);
-            border: 0.2rem solid var(--background-color);
-            border-radius: 0.5rem;
-        }
-
-        .selector-active {
-            color: var(--selector-active-text-color);
-            background: var(--selector-active-background-color);
-        }
-
-        .selector-passive {
-            color: var(--selector-active-text-color);
-            background: var(--selector-passive-background-color);
-        }
-
-        /* Frequency sub-selectors are inert while `single` itself is deselected. */
-        .selector-disabled {
-            opacity: 0.4;
-            pointer-events: none;
-        }
-
-        a, a:visited {
-            text-decoration: none;
-            color: var(--link-color);
-            cursor: pointer;
-        }
-
-        a:hover {
-            color: var(--link-hover-color);
-        }
-
-        .selector:hover {
-            color: var(--selector-hover-text-color) !important;
-            background: var(--selector-background-color);
-        }
-
-        .selector-active:hover, .selector-passive:hover {
-            background: var(--selector-hover-background-color);
-        }
-
-        #summary tr:nth-child(odd) {
-            background: var(--summary-every-other-row-color);
-        }
-
-        .summary-container {
-            display: flex;
-            align-items: flex-start;
-            gap: 2rem;
-        }
-
-        .summary-table {
-            flex: 1 1 auto;
-            min-width: 0;
-        }
-
-        .summary-charts {
-            display: flex;
-            align-items: flex-start;
-            gap: 2rem;
-            padding-top: 1.5rem;
-        }
-
-        #winners-panel, #memory-panel {
-            flex: 1 1 50%;
-            max-width: 50%;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        #winners-title, #memory-title, #datasize-title {
-            font-weight: bold;
-            text-align: center;
-            padding-bottom: 0.5rem;
-        }
-
-        #datasize-title {
-            padding-top: 1.5rem;
-        }
-
-        #winners-hint, #memory-hint, #datasize-hint {
-            font-weight: normal;
-            font-size: 80%;
-            filter: contrast(10%);
-        }
-
-        #memory-table, #datasize-table {
-            width: 100%;
-        }
-
-        #memory-table tr:nth-child(odd), #datasize-table tr:nth-child(odd) {
-            background: var(--summary-every-other-row-color);
-        }
-
-        #winners-pie {
-            width: 100%;
-            max-width: 18rem;
-            height: auto;
-        }
-
-        #winners-legend {
-            padding-top: 0.75rem;
-            font-size: 90%;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            column-gap: 1.25rem;
-            row-gap: 0.25rem;
-        }
-
-        .winners-legend-entry {
-            white-space: nowrap;
-        }
-
-        .winners-swatch {
-            display: inline-block;
-            width: 0.8em;
-            height: 0.8em;
-            border-radius: 0.2em;
-            margin-right: 0.35em;
-        }
-
-        .summary-name {
-            white-space: nowrap;
-            text-align: right;
-            padding-right: 1rem;
-            position: relative;
-        }
-
-        .summary-bar-cell {
-            width: 100%;
-            position: relative;
-        }
-
-        .summary-date {
-            position: absolute;
-            right: 0.5rem;
-            top: 0;
-            bottom: 0;
-            display: flex;
-            align-items: center;
-            font-size: 80%;
-            text-stroke: 2px var(--background-color);
-            -webkit-text-stroke: 2px var(--background-color);
-            paint-order: stroke fill;
-            pointer-events: none;
-            font-family: monospace;
-        }
-
-        .summary-bar {
-            height: 1rem;
-            width: 100%;
-        }
-
-        .summary-number {
-            font-family: monospace;
-            text-align: right;
-            padding-left: 1rem;
-            white-space: nowrap;
-        }
-
-        th {
-            padding-bottom: 0.5rem;
-        }
-
-        .th-entry-hilite {
-            background: var(--highlight-color);
-            font-weight: bold;
-        }
-
-        .summary-row:hover, .summary-row-hilite {
-            background: var(--highlight-color) !important;
-            font-weight: bold;
-        }
-
-        .remove-system {
-            visibility: hidden;
-            cursor: pointer;
-            color: var(--link-color);
-            user-select: none;
-            position: absolute;
-            left: -1rem;
-            padding-right: 1.5rem;
-        }
-
-        .summary-row:hover .remove-system {
-            visibility: visible;
-        }
-
-        .remove-system:hover {
-            color: var(--link-hover-color);
-        }
-
-        #details, #load_times {
-            padding-bottom: 1rem;
-        }
-
-        #details th, #load_times th {
-            vertical-align: bottom;
-            white-space: pre;
-        }
-
-        #details td, #load_times td {
-            white-space: pre;
-            font-family: monospace;
-            text-align: right;
-            padding: 0.1rem 0.5rem 0.1rem 0.5rem;
-        }
-
-        /* Anchor for the per-cell engine query tooltips */
-        #details td {
-            position: relative;
-        }
-
-        #details td:hover > .tooltip-engine-query {
-            visibility: visible;
-        }
-
-        .shadow:hover {
-            box-shadow: 0 0 1rem var(--shadow-color);
-            position: relative;
-        }
-
-        #nothing-selected {
-            display: none;
-            font-size: 32pt;
-            font-weight: bold;
-            color: var(--nothing-selected-color);
-        }
-
-        .note {
-            position: relative;
-            display: inline-block;
-        }
-
-        .tooltip {
-            position: absolute;
-            bottom: calc(100% + 0.5rem);
-            visibility: hidden;
-            background-color: var(--tooltip-background-color);
-            color: var(--tooltip-text-color);
-            box-shadow: 0 0 1rem var(--shadow-color);
-            padding: 0.5rem 0.75rem;
-            border-radius: 0.5rem;
-            z-index: 1;
-            text-align: left;
-            white-space: normal;
-        }
-
-        .tooltip-result {
-            left: calc(50% - 0.25rem);
-            width: 20rem;
-            margin-left: -10rem;
-        }
-
-        .tooltip-query {
-            left: 0;
-            width: 40rem;
-            margin-left: -3rem;
-        }
-
-        .note:hover .tooltip, .note:active .tooltip {
-            visibility: visible;
-        }
-
-        .tooltip::after {
-            content: " ";
-            position: absolute;
-            top: 100%;
-            border-width: 0.5rem;
-            border-style: solid;
-            border-color: var(--tooltip-background-color) transparent transparent transparent;
-        }
-
-        .tooltip-result::after {
-            left: 50%;
-            margin-left: -1rem;
-        }
-
-        .tooltip-query::after {
-            left: 3rem;
-            margin-left: 0.5rem;
-        }
-
-        /* The engine query of one result cell; anchored on the cell edge away
-           from the nearer side of the table so it stays on screen. */
-        .tooltip-engine-query {
-            right: 0;
-            width: max-content;
-            max-width: 44rem;
-            font-family: monospace;
-            font-size: 90%;
-            font-weight: normal;
-            white-space: pre;
-            text-align: left;
-        }
-
-        .tooltip-engine-query::after {
-            right: 1rem;
-        }
-
-        .tooltip-engine-query-left {
-            left: 0;
-            right: auto;
-        }
-
-        .tooltip-engine-query-left::after {
-            left: 1rem;
-            right: auto;
-        }
-
-        .nowrap {
-            text-wrap: none;
-        }
-
-        .themes {
-            float: right;
-            font-size: 200%;
-            cursor: pointer;
-        }
-
-        #toggle-dark, #toggle-light {
-            padding-right: 0.5rem;
-            cursor: pointer;
-        }
-
-        #toggle-dark:hover, #toggle-light:hover {
-            display: inline-block;
-            transform: translate(1px, 1px);
-            filter: brightness(125%);
-        }
-
-        #scale_hint {
-            font-weight: normal;
-            font-size: 80%;
-            filter: contrast(10%);
-        }
-    </style>
-    <script type="text/javascript" src="results/inmemory/data.generated.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="assets/css/benchmark.css">
+    <script type="text/javascript">
+        /// Results are published per data size under results/inmemory/<size>/,
+        /// each with its own data.generated.js declaring the same globals, so
+        /// only one of them can be loaded per page. The selected size travels
+        /// in the ?size= query parameter (the rest of the selector state lives
+        /// in the URL hash) and switching size reloads the page.
+        const available_sizes = ['full', 'xlarge', 'large'];  /// sizes with published results
+        const default_size = 'full';
+        const size_param = new URLSearchParams(window.location.search).get('size');
+        const selected_size = available_sizes.includes(size_param) ? size_param : default_size;
+        document.write(`<script type="text/javascript" src="results/inmemory/${selected_size}/data.generated.js"><\/script>`);
+    </script>
     <!-- Fallback copy of querymeta.psv for when the page is opened via file:// and fetch() is blocked.
-         Refreshed by pysrc/convertToClickBenchFormat.py -->
+         Refreshed by pysrc/convertToJSFormat.py -->
     <script type="text/javascript" src="artifacts/queries/inmemory/querymeta.generated.js"></script>
 </head>
 <body>
+<a class="skip-link" href="#main-content">Skip to benchmark results</a>
 
-<div class="header stick-left">
-    <span class="nowrap themes"><span id="toggle-dark">🌚</span><span id="toggle-light">🌞</span></span>
-    <h1>KX NYSE TAQ Benchmark — In-Memory Query Engines</h1>
-    <a href="https://github.com/KxSystems/NYSETAQBenchmarks">Methodology</a> | <a href="https://github.com/KxSystems/NYSETAQBenchmarks">Reproduce and Validate the Results</a> | <a href="https://github.com/KxSystems/NYSETAQBenchmarks#adding-a-new-python-based-in-memory-query-engine">Add a Solution</a>
-</div>
+<header class="header stick-left">
+    <span class="nowrap themes">
+        <button id="toggle-theme" aria-label="Change theme" title="Dark/Light View">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm40-83q119-15 199.5-104.5T800-480q0-123-80.5-212.5T520-797v634Z"/></svg>
+        </button>
+    </span>
+    <h1><a href="https://kx.com" target="_blank" rel="noopener noreferrer" title="kx.com"><svg class="kx-logo" viewBox="0 0 48 26" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="KX"><path d="M0 25.5H7.1488V0.5H0V25.5Z"/><path d="M15.3193 0.500002L7.14881 12.9983V13.0016L15.3193 25.5H23.4897L15.3193 12.9983L23.4897 0.500002H15.3193Z"/><path d="M39.8299 0.500002L35.7449 6.74937L31.6599 0.500002H23.4897L31.6599 12.9988L23.4897 25.5H31.6599L35.7449 19.2506L39.8299 25.5H48L39.8299 12.9988L48 0.500027L39.8299 0.500002Z"/></svg></a> NYSE TAQ Benchmark — In-Memory Query Engines</h1>
+    <nav class="resource-nav" aria-label="Benchmark resources">
+        <a href="https://kx.com/blog/the-kx-nyse-taq-benchmark/">Methodology and motivation</a>
+        <a href="https://github.com/KxSystems/NYSETAQBenchmarks">Reproduce and validate results</a>
+        <a href="https://github.com/KxSystems/NYSETAQBenchmarks#adding-a-new-python-based-in-memory-query-engine">Add a solution</a>
+    </nav>
+</header>
 
+<main id="main-content">
+<section class="benchmark-intro" aria-labelledby="benchmark-intro-title">
+    <p>Results show query (and data load) performance statistics of various query engines. Filters update the summary charts and detailed comparison below.</p>
+    <p id="results-status" role="status" aria-live="polite"></p>
+    <div class="benchmark-actions">
+        <button class="action-button" type="button" id="reset-filters">Reset filters</button>
+        <button class="action-button" type="button" id="copy-comparison-link">Copy comparison link</button>
+    </div>
+</section>
+
+<section aria-labelledby="filters-heading">
+<h2 id="filters-heading">Benchmark filters</h2>
 <table class="selectors-container stick-left">
     <tr>
         <th>Solution: </th>
@@ -514,24 +70,27 @@
             <a id="select-all-solutions" class="selector selector-active">All</a>
         </td>
     </tr>
-    <tr>
-        <td colspan="2">
+    <tr class="top-filter-row">
+        <th>
+            <span class="sr-only">Additional filters</span>
+        </th>
+        <td>
             <span class="inline-filter" id="selectors_opensource">
                 <span class="inline-filter-label">Open source:</span>
                 <a id="selector-opensource-yes" class="selector selector-active">Yes</a>
                 <a id="selector-opensource-no" class="selector selector-active">No</a>
             </span>
             <span class="inline-filter-separator"></span>
+            <span class="inline-filter" id="selectors_sortcols">
+                <span class="inline-filter-label">Sort columns:</span>
+                <a id="selector-sortcols-time" class="selector selector-active">Time</a>
+                <a id="selector-sortcols-symtime" class="selector selector-active">Sym, Time</a>
+            </span>
+            <span class="inline-filter-separator"></span>
             <span class="inline-filter" id="selectors_hardware">
                 <span class="inline-filter-label">Hardware:</span>
                 <a id="selector-hardware-cpu" class="selector selector-active">CPU</a>
                 <a id="selector-hardware-gpu" class="selector">GPU</a>
-            </span>
-            <span class="inline-filter-separator"></span>
-            <span class="inline-filter" id="selectors_tuned">
-                <span class="inline-filter-label">Tuned:</span>
-                <a id="selector-tuned-no" class="selector selector-active">No</a>
-                <a id="selector-tuned-yes" class="selector">Yes</a>
             </span>
         </td>
     </tr>
@@ -544,8 +103,8 @@
             <span class="inline-filter">
                 <span class="inline-filter-label">Metric:</span>
                 <span id="selectors_run">
-                    <a class="selector" id="selector-metric-cold">Cold Run</a>
-                    <a class="selector selector-active" id="selector-metric-hot">Hot Run</a>
+                    <a class="selector selector-active" id="selector-metric-cold">Cold Run</a>
+                    <a class="selector" id="selector-metric-hot">Hot Run</a>
                     <a class="selector" id="selector-metric-hot2">Second Hot Run</a>
                 </span>
             </span>
@@ -556,13 +115,18 @@
         <td>
             <span class="inline-filter" id="selectors_machine"></span>
             <span class="inline-filter-separator"></span>
+            <span class="inline-filter" title="Amount of TAQ data loaded (see the README for what each size covers); switching reloads the page with that size's results.">
+                <span class="inline-filter-label">Size:</span>
+                <span id="selectors_size"></span>
+            </span>
+            <span class="inline-filter-separator"></span>
             <span class="inline-filter">
                 <span class="inline-filter-label">Data date:</span>
                 <span id="selectors_date"></span>
             </span>
         </td>
     </tr>
-    <tr>
+    <tr title="Baseline to use in calculating ratios">
         <th>Baseline: </th>
         <td id="selectors_baseline">
         </td>
@@ -593,8 +157,11 @@
     </tr>
     <tr class="selector-separator"><td colspan="2"></td></tr>
 </table>
+</section>
 
-<div class="stick-left comparison summary-container">
+<section aria-labelledby="summary-heading">
+<h2 id="summary-heading">Benchmark summary</h2>
+<div class="stick-left comparison summary-container results-content">
     <table class="summary-table">
         <thead>
             <tr>
@@ -602,7 +169,7 @@
                     Solution
                 </th>
                 <th colspan="2">
-                    Geometric mean of per-query time ratios relative to <span id="baseline-name"></span> (lower is better).<br/>
+                    Geometric mean<sup><a id="goto-footnote" href="#geomean-footnote">[1]</a></sup> of per-query time ratios relative to <span id="baseline-name"></span> (lower is better).<br/>
                     <span id="scale_hint"></span>
                 </th>
             </tr>
@@ -610,9 +177,15 @@
         <tbody id="summary">
         </tbody>
     </table>
+    <div id="failures-panel">
+        <div id="failures-title">Query Failures<br/>
+            <span id="failures-hint">number of null execution times (☠)</span>
+        </div>
+        <table id="failures-table" aria-label="Bar chart of query failures per solution"></table>
+    </div>
 </div>
 
-<div class="stick-left comparison summary-charts">
+<div class="stick-left comparison summary-charts results-content">
     <div id="winners-panel">
         <div id="winners-title">Wins per solution<br/>
             <span id="winners-hint">on how many of the compared queries the solution posts the fastest time</span>
@@ -621,50 +194,85 @@
         <div id="winners-legend"></div>
     </div>
     <div id="memory-panel">
-        <div id="memory-title">Max Res Mem (kb)<br/>
-            <span id="memory-hint">maximum resident set size of the benchmark process; not affected by the query filters</span>
+        <div id="memory-title">Max Res Mem (GB)<br/>
+            <span id="memory-hint">maximum resident set size of the benchmark process (reported by <code>time -v</code>)</span>
         </div>
         <table id="memory-table" aria-label="Bar chart of maximum resident memory per solution"></table>
-        <div id="datasize-title">Data size (MB)<br/>
-            <span id="datasize-hint">in-memory size of the loaded tables; not affected by the query filters</span>
+        <div id="datasize-title">Data Size (GB)<br/>
+            <span id="datasize-hint">in-memory size of the loaded tables (reported by the engine)</span>
         </div>
         <table id="datasize-table" aria-label="Bar chart of in-memory data size per solution"></table>
     </div>
 </div>
 
-<div id="nothing-selected" class="stick-left">Nothing selected</div>
+<div id="nothing-selected" class="stick-left" hidden>
+    No results match the selected filters. Select a solution above or use Reset filters.
+</div>
 
-<div class="stick-left comparison">
+<div class="stick-left comparison results-content">
     <h2>Detailed Comparison</h2>
 </div>
 
-<table id="details">
-    <thead>
-        <tr id="details_head">
-        </tr>
-    </thead>
-    <tbody id="details_body">
-    </tbody>
-</table>
+<div
+    class="table-scroll results-content"
+    tabindex="0"
+    role="region"
+    aria-label="Scrollable detailed comparison table"
+>
+    <table id="details" class="responsive-data-table">
+        <thead>
+            <tr id="details_head"></tr>
+        </thead>
+        <tbody id="details_body"></tbody>
+    </table>
+</div>
+</section>
 
+<section id="load-times-section" class="results-content" aria-labelledby="load-times-heading-text">
 <div class="stick-left comparison" id="load-times-heading">
-    <h2>Load Times</h2>
+    <h2 id="load-times-heading-text">Load Times</h2>
 </div>
 
-<table id="load_times">
-    <thead>
-        <tr id="load_times_head">
-        </tr>
-    </thead>
-    <tbody id="load_times_body">
-    </tbody>
-</table>
+<div
+    class="table-scroll"
+    tabindex="0"
+    role="region"
+    aria-label="Scrollable load-times table"
+>
+    <table id="load_times" class="responsive-data-table">
+        <thead>
+            <tr id="load_times_head"></tr>
+        </thead>
+        <tbody id="load_times_body"></tbody>
+    </table>
+</div>
+</section>
+
+<div class="stick-left comparison results-content" id="geomean-footnote" tabindex="-1">
+    [1] A failed query is counted in the geometric mean with a penalty ratio: twice the worst time ratio posted for that query by any of the compared solutions.
+</div>
+</main>
+<footer class="site-footer">
+    <div class="footer-lower">
+        <div class="footer-copyright">
+            ©2026 KX. All Rights Reserved. KX® and kdb+ are registered trademarks of KX Systems, Inc., a subsidiary of KX Software Limited.
+        </div>
+
+        <nav id="footer-navigation" class="footer-navigation" aria-label="Footer menu">
+            <ul class="footer-menu">
+                <li><a href="https://kx.com/privacy-policy/">Privacy Policy</a></li>
+                <li>
+                    <button type="button" class="footer-cookie-settings" id="footer-cookie-settings">Cookie Settings</button>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</footer>
 
 <script type="text/javascript">
 
 const constant_time_add = 0.01;
 const missing_result_penalty = 2;
-const missing_result_time = 300;
 const ns_to_s = 1e-9;
 
 const load_phase_order = ['load a partition into memory', 'transform', 'sort', 'index'];
@@ -695,7 +303,7 @@ const instrument_multi_values = {
     '1000infreq': '1000 infreq',
 };
 
-/// Values of the complexity:<value> tags in querymeta.psv, with their selector labels.
+/// Values of the mandatory `complexity` column of querymeta.psv, with their selector labels.
 /// They get their own "Complexity filter" selector instead of the generic tag filters.
 const complexity_values = {
     'simple': 'simple',
@@ -703,16 +311,28 @@ const complexity_values = {
     'complex': 'complex',
 };
 
+/// Tags excluded by default; queries carrying them are hidden until deselected.
+const default_excluded_tags = ['manydummyfilters', 'unnecessarycolumnfetch'];
+
+/// Solutions selected on first load (when the URL carries no saved state);
+/// ones absent from the loaded data size are simply skipped. Everything else
+/// starts deselected but can be toggled on.
+const default_solutions = ['DuckDB (Index)', 'KDB-X', 'KDB-X (Manual Opt)', 'Pandas', 'Polars'];
+
+const default_baseline = 'KDB-X';
+const default_threads = '4';
+const default_metric = 'cold';
+
 let selectors = {
     "solution": {},
     "machine": null,
     "date": null,
     "threads": null,
-    "baseline": "kdb",
+    "baseline": default_baseline,
     "opensource": {"yes": true, "no": true},
+    "sortcols": {"time": true, "symtime": true},
     "hardware": {"cpu": true, "gpu": false},
-    "tuned": {"no": true, "yes": false},
-    "metric": "hot",
+    "metric": default_metric,
     "instrument": {},
     "complexity": {},
     "tag_include": {},
@@ -727,10 +347,20 @@ function setTheme(new_theme) {
     document.documentElement.setAttribute('data-theme', theme);
     window.localStorage.setItem('theme', theme);
     render();
+    requestAnimationFrame(applyAccessibilityEnhancements);
 }
 
-document.getElementById('toggle-light').addEventListener('click', e => setTheme('light'));
-document.getElementById('toggle-dark').addEventListener('click', e => setTheme('dark'));
+document.getElementById('toggle-theme').addEventListener('click', e => setTheme(theme == 'dark' ? 'light' : 'dark'));
+
+/// The [1] marker jumps to the footnote at the page bottom. The default anchor
+/// navigation must not run: the URL hash carries the encoded selector state,
+/// which "#geomean-footnote" would overwrite.
+document.getElementById('goto-footnote').addEventListener('click', e => {
+    e.preventDefault();
+    const footnote = document.getElementById('geomean-footnote');
+    footnote.scrollIntoView({behavior: 'smooth', block: 'center'});
+    footnote.focus({preventScroll: true});
+});
 
 let new_theme = window.localStorage.getItem('theme');
 if (new_theme && new_theme != theme) {
@@ -742,6 +372,7 @@ if (new_theme && new_theme != theme) {
 
 let solutions = document.getElementById('selectors_solution');
 let machines = document.getElementById('selectors_machine');
+let sizes = document.getElementById('selectors_size');
 let dates = document.getElementById('selectors_date');
 let threads = document.getElementById('selectors_threads');
 let baselines = document.getElementById('selectors_baseline');
@@ -751,6 +382,21 @@ let tag_includes = document.getElementById('selectors_tag_include');
 let tag_excludes = document.getElementById('selectors_tag_exclude');
 
 let unique_solutions = [... new Set(data.map(elem => elem.solution))].sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
+
+/// The size selector stands apart from the others: each size's results are a
+/// separate data.generated.js picked in <head>, so instead of re-rendering it
+/// reloads the page with the new ?size= parameter. The URL hash (and with it
+/// the rest of the selector state) survives the navigation.
+available_sizes.forEach(value => {
+    let selector = document.createElement('a');
+    selector.className = value == selected_size ? 'selector selector-active' : 'selector';
+    selector.appendChild(document.createTextNode(value));
+    sizes.appendChild(selector);
+    selector.addEventListener('click', e => {
+        if (value == selected_size) { return; }
+        window.location.search = '?size=' + value;
+    });
+});
 
 /// The selector map is addressed by key at click time: decoding the URL hash replaces
 /// the whole `selectors` object, so a map reference captured at build time goes stale.
@@ -785,10 +431,13 @@ function toggleAll(e, selectors_key) {
 
 unique_solutions.map(elem => {
     let selector = document.createElement('a');
-    selector.className = 'selector selector-active';
+    selectors.solution[elem] = default_solutions.includes(elem) && data.some(entry => entry.solution == elem && !entry.hide);
+    selector.className = selectors.solution[elem] ? 'selector selector-active' : 'selector';
     selector.appendChild(document.createTextNode(elem));
+    const versions = [... new Set(data.filter(entry => entry.solution == elem)
+        .map(entry => entry.engineversion).filter(Boolean))];
+    if (versions.length) { selector.title = `Engine version: ${versions.join(', ')}`; }
     solutions.appendChild(selector);
-    selectors.solution[elem] = data.some(entry => entry.solution == elem && !entry.hide);
     selector.addEventListener('click', e => toggle(e, elem, 'solution'));
 
     /// Highlighting summary rows and table columns on hovering over the solution selector.
@@ -818,6 +467,20 @@ document.getElementById('selector-opensource-no').addEventListener('click', e =>
     updateHistory();
 });
 
+document.getElementById('selector-sortcols-time').addEventListener('click', e => {
+    selectors.sortcols.time = !selectors.sortcols.time;
+    e.target.classList.toggle('selector-active', selectors.sortcols.time);
+    render();
+    updateHistory();
+});
+
+document.getElementById('selector-sortcols-symtime').addEventListener('click', e => {
+    selectors.sortcols.symtime = !selectors.sortcols.symtime;
+    e.target.classList.toggle('selector-active', selectors.sortcols.symtime);
+    render();
+    updateHistory();
+});
+
 document.getElementById('selector-hardware-cpu').addEventListener('click', e => {
     selectors.hardware.cpu = !selectors.hardware.cpu;
     e.target.classList.toggle('selector-active', selectors.hardware.cpu);
@@ -828,20 +491,6 @@ document.getElementById('selector-hardware-cpu').addEventListener('click', e => 
 document.getElementById('selector-hardware-gpu').addEventListener('click', e => {
     selectors.hardware.gpu = !selectors.hardware.gpu;
     e.target.classList.toggle('selector-active', selectors.hardware.gpu);
-    render();
-    updateHistory();
-});
-
-document.getElementById('selector-tuned-yes').addEventListener('click', e => {
-    selectors.tuned.yes = !selectors.tuned.yes;
-    e.target.classList.toggle('selector-active', selectors.tuned.yes);
-    render();
-    updateHistory();
-});
-
-document.getElementById('selector-tuned-no').addEventListener('click', e => {
-    selectors.tuned.no = !selectors.tuned.no;
-    e.target.classList.toggle('selector-active', selectors.tuned.no);
     render();
     updateHistory();
 });
@@ -861,7 +510,7 @@ selectors.queries = Object.values(data[0].result)[0].map(k => true);
 /// Load query descriptions and tags from the PSV. The file is tiny, so parsing it on
 /// every page load is free; the benefit is that new queries appear automatically.
 /// When the page is opened via file:// the fetch is blocked - fall back to the copy
-/// embedded in querymeta.generated.js (refreshed by pysrc/convertToClickBenchFormat.py).
+/// embedded in querymeta.generated.js (refreshed by pysrc/convertToJSFormat.py).
 async function loadQueryMeta() {
     let text = null;
     try {
@@ -881,6 +530,7 @@ async function loadQueryMeta() {
         const header = lines[0].split('|');
         const idx_tags = header.indexOf('tags');
         const idx_instrument = header.indexOf('instrument');
+        const idx_complexity = header.indexOf('complexity');
         const idx_description = header.indexOf('description');
         const idx_comment = header.indexOf('comment');
         lines.slice(1).forEach(line => {
@@ -888,10 +538,9 @@ async function loadQueryMeta() {
             const comment = (fields[idx_comment] ?? '').trim();
             queries.push(fields[idx_description] + (comment ? ` (${comment})` : ''));
             const tags = (fields[idx_tags] ?? '').split(',').map(t => t.trim()).filter(t => t !== '');
-            /// complexity:<value> tags feed the dedicated "Complexity filter" selector,
-            /// so they are kept out of the generic include/exclude tag lists.
-            const complexity_tag = tags.find(t => t.startsWith('complexity:'));
-            query_complexity.push(complexity_tag ? complexity_tag.split(':')[1] : '');
+            /// The `complexity` column feeds the dedicated "Complexity filter" selector;
+            /// legacy complexity:<value> tags are kept out of the generic tag lists.
+            query_complexity.push((fields[idx_complexity] ?? '').trim());
             query_tags.push(tags.filter(t => !t.startsWith('complexity:')));
             query_instrument.push((fields[idx_instrument] ?? '').trim());
         });
@@ -946,13 +595,38 @@ async function loadQueryMeta() {
         selector.addEventListener('click', e => toggle(e, value, 'complexity'));
     });
 
+    /// Tag descriptions from tags.psv, shown as hover tooltips on the tag selectors.
+    /// Same fetch / file:// fallback dance as querymeta.psv above.
+    let tags_text = null;
+    try {
+        const response = await fetch('artifacts/queries/inmemory/tags.psv');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        tags_text = await response.text();
+    } catch (e) {
+        if (typeof tags_psv !== 'undefined') tags_text = tags_psv;
+    }
+    const tag_descriptions = {};
+    if (tags_text !== null) {
+        const lines = tags_text.trim().split('\n');
+        const header = lines[0].split('|');
+        const idx_tag = header.indexOf('tag');
+        const idx_desc = header.indexOf('description');
+        lines.slice(1).forEach(line => {
+            const fields = line.split('|');
+            const tag = (fields[idx_tag] ?? '').trim();
+            if (tag) tag_descriptions[tag] = (fields[idx_desc] ?? '').trim();
+        });
+    }
+
     [[tag_includes, 'tag_include'], [tag_excludes, 'tag_exclude']].forEach(([container, selectors_key]) => {
         all_tags.forEach(tag => {
+            const active = selectors_key === 'tag_exclude' && default_excluded_tags.includes(tag);
             let selector = document.createElement('a');
-            selector.className = 'selector';
+            selector.className = active ? 'selector selector-active' : 'selector';
             selector.appendChild(document.createTextNode(tag));
+            if (tag_descriptions[tag]) selector.title = tag_descriptions[tag];
             container.appendChild(selector);
-            selectors[selectors_key][tag] = false;
+            selectors[selectors_key][tag] = active;
             selector.addEventListener('click', e => toggle(e, tag, selectors_key));
         });
     });
@@ -1028,7 +702,7 @@ function formatEngineQuery(query, engine) {
 }
 
 /// Pre-format the per-cell tooltip texts from the query texts and engine name
-/// recorded in each entry by pysrc/convertToClickBenchFormat.py.
+/// recorded in each entry by pysrc/convertToJSFormat.py.
 data.forEach(elem => {
     if (elem.queries) {
         elem.queries_tooltip = elem.queries.map(query => formatEngineQuery(query, elem.engine ?? ''));
@@ -1056,8 +730,8 @@ function queryPassesTagFilters(query_num) {
 }
 
 function matchesTopRow(elem) {
-    return ((selectors.tuned.yes && elem.tuned === "yes") || (selectors.tuned.no && elem.tuned === "no")) &&
-        ((selectors.opensource.yes && elem.proprietary === "no") || (selectors.opensource.no && elem.proprietary === "yes")) &&
+    return ((selectors.opensource.yes && elem.proprietary === "no") || (selectors.opensource.no && elem.proprietary === "yes")) &&
+        ((selectors.sortcols.time && (elem.sortcols === "time" || !elem.sortcols)) || (selectors.sortcols.symtime && elem.sortcols === "sym,time")) &&
         ((selectors.hardware.cpu && (elem.hardware === "cpu" || !elem.hardware)) || (selectors.hardware.gpu && elem.hardware === "gpu"));
 }
 
@@ -1080,11 +754,12 @@ function reconcile() {
 
     const available_threads = availableThreads(base);
     if (!available_threads.includes(selectors.threads)) {
-        selectors.threads = available_threads[available_threads.length - 1];
+        selectors.threads = available_threads.includes(default_threads)
+            ? default_threads : available_threads[available_threads.length - 1];
     }
 
     if (!unique_solutions.includes(selectors.baseline)) {
-        selectors.baseline = unique_solutions.includes('kdb') ? 'kdb' : unique_solutions[0];
+        selectors.baseline = unique_solutions.includes(default_baseline) ? default_baseline : unique_solutions[0];
     }
 }
 
@@ -1121,11 +796,27 @@ function buildRadio(container, values, current, onSelect) {
     });
 }
 
+/// Show each machine's environment.yaml (embedded in data.generated.js as
+/// machine_environments) as a hover tooltip on its selector. Generated data
+/// files predating machine_environments simply get no tooltips.
+function attachMachineEnvironments() {
+    if (typeof machine_environments === 'undefined') { return; }
+    [...machines.querySelectorAll('a')].forEach(elem => {
+        const env = machine_environments[elem.textContent];
+        if (!env) { return; }
+        let tooltip = document.createElement('span');
+        tooltip.className = 'tooltip tooltip-machine-env';
+        tooltip.appendChild(document.createTextNode(env.trim()));
+        elem.appendChild(tooltip);
+    });
+}
+
 function rebuildDynamicSelectors(filtered_solutions) {
     const base = data.filter(matchesTopRow);
     if (base.length == 0) { return; }
 
     buildRadio(machines, availableMachines(base), selectors.machine, value => { selectors.machine = value; });
+    attachMachineEnvironments();
     buildRadio(dates, availableDates(base), selectors.date, value => { selectors.date = value; });
     buildRadio(threads, availableThreads(base), selectors.threads, value => { selectors.threads = value; });
     buildRadio(baselines, unique_solutions, selectors.baseline, value => { selectors.baseline = value; });
@@ -1177,11 +868,11 @@ function updateSelectors() {
     document.getElementById('selector-opensource-yes').className = selectors.opensource.yes ? 'selector selector-active' : 'selector';
     document.getElementById('selector-opensource-no').className = selectors.opensource.no ? 'selector selector-active' : 'selector';
 
+    document.getElementById('selector-sortcols-time').className = selectors.sortcols.time ? 'selector selector-active' : 'selector';
+    document.getElementById('selector-sortcols-symtime').className = selectors.sortcols.symtime ? 'selector selector-active' : 'selector';
+
     document.getElementById('selector-hardware-cpu').className = selectors.hardware.cpu ? 'selector selector-active' : 'selector';
     document.getElementById('selector-hardware-gpu').className = selectors.hardware.gpu ? 'selector selector-active' : 'selector';
-
-    document.getElementById('selector-tuned-yes').className = selectors.tuned.yes ? 'selector selector-active' : 'selector';
-    document.getElementById('selector-tuned-no').className = selectors.tuned.no ? 'selector selector-active' : 'selector';
 }
 
 function clearElement(elem)
@@ -1199,9 +890,9 @@ function selectRun(timings, metric) {
 }
 
 /// Geometric mean of per-query time ratios against the baseline solution.
-function relativeQueryTime(num_queries, baseline_runs, runs, metric) {
-    const fallback_timing = missing_result_penalty * Math.max(missing_result_time, ...runs.map(timings => selectRun(timings, metric)).filter(x => x !== null));
-
+/// worst_times[i] is the worst time across the compared solutions for query i,
+/// used to penalize failed queries (footnote [1] at the page bottom).
+function relativeQueryTime(num_queries, baseline_runs, runs, metric, worst_times) {
     let accumulator = 0;
     let used_queries = 0;
 
@@ -1212,8 +903,11 @@ function relativeQueryTime(num_queries, baseline_runs, runs, metric) {
             const baseline_timing = selectRun(baseline_runs[i], metric);
             /// Skip queries the baseline solution fails on - there is no ratio to take.
             if (baseline_timing === null || !isFinite(baseline_timing)) continue;
-            const curr_timing = selectRun(runs[i], metric) ?? fallback_timing;
-            const ratio = (constant_time_add + curr_timing) / (constant_time_add + baseline_timing);
+            const curr_timing = selectRun(runs[i], metric);
+            /// Failed query: twice the worst ratio across the compared solutions for
+            /// this query (footnote [1] at the page bottom).
+            const ratio = (constant_time_add + (curr_timing ?? worst_times[i])) / (constant_time_add + baseline_timing)
+                * (curr_timing === null ? missing_result_penalty : 1);
             accumulator += Math.log(ratio);
             ++used_queries;
         }
@@ -1235,20 +929,21 @@ function addNote(text) {
     return note;
 }
 
-function nameToColor(str) {
-    let x = 0;
-    for (let i = 0; i < str.length; i++) {
-        x += str.charCodeAt(i);
-        x *= 0xff51afd7;
-        x ^= x >> 17;
-    }
+const chartSeriesColors = [
+    'var(--series-1)',
+    'var(--series-2)',
+    'var(--series-3)',
+    'var(--series-4)',
+    'var(--series-5)',
+    'var(--series-6)',
+    'var(--series-7)',
+    'var(--series-8)',
+];
 
-    return 60 + Math.abs(x % 240);
-}
-
-/// The stable per-solution color, shared by the summary links and the pie chart slices.
+/// Stable, distinct per-solution colours from the controlled chart palette.
 function solutionColor(solution) {
-    return `oklch(var(--hashed-link-lightness) 0.2018 ${nameToColor(solution.split(' ')[0])})`;
+    const index = unique_solutions.indexOf(solution);
+    return chartSeriesColors[(index >= 0 ? index : 0) % chartSeriesColors.length];
 }
 
 /// Pie chart of how many of the compared queries each solution wins (has the fastest time).
@@ -1295,7 +990,7 @@ function renderWinnersPie(filtered_data) {
         slice.style.fill = solutionColor(solution);
         /// Surface-colored gap between the slices
         slice.style.stroke = 'var(--background-color)';
-        slice.style.strokeWidth = '0.02';
+        slice.style.strokeWidth = '0.035';
 
         let title = document.createElementNS(svg_ns, 'title');
         title.textContent = `${solution}: ${count} wins (${Math.round(count / total * 100)}%)`;
@@ -1322,7 +1017,8 @@ function renderBarChart(table_id, entries, value_of, format_value, tooltip_suffi
     const with_value = entries.filter(elem => value_of(elem) != null);
     if (!with_value.length) { return false; }
 
-    const max_value = Math.max(...with_value.map(value_of));
+    /// All-zero values (e.g. no query failures at all) still need a valid bar width.
+    const max_value = Math.max(...with_value.map(value_of)) || 1;
     [...with_value].sort((a, b) => value_of(a) - value_of(b)).forEach(elem => {
         const value = value_of(elem);
         let tr = document.createElement('tr');
@@ -1356,18 +1052,45 @@ function renderBarChart(table_id, entries, value_of, format_value, tooltip_suffi
     return true;
 }
 
+/// Bar chart of how many of the compared queries each solution fails on (no result
+/// for the selected run, shown as ☠ in the details table). Absolute counts, no ratios;
+/// like the pie, it honors the query checkboxes and tag filters.
+function renderFailuresChart(filtered_data) {
+    const num_queries = filtered_data[0].runs.length;
+    const no_queries_selected = selectors.queries.filter(x => x).length == 0;
+    const failures = new Map(filtered_data.map(elem => [elem.solution, 0]));
+
+    for (let i = 0; i < num_queries; ++i) {
+        if (!((no_queries_selected || selectors.queries[i]) && queryPassesTagFilters(i))) continue;
+        filtered_data.forEach(elem => {
+            if (selectRun(elem.runs[i], selectors.metric) === null) {
+                failures.set(elem.solution, failures.get(elem.solution) + 1);
+            }
+        });
+    }
+
+    renderBarChart('failures-table', filtered_data,
+        elem => failures.get(elem.solution),
+        value => value.toLocaleString('en-US'),
+        'failed queries');
+}
+
 /// Bar charts of each solution's peak memory use (max_res_mem_kb) and in-memory data
 /// size. Both describe the whole benchmark run, so unlike the pie they are not
 /// affected by the query filters.
 function renderMemoryCharts(filtered_data) {
     const has_mem = renderBarChart('memory-table', filtered_data,
-        elem => elem.max_res_mem_kb, value => value.toLocaleString('en-US'),
-        'kb maximum resident set size');
+        elem => elem.max_res_mem_kb,
+        value => (value / 1024 / 1024).toLocaleString('en-US',
+            { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+        'GB maximum resident set size');
     document.getElementById('memory-title').style.display = has_mem ? '' : 'none';
 
     const has_size = renderBarChart('datasize-table', filtered_data,
-        elem => elem.data_size, value => Math.round(value).toLocaleString('en-US'),
-        'MB of loaded data');
+        elem => elem.data_size,
+        value => (value / 1024).toLocaleString('en-US',
+            { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+        'GB of loaded data');
     document.getElementById('datasize-title').style.display = has_size ? '' : 'none';
 
     document.getElementById('memory-panel').style.display = has_mem || has_size ? '' : 'none';
@@ -1381,12 +1104,19 @@ function renderSummary(filtered_data, baseline_runs) {
 
     /// The algorithm: for each of the queries,
     /// - if there is a result - take query duration, add 10 ms, and divide it to the corresponding value of the baseline solution,
-    /// - if there is no result - take the worst query duration across all query runs for this solution and multiply by 2.
+    /// - if there is no result - take the worst time ratio across the compared solutions for this query and multiply by 2.
     /// Take geometric mean across the queries.
 
     const num_queries = baseline_runs.length;
 
-    const summaries = filtered_data.map(elem => relativeQueryTime(num_queries, baseline_runs, elem.runs, selectors.metric));
+    /// Worst per-query time across the compared solutions (and the baseline, so the
+    /// value is defined whenever the query is compared at all), feeding the penalty
+    /// ratio of failed queries.
+    const worst_times = [...Array(num_queries).keys()].map(i =>
+        Math.max(...[...filtered_data.map(elem => elem.runs[i]), baseline_runs[i]]
+            .map(timings => selectRun(timings, selectors.metric)).filter(x => x !== null)));
+
+    const summaries = filtered_data.map(elem => relativeQueryTime(num_queries, baseline_runs, elem.runs, selectors.metric, worst_times));
 
     const sorted_indices = [...summaries.keys()].sort((a, b) => summaries[a] - summaries[b]);
 
@@ -1406,10 +1136,16 @@ function renderSummary(filtered_data, baseline_runs) {
         let td_name = document.createElement('td');
         td_name.className = 'summary-name';
 
-        let remove = document.createElement('span');
+        let remove = document.createElement('button');
+        remove.type = 'button';
         remove.className = 'remove-system';
-        remove.textContent = '✕';
-        remove.title = 'Remove this solution from the selection';
+        remove.setAttribute('aria-label', `Remove ${elem.solution} from the comparison`);
+        remove.title = `Remove ${elem.solution} from the comparison`;
+
+        let removeIcon = document.createElement('span');
+        removeIcon.setAttribute('aria-hidden', 'true');
+        removeIcon.textContent = '×';
+        remove.appendChild(removeIcon);
         remove.addEventListener('click', e => {
             e.preventDefault();
             e.stopPropagation();
@@ -1438,7 +1174,11 @@ function renderSummary(filtered_data, baseline_runs) {
 
         let td_number = document.createElement('td');
         td_number.className = 'summary-number';
-        td_number.appendChild(document.createTextNode(ratio !== null ? `×${ratio.toFixed(2)}` : '—'));
+        if (ratio !== null) {
+            appendRatio(td_number, ratio);
+        } else {
+            td_number.appendChild(document.createTextNode('—'));
+        }
 
         let td_bar = document.createElement('td');
         td_bar.className = 'summary-bar-cell';
@@ -1446,26 +1186,17 @@ function renderSummary(filtered_data, baseline_runs) {
         let bar = document.createElement('div');
 
         bar.className = `summary-bar`;
+        const scale1 = Math.min(100, percentage);
+        const scale2 = Math.min(100, percentage * 10);
         bar.style.background = `linear-gradient(to right,
-            var(--bar-color1) 0%,
-            var(--bar-color1) ${Math.min(100, percentage)}%,
-            var(--bar-color2) ${Math.min(100, percentage)}%,
-            var(--bar-color2) ${Math.min(100, percentage * 10)}%,
-            var(--bar-color3) ${Math.min(100, percentage * 10)}%,
-            var(--bar-color3) ${Math.min(100, percentage * 100)}%,
-            var(--bar-color4) ${Math.min(100, percentage * 100)}%,
-            var(--bar-color4) ${Math.min(100, percentage * 1000)}%,
-            transparent ${Math.min(100, percentage * 1000)}%,
+            var(--chart-scale-1) 0%,
+            var(--chart-scale-1) ${scale1}%,
+            var(--chart-scale-2) ${scale1}%,
+            var(--chart-scale-2) ${scale2}%,
+            transparent ${scale2}%,
             transparent 100%)`;
 
         td_bar.appendChild(bar);
-
-        if (elem.datadate) {
-            let date_span = document.createElement('span');
-            date_span.className = 'summary-date';
-            date_span.textContent = elem.datadate;
-            td_bar.appendChild(date_span);
-        }
 
         tr.appendChild(td_name);
         tr.appendChild(td_bar);
@@ -1473,69 +1204,68 @@ function renderSummary(filtered_data, baseline_runs) {
         table.appendChild(tr);
     });
 
+    renderFailuresChart(filtered_data);
     renderWinnersPie(filtered_data);
     renderMemoryCharts(filtered_data);
 
     return sorted_indices;
 }
 
-function colorize(elem, ratio) {
-    /// ratio from 0.9 to 1.1 - neutral: no background, on-par with the baseline
-    /// ratio below 0.9 - green, the smaller the ratio the darker (mirrors the
-    ///                   slow side on the inverse ratio: pale green to green to
-    ///                   dark green to near-black green)
-    /// ratio from 1.1 to 2 - pale yellow to yellow
-    /// ratio from 2 to 10 - yellow to red
-    /// ratio from 10 to 1000 to infinity - red to brown to black
+/// Appends a ratio as "×<n>". Speedups read better inverted, so a ratio of 0.5
+/// becomes ×2.0<sup>-1</sup>; the inverse gets one decimal so the extra exponent
+/// does not widen the column.
+function appendRatio(elem, ratio) {
+    if (isFinite(ratio) && ratio > 0 && ratio < 1) {
+        elem.appendChild(document.createTextNode(`×${(1 / ratio).toFixed(1)}`));
+        let sup = document.createElement('sup');
+        sup.appendChild(document.createTextNode('-1'));
+        elem.appendChild(sup);
+    } else {
+        elem.appendChild(document.createTextNode(`×${ratio.toFixed(2)}`));
+    }
+}
 
-    /// Note: we are using RGB space without proper gamma correction. Read more: https://www.handprint.com/HP/WCL/color1.html
-
-    if (ratio !== null && ratio >= 0.9 && ratio <= 1.1) {
-        /// The best result is highlighted
-        if (ratio == 1) {
-            elem.style.fontWeight = 'bold';
-        }
+/// Appends "<time>s (×<ratio>)" to a cell, or ☠ when the query produced no timing.
+function appendTimingWithRatio(elem, curr_timing, ratio) {
+    if (curr_timing === null) {
+        elem.appendChild(document.createTextNode('☠'));
         return;
     }
 
-    let [r, g, b] = [0, 0, 0];
+    elem.appendChild(document.createTextNode(`${curr_timing.toFixed(3)}s`));
+    if (ratio === null) { return; }
 
-    if (ratio !== null) {
-        if (ratio < 0.9) {
-            const inv = 1 / ratio;
-            if (inv <= 2) {
-                g = 255;
-                r = b = (2 - inv) / (2 - 1 / 0.9) * 232;
-            } else if (inv <= 10) {
-                g = 100 + (10 - inv) / 8 * 155;
-            } else {
-                g = (1 - ((inv - 10) / ((inv - 10) + 1000))) * 100;
-            }
-        } else if (ratio <= 2) {
-            r = 255;
-            g = 255;
-            b = (2 - ratio) / (2 - 1.1) * 232;
-        } else if (ratio <= 10) {
-            g = (10 - ratio) / 8 * 255;
-            r = 255;
-        } else {
-            r = (1 - ((ratio - 10) / ((ratio - 10) + 1000))) * 255;
-        }
-    }
+    elem.appendChild(document.createTextNode(' ('));
+    appendRatio(elem, ratio);
+    elem.appendChild(document.createTextNode(')'));
+}
 
-    if (document.documentElement.getAttribute('data-theme') == 'dark') {
-        r /= 1.5;
-        g /= 1.5;
-        b /= 1.5;
-    }
+function colorize(elem, ratio) {
+    elem.classList.remove('result-much-faster', 'result-faster', 'result-similar',
+        'result-slower', 'result-much-slower', 'result-failed');
 
-    elem.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-    if (ratio === null || ratio > 10 || ratio < 0.1) {
-        /// This will look better on dark backgrounds
-        elem.style.color = 'white';
+    let description;
+    if (ratio === null || !isFinite(ratio)) {
+        elem.classList.add('result-failed');
+        description = 'Query failed or no comparable result';
+    } else if (ratio < 0.5) {
+        elem.classList.add('result-much-faster');
+        description = `${Math.round((1 - ratio) * 100)} percent faster than baseline`;
+    } else if (ratio < 0.9) {
+        elem.classList.add('result-faster');
+        description = `${Math.round((1 - ratio) * 100)} percent faster than baseline`;
+    } else if (ratio <= 1.1) {
+        elem.classList.add('result-similar');
+        description = 'Approximately equal to baseline';
+        if (ratio === 1) elem.style.fontWeight = 'bold';
+    } else if (ratio <= 2) {
+        elem.classList.add('result-slower');
+        description = `${Math.round((ratio - 1) * 100)} percent slower than baseline`;
     } else {
-        elem.style.color = 'black';
+        elem.classList.add('result-much-slower');
+        description = `${ratio.toFixed(2)} times the baseline execution time`;
     }
+    elem.setAttribute('aria-label', `${elem.textContent.trim()}. ${description}.`);
 }
 
 function render() {
@@ -1571,15 +1301,18 @@ function render() {
 
     rebuildDynamicSelectors(new Set(baseline_entry ? [...filtered_data.map(elem => elem.solution), baseline_entry.solution] : []));
 
-    let nothing_selected_elem = document.getElementById('nothing-selected');
-    if (filtered_data.length == 0) {
-        nothing_selected_elem.style.display = 'block';
-        [...document.querySelectorAll('.comparison')].map(e => e.style.display = 'none');
+    const nothingSelectedElement = document.getElementById('nothing-selected');
+    const resultsContent = [...document.querySelectorAll('.results-content')];
+
+    if (filtered_data.length === 0) {
+        nothingSelectedElement.hidden = false;
+        resultsContent.forEach(element => { element.hidden = true; });
+        requestAnimationFrame(applyAccessibilityEnhancements);
         return;
     }
-    nothing_selected_elem.style.display = 'none';
-    /// Reset to the stylesheet display value (the summary container is a flexbox, not a block).
-    [...document.querySelectorAll('.comparison')].map(e => e.style.display = '');
+
+    nothingSelectedElement.hidden = true;
+    resultsContent.forEach(element => { element.hidden = false; });
 
     const baseline_runs = baseline_entry.result[selectors.threads];
     document.getElementById('baseline-name').innerText = baseline_entry.solution;
@@ -1619,7 +1352,7 @@ function render() {
     const load_phases = load_phase_order.filter(phase =>
         filtered_data.some(elem => elem.load_time?.[phase]?.[selectors.threads] != null));
 
-    document.getElementById('load-times-heading').style.display = load_phases.length ? '' : 'none';
+    document.getElementById('load-times-section').style.display = load_phases.length ? '' : 'none';
 
     if (load_phases.length) {
         load_times_head.appendChild(document.createElement('th'));
@@ -1631,6 +1364,39 @@ function render() {
             th.dataset.solution = elem.solution;
             load_times_head.appendChild(th);
         });
+    }
+
+    /// Total load time per solution. A missing phase counts as zero, so the total is
+    /// always a number, even for a solution that reported no load times at all.
+    const loadTotal = elem => load_phases.reduce(
+        (sum, phase) => sum + (elem.load_time?.[phase]?.[selectors.threads] ?? 0), 0) * ns_to_s;
+
+    /// Without any baseline load time there is nothing to compare against, so the
+    /// totals are shown without a ratio rather than against a zero-second baseline.
+    const hasLoadTimes = elem => load_phases.some(phase => elem.load_time?.[phase]?.[selectors.threads] != null);
+
+    if (load_phases.length) {
+        let tr = document.createElement('tr');
+        tr.className = 'shadow load-times-total';
+
+        let td_title = document.createElement('td');
+        td_title.appendChild(document.createTextNode('Total: '));
+        tr.appendChild(td_title);
+
+        const baseline_total = hasLoadTimes(baseline_entry) ? loadTotal(baseline_entry) : null;
+
+        sorted_indices.map(idx => {
+            const curr_total = loadTotal(filtered_data[idx]);
+            const ratio = baseline_total !== null ? (constant_time_add + curr_total) / (constant_time_add + baseline_total) : null;
+
+            let td = document.createElement('td');
+            appendTimingWithRatio(td, curr_total, ratio);
+
+            colorize(td, ratio);
+            tr.appendChild(td);
+        });
+
+        load_times_body.appendChild(tr);
     }
 
     load_phases.forEach(phase => {
@@ -1645,12 +1411,12 @@ function render() {
         const baseline_timing = baseline_ns != null ? baseline_ns * ns_to_s : null;
 
         sorted_indices.map(idx => {
-            const curr_ns = filtered_data[idx].load_time?.[phase]?.[selectors.threads];
-            const curr_timing = curr_ns != null ? curr_ns * ns_to_s : null;
-            const ratio = curr_timing !== null && baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
+            /// A phase a solution does not report costs it nothing, so it shows as 0.000s.
+            const curr_timing = (filtered_data[idx].load_time?.[phase]?.[selectors.threads] ?? 0) * ns_to_s;
+            const ratio = baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
 
             let td = document.createElement('td');
-            td.appendChild(document.createTextNode(curr_timing !== null ? `${curr_timing.toFixed(3)}s${ratio !== null ? ` (×${ratio.toFixed(2)})` : ''}` : '☠'));
+            appendTimingWithRatio(td, curr_timing, ratio);
 
             colorize(td, ratio);
             tr.appendChild(td);
@@ -1700,7 +1466,7 @@ function render() {
             const ratio = curr_timing !== null && baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
 
             let td = document.createElement('td');
-            td.appendChild(document.createTextNode(curr_timing !== null ? `${curr_timing.toFixed(3)}s${ratio !== null ? ` (×${ratio.toFixed(2)})` : ''}` : '☠'));
+            appendTimingWithRatio(td, curr_timing, ratio);
 
             colorize(td, ratio);
 
@@ -1709,10 +1475,42 @@ function render() {
             const engine_query = filtered_data[idx].queries_tooltip?.[query_num];
             if (engine_query) {
                 let tooltip = document.createElement('span');
-                tooltip.className = 'tooltip tooltip-engine-query'
-                    + (col * 2 < sorted_indices.length ? ' tooltip-engine-query-left' : '');
+                tooltip.className = 'tooltip tooltip-engine-query';
                 tooltip.appendChild(document.createTextNode(engine_query));
                 td.appendChild(tooltip);
+
+                /// Puts the tooltip on whichever side of the cell has room for it. The
+                /// scrolling table clips anything outside its box, so the room available
+                /// is bounded by that box as well as by the viewport, and the tooltip is
+                /// capped to what it gets - otherwise a wide query on a right-hand column
+                /// flips leftwards and has its left half cut off.
+                const positionEngineTooltip = () => {
+                    tooltip.classList.remove('tooltip-engine-query-flipped');
+                    tooltip.style.maxWidth = '';
+
+                    /// On narrow screens the tooltip is a fixed, full-width panel instead.
+                    if (getComputedStyle(tooltip).position === 'fixed') { return; }
+
+                    const viewportPadding = 16;
+                    const tooltipGap = 8; /* the 0.5rem offset from the cell */
+                    const scroller = td.closest('.table-scroll');
+                    const bounds = scroller ? scroller.getBoundingClientRect() : null;
+                    const limit_left = Math.max(viewportPadding, bounds ? bounds.left : 0);
+                    const limit_right = Math.min(window.innerWidth - viewportPadding, bounds ? bounds.right : window.innerWidth);
+
+                    const cell = td.getBoundingClientRect();
+                    const room_right = limit_right - cell.right - tooltipGap;
+                    const room_left = cell.left - tooltipGap - limit_left;
+
+                    if (tooltip.offsetWidth <= room_right) { return; }
+
+                    const flip = room_left > room_right;
+                    if (flip) { tooltip.classList.add('tooltip-engine-query-flipped'); }
+                    tooltip.style.maxWidth = `${Math.floor(Math.max(flip ? room_left : room_right, 0))}px`;
+                };
+
+                td.addEventListener('mouseenter', positionEngineTooltip);
+                td.addEventListener('focusin', positionEngineTooltip);
             }
 
             tr.appendChild(td);
@@ -1724,7 +1522,8 @@ function render() {
     findPassiveSelectors(filtered_data);
 
     /// The small hint below the column heading
-    document.getElementById("scale_hint").textContent = 'Different colors on the bar chart represent the same values shown at different scales (1x, 10x, 100x zoom)';
+    document.getElementById("scale_hint").textContent = 'Each colour band shows the same ratio range at a different scale: 1x and 10x.';
+    requestAnimationFrame(applyAccessibilityEnhancements);
 }
 
 function isSubsequence(str, subseq) {
@@ -1817,17 +1616,17 @@ function applyStateDefaults() {
     if (!selectors.opensource) {
         selectors.opensource = {"yes": true, "no": true};
     }
+    if (!selectors.sortcols) {
+        selectors.sortcols = {"time": true, "symtime": true};
+    }
     if (!selectors.hardware) {
         selectors.hardware = {"cpu": true, "gpu": false};
     }
-    if (!selectors.tuned) {
-        selectors.tuned = {"no": true, "yes": false};
-    }
     if (!selectors.metric) {
-        selectors.metric = 'hot';
+        selectors.metric = default_metric;
     }
     if (!selectors.baseline) {
-        selectors.baseline = 'kdb';
+        selectors.baseline = default_baseline;
     }
     if (!selectors.instrument) {
         selectors.instrument = Object.fromEntries(
@@ -1843,12 +1642,16 @@ function applyStateDefaults() {
         selectors.tag_include = allFalseTagMap();
     }
     if (!selectors.tag_exclude) {
-        selectors.tag_exclude = allFalseTagMap();
+        selectors.tag_exclude = tagMap(tag => default_excluded_tags.includes(tag));
     }
 }
 
 function allFalseTagMap() {
-    return Object.fromEntries([...new Set(query_tags.flat())].map(tag => [tag, false]));
+    return tagMap(() => false);
+}
+
+function tagMap(value) {
+    return Object.fromEntries([...new Set(query_tags.flat())].map(tag => [tag, value(tag)]));
 }
 
 function updateHistory() {
@@ -1862,7 +1665,160 @@ window.onpopstate = function(event) {
     applyStateDefaults();
     updateSelectors();
     render();
+    requestAnimationFrame(applyAccessibilityEnhancements);
 };
+
+
+function prepareExternalLinks(root = document) {
+    root.querySelectorAll('a[href]').forEach(link => {
+        const href = link.getAttribute('href');
+
+        if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+            return;
+        }
+
+        let targetUrl;
+        try {
+            targetUrl = new URL(link.href, window.location.href);
+        } catch {
+            return;
+        }
+
+        const isHttpLink = targetUrl.protocol === 'http:' || targetUrl.protocol === 'https:';
+        const isDifferentHostname = targetUrl.hostname !== window.location.hostname;
+
+        if (isHttpLink && isDifferentHostname) {
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+        }
+    });
+}
+
+function applyAccessibilityEnhancements() {
+    document.querySelectorAll('.selector').forEach(selector => {
+        selector.setAttribute('role', 'button');
+        selector.setAttribute('tabindex', selector.classList.contains('selector-disabled') ? '-1' : '0');
+        selector.setAttribute('aria-pressed', selector.classList.contains('selector-active') ? 'true' : 'false');
+        if (selector.classList.contains('selector-passive') || selector.classList.contains('selector-disabled')) {
+            selector.setAttribute('aria-disabled', 'true');
+        } else {
+            selector.removeAttribute('aria-disabled');
+        }
+        if (!selector.dataset.keyboardBound) {
+            selector.addEventListener('keydown', event => {
+                if ((event.key === 'Enter' || event.key === ' ') && selector.getAttribute('aria-disabled') !== 'true') {
+                    event.preventDefault();
+                    selector.click();
+                }
+            });
+            selector.dataset.keyboardBound = 'true';
+        }
+    });
+
+    const themeButton = document.getElementById('toggle-theme');
+    themeButton.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+    themeButton.setAttribute('aria-label', theme === 'dark' ? 'Use light theme' : 'Use dark theme');
+
+    const allCheckbox = document.querySelector('#details_head input[type="checkbox"]');
+    const queryCheckboxes = [...document.querySelectorAll('.query-checkbox')];
+    if (allCheckbox) {
+        allCheckbox.setAttribute('aria-label', 'Select all displayed queries');
+        const selected = queryCheckboxes.filter(input => input.checked).length;
+        allCheckbox.indeterminate = selected > 0 && selected < queryCheckboxes.length;
+    }
+    queryCheckboxes.forEach((input, index) => {
+        input.setAttribute('aria-label', `Include query ${index + 1} in the summary`);
+    });
+
+    document.querySelectorAll('.note').forEach((note, index) => {
+        note.setAttribute('tabindex', '0');
+        const tooltip = note.querySelector('.tooltip');
+        if (tooltip) {
+            if (!tooltip.id) tooltip.id = `tooltip-${index + 1}`;
+            note.setAttribute('aria-describedby', tooltip.id);
+            tooltip.setAttribute('role', 'tooltip');
+        }
+    });
+
+    document.querySelectorAll('#details td').forEach((cell, index) => {
+        const tooltip = cell.querySelector('.tooltip-engine-query');
+        if (tooltip) {
+            cell.setAttribute('tabindex', '0');
+            if (!tooltip.id) tooltip.id = `engine-query-tooltip-${index + 1}`;
+            cell.setAttribute('aria-describedby', tooltip.id);
+            tooltip.setAttribute('role', 'tooltip');
+        }
+    });
+
+    document.querySelectorAll('.winners-legend-entry').forEach(entry => entry.setAttribute('role', 'listitem'));
+    document.getElementById('winners-legend')?.setAttribute('role', 'list');
+
+    const details = document.getElementById('details');
+    if (details && !details.querySelector('caption')) {
+        const caption = document.createElement('caption');
+        caption.textContent = 'Execution time and ratio to the selected baseline for each query and solution';
+        details.prepend(caption);
+    }
+    const load = document.getElementById('load_times');
+    if (load && !load.querySelector('caption')) {
+        const caption = document.createElement('caption');
+        caption.textContent = 'Load phase duration and ratio to the selected baseline';
+        load.prepend(caption);
+    }
+    document.querySelectorAll('#details_head th, #load_times_head th').forEach(th => th.setAttribute('scope', 'col'));
+
+    const visibleSolutions = document.querySelectorAll('#summary .summary-row').length;
+    const visibleQueries = document.querySelectorAll('#details_body tr').length;
+    const status = document.getElementById('results-status');
+    if (status) {
+        status.textContent = visibleSolutions
+            ? `${visibleSolutions} solutions and ${visibleQueries} queries displayed. Baseline: ${document.getElementById('baseline-name').textContent}.`
+            : 'No results match the selected filters.';
+    }
+
+    prepareExternalLinks();
+}
+
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+        document.querySelectorAll('.tooltip').forEach(tooltip => tooltip.classList.add('force-hidden'));
+        document.activeElement?.blur();
+    }
+});
+
+document.addEventListener('focusin', () => {
+    document.querySelectorAll('.tooltip.force-hidden').forEach(tooltip => tooltip.classList.remove('force-hidden'));
+});
+
+document.getElementById('reset-filters').addEventListener('click', () => {
+    window.location.href = window.location.pathname + '?size=' + selected_size;
+});
+
+document.getElementById('copy-comparison-link').addEventListener('click', async event => {
+    const button = event.currentTarget;
+    try {
+        await navigator.clipboard.writeText(window.location.href);
+        button.textContent = 'Link copied';
+    } catch {
+        window.prompt('Copy this comparison link:', window.location.href);
+    }
+    setTimeout(() => { button.textContent = 'Copy comparison link'; }, 2000);
+});
+
+const cookieSettingsButton = document.getElementById('footer-cookie-settings');
+cookieSettingsButton?.addEventListener('click', () => {
+    if (window.OneTrust && typeof window.OneTrust.ToggleInfoDisplay === 'function') {
+        window.OneTrust.ToggleInfoDisplay();
+        return;
+    }
+
+    if (window.Optanon && typeof window.Optanon.ToggleInfoDisplay === 'function') {
+        window.Optanon.ToggleInfoDisplay();
+        return;
+    }
+
+    console.warn('OneTrust Preference Center is unavailable. Confirm that the OneTrust CMP script is loaded and published for this domain.');
+});
 
 async function init() {
     /// The tag selectors must exist before the URL hash is decoded,
@@ -1878,9 +1834,16 @@ async function init() {
 
     updateSelectors();
     render();
+    prepareExternalLinks();
 }
 
-init();
+init().catch(error => {
+    console.error('Benchmark initialisation failed:', error);
+    const status = document.getElementById('results-status');
+    if (status) {
+        status.textContent = 'The benchmark data could not be displayed. Check the browser console and confirm the site is being served over HTTP.';
+    }
+});
 
 </script>
 </body>

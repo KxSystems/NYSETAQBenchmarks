@@ -174,7 +174,7 @@ QUOTERENAME: Dict = {
     'Sequence_Number': 'seq',
     'National_BBO_Ind': 'nationalBBOIndicator',
     'FINRA_BBO_Indicator': 'finraBBOIndicator',
-    'FINRA_ADF_MPID_Indicator': 'finraADFMPIDIndicator',
+    'FINRA_ADF_MPID_Indicator': 'finraADFMpidIndicator',
     'Quote_Cancel_Correction': 'corr',
     'Source_Of_Quote': 'source',
     'Retail_Interest_Indicator': 'retailInterestIndicator',

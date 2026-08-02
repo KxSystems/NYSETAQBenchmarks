@@ -14,10 +14,10 @@ script_dir=$(dirname "${BASH_SOURCE[0]}")
 pushd "${script_dir}/.."
 
 TESTDB=${script_dir}/testdb
-TESTDBDATE=20250701
+TESTDBDATE=20260401
 
 # Test PSV files are available in the TAQ submodule directory.
-TESTPSV=./external/kx/taq/testdata
+TESTPSV=./external/kx/taq/test/data
 RESULTDIR=${script_dir}/results/inmemory
 
 # Remove the generated database and results on exit, even if a benchmark fails.
@@ -53,7 +53,10 @@ if [[ "${RAYFORCE_SMOKE:-0}" == "1" ]]; then
     SIZE=full DATAFORMAT=rayforce RAYFORCE_BIN="${RAYFORCE_BIN}" \
         ./generateDB.sh "${TESTPSV}" "${TESTDB}/rayforce" "${TESTDBDATE}"
     export RAYFORCE_BIN
-    QUERY_ENGINE_ARGS=(--engines "kdb,kdbxsql,duckdb,polars,pykx,pandas,rayforce")
+    QUERY_ENGINE_ARGS=(
+        --engines "kdb,kdbxsql,duckdb,polars,pykx,pandas,rayforce"
+        --solutions "KDB-X,DuckDB (Index),Polars,Pandas,Rayforce,Rayforce Parted"
+    )
 fi
 
 # Run the benchmarks.
@@ -61,5 +64,7 @@ rm -rf "${RESULTDIR}"
 
 ./benchmarks/inmemory/queryEngines.sh --db-dir "${TESTDB}" --param-dir "${PARAM_DIR}" --datadate "${TESTDBDATE}" --threads "4 16" --result-dir "${RESULTDIR}" "${QUERY_ENGINE_ARGS[@]}"
 ./benchmarks/inmemory/kdbAttributes.sh --db-dir "${TESTDB}" --param-dir "${PARAM_DIR}" --datadate "${TESTDBDATE}" --threads "4 16" --result-dir "${RESULTDIR}"
+
+python3 ./pysrc/convertToJSFormat.py "${RESULTDIR}" "${RESULTDIR}/data.generated.js"
 
 popd

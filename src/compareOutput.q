@@ -40,7 +40,7 @@ if[not all `querymeta`queryoutput1`queryoutput2 in ko;
 
 system "l src/util.q"
 
-querymeta: ("J*****"; enlist "|")0: hsym `$o`querymeta / idx plus metadata used for canonical result ordering
+querymeta: ("J******"; enlist "|")0: hsym `$o`querymeta / idx plus metadata used for canonical result ordering
 if[`idx in ko;
     querymeta: select from querymeta where idx in parseIdxFilter o`idx];
 if[not count querymeta;
@@ -52,7 +52,7 @@ queryoutput2: hsym `$o`queryoutput2
 FLOATDIFFTHREASHOLD: 0.00005
 
 
-tradeTypes: `time`ex`sym`cond`size`price`stop`corr`seq`tradeId`source`tradeReportingFacility`participantTimestamp`tradeReportingFacilityTRFTimestamp`tradeThroughExemptIndicator!"ncssieshijcsnnb"
+tradeTypes: `time`ex`sym`cond`size`price`stop`corr`seq`tradeId`source`tradeReportingFacility`participantTimestamp`tradeReportingFacilityTRFTimestamp`tradeThroughExemptIndicator!"ncsseeshijcsnnb"
 quoteTypes: `time`ex`sym`bid`bsize`ask`asize`cond`seq`nationalBBOIndicator`finraBBOIndicator`finraADFMPIDIndicator`corr`source`retailInterestIndicator`shortSaleRestrictionIndicator`LULDBBOIndicator`SIPGeneratedMessageIdentifier`nationalBBOLULDIndicator`participantTimestamp`FINRAADFTimestamp`FINRAADFMarketParticipantQuoteIndicator`securityStatusIndicator!"ncseieiciccccccccccnncc"
 / The source kdb+ schema and Parquet schema differ only in acronym casing.
 quoteTypes[`finraADFMpidIndicator]: first "c";
@@ -61,7 +61,7 @@ types: tradeTypes, quoteTypes, ([mid: "f"; avgLiqWMid: "f"]),
  ([weightedBidPrice: "f"; weightedOfferPrice: "f"]),
  ([movingLiqWMid: "f"; movingsize: "f"; movingvwap: "f"; tag: "s"; seqDecr: "i"]),
  ([timeBucket: "s"; cnt: "j"]),
- ([o: "e"; h: "e"; l: "e"; c: "e"; s: "i"]),
+ ([o: "e"; h: "e"; l: "e"; c: "e"; s: "e"]),
  ([minute: "u"; inbal: "f"]),
  ([wsumAsk: "f"; wsumBid: "f"; sdevasksize: "f"; sdevbid: "f"; corPrice: "f"; corSize: "f"]),
  ([pricegroup: "i"; FirstTime: "n"; LastTime: "n"; medMidSize: "f"; medSize: "f"; quotecond: "c"; quoteex: "c"])
@@ -120,7 +120,7 @@ canonicalSort: {[t; sortby; tags]
 
 ERRORS: 0;
 
-compare: {[idx: `j; tags: `C; instrument; description; sortby; comment]
+compare: {[idx: `j; tags: `C; instrument; complexity; description; sortby; comment]
     filename: `$"queryoutput_" , string[idx], ".csv";
     if[not filename in key queryoutput1;
         ERRORS::ERRORS+1;
@@ -153,7 +153,7 @@ compare: {[idx: `j; tags: `C; instrument; description; sortby; comment]
         if[count missing: cols[t2] except cols t1;
             .log.error "Columns in ", (1_string srct2), " not in ", (1_string srct1), ": ", "," sv string missing];
         :()];
-    .log.info "Number of columns: \tOK";
+    .log.info "Number of columns: \t\tOK";
 
 
     if[ not (asc cols t1) ~ asc cols t2;

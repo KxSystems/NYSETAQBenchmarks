@@ -1,0 +1,176 @@
+solution: Pandas
+proprietary: 'no'
+engineversion: 3.0.3
+master:
+  name: master
+  size (MB): 2.5673828125
+  rowCount: 12453
+  columnCount: 39
+  columns:
+  - name: sym
+    type: category
+  - name: description
+    type: str
+  - name: cusip
+    type: category
+  - name: securityType
+    type: category
+  - name: SIPSymbol
+    type: category
+  - name: oldSym
+    type: category
+  - name: testSymFlag
+    type: bool
+  - name: ex
+    type: category
+  - name: tap
+    type: category
+  - name: unit
+    type: uint16
+  - name: roundLot
+    type: uint16
+  - name: NYSEIndustryCode
+    type: category
+  - name: sharesOutstanding
+    type: float64
+  - name: haltDelayReason
+    type: category
+  - name: specialistClearingAgent
+    type: category
+  - name: specialistClearingNumber
+    type: category
+  - name: specialistPostNumber
+    type: float64
+  - name: specialistPanel
+    type: category
+  - name: tradedOnNYSEMKT
+    type: bool
+  - name: tradedOnNASDAQBX
+    type: bool
+  - name: tradedOnNSX
+    type: bool
+  - name: tradedOnFINRA
+    type: bool
+  - name: tradedOnISE
+    type: bool
+  - name: tradedOnEdgeA
+    type: bool
+  - name: tradedOnEdgeX
+    type: bool
+  - name: tradedOnNYSETexas
+    type: bool
+  - name: tradedOnNYSE
+    type: bool
+  - name: tradedOnArca
+    type: bool
+  - name: tradedOnNasdaq
+    type: bool
+  - name: tradedOnCBOE
+    type: bool
+  - name: tradedOnPSX
+    type: bool
+  - name: tradedOnBATSY
+    type: bool
+  - name: tradedOnBATS
+    type: bool
+  - name: tradedOnIEX
+    type: bool
+  - name: tickPilotIndicator
+    type: category
+  - name: effectiveDate
+    type: datetime64[ms]
+  - name: tradedOnLTSE
+    type: bool
+  - name: tradedOnMEMX
+    type: bool
+  - name: tradedOnMIAX
+    type: bool
+trade:
+  name: trade
+  size (MB): 8305.2939453125
+  rowCount: 140460972
+  columnCount: 15
+  columns:
+  - name: time
+    type: timedelta64[ns]
+  - name: ex
+    type: category
+  - name: sym
+    type: category
+  - name: cond
+    type: category
+  - name: size
+    type: float32
+  - name: price
+    type: float32
+  - name: stop
+    type: category
+  - name: corr
+    type: uint16
+  - name: seq
+    type: int32
+  - name: tradeId
+    type: uint64
+  - name: source
+    type: category
+  - name: tradeReportingFacility
+    type: category
+  - name: participantTimestamp
+    type: timedelta64[ns]
+  - name: tradeReportingFacilityTRFTimestamp
+    type: timedelta64[ns]
+  - name: tradeThroughExemptIndicator
+    type: bool
+quote:
+  name: quote
+  size (MB): 185510.685546875
+  rowCount: 2860612301
+  columnCount: 23
+  columns:
+  - name: time
+    type: timedelta64[ns]
+  - name: ex
+    type: category
+  - name: sym
+    type: category
+  - name: bid
+    type: float32
+  - name: bsize
+    type: int32
+  - name: ask
+    type: float32
+  - name: asize
+    type: int32
+  - name: cond
+    type: category
+  - name: seq
+    type: int32
+  - name: nationalBBOIndicator
+    type: category
+  - name: finraBBOIndicator
+    type: category
+  - name: finraADFMpidIndicator
+    type: category
+  - name: corr
+    type: category
+  - name: source
+    type: category
+  - name: retailInterestIndicator
+    type: category
+  - name: shortSaleRestrictionIndicator
+    type: category
+  - name: LULDBBOIndicator
+    type: category
+  - name: SIPGeneratedMessageIdentifier
+    type: category
+  - name: nationalBBOLULDIndicator
+    type: category
+  - name: participantTimestamp
+    type: timedelta64[ns]
+  - name: FINRAADFTimestamp
+    type: timedelta64[ns]
+  - name: FINRAADFMarketParticipantQuoteIndicator
+    type: category
+  - name: securityStatusIndicator
+    type: category
+sortcols: time

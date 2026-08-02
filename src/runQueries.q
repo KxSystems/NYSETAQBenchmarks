@@ -72,6 +72,10 @@ system "l src/memusage.q" / This is also available as a DI module
 system "l src/util.q"
 
 DB: o `db
+DATE: "D"$o `date
+if[not count key hsym `$DB, "/", string DATE;
+  -2 "Data directory ", DB, "/", string[DATE], " does not exist";
+  exit 3]
 PARAMDIR: hsym `$o`paramdir
 
 
@@ -108,7 +112,7 @@ if[`result in key o;
   .log.info "saving results to ", o `result;
   if[not ()~key `$resFile: ":", o `result; hdel `$resFile];
   resultH: hopen resFile;
-  resultH "storagebackend|compparam|threadcount|runner|engine|format|sortcols|indexon|engineversion|idx|query|status|run1timeNS|run2timeNS|run3timeNS|run3memKB|run1ioKB|run2ioKB|run3ioKB|ressizeKB\n"]
+  resultH "storagebackend|compparam|threadcount|runner|engine|format|indexon|idx|query|status|run1timeNS|run2timeNS|run3timeNS|run3memKB|run1ioKB|run2ioKB|run3ioKB|ressizeKB\n"]
 
 
 TagsFilter: ("," vs o`tags) except enlist ""
@@ -146,7 +150,7 @@ getKBRead: $["false" ~ lower getenv `IOSTAT; {[x] IOStatError}; .z.o ~ `m64; get
 getIdx: {[idx] $[10h ~ type idx; idx; string idx]}
 
 SEP: "|"
-writeRes: {[h; (storagebackend:`C; compparm:`C; engine:`s; format:`s; sortcols:`S; attrib:`C); idx:getIdx; query:`C; (status:`C; ts:`N; memusage:`j; io:`J; ressize:`j)]
+writeRes: {[h; (storagebackend:`C; compparm:`C; engine:`s; format:`s; attrib:`C); idx:getIdx; query:`C; (status:`C; ts:`N; memusage:`j; io:`J; ressize:`j)]
   if[null h; :()];
   if[not 3 = count ts;
     .log.error "Three elapsed times are expected";
@@ -155,8 +159,7 @@ writeRes: {[h; (storagebackend:`C; compparm:`C; engine:`s; format:`s; sortcols:`
     .log.error "Four IO numbers are expected";
     io: 4#io];
   runner: "KDB-X";
-  engineversion: string[.z.K], ",", string .z.k;
-  h ,[;"\n"] SEP sv (storagebackend; compparm; string 1|system "s"; "KDB-X"; string engine; string lower format; "," sv string sortcols; attrib; engineversion; idx; query; status), string (`long$ts), (memusage div 1000), (1 _ deltas io), ressize div 1024;
+  h ,[;"\n"] SEP sv (storagebackend; compparm; string 1|system "s"; "KDB-X"; string engine; string lower format; attrib; idx; query; status), string (`long$ts), (memusage div 1000), (1 _ deltas io), ressize div 1024;
   }
 
 loadParquetDB: {[db: `C; rowgroup: `b; device: `C; writerFN]
@@ -186,20 +189,26 @@ captureTableStats: {[tableStatsDir:`s]
 
   h: hopen tableStatsFile;
   h "proprietary: 'yes'\n";
+  h "engineversion: '", string[.z.k], "'\n";
   h {[h; tName]
+    rowCount: $[99h ~ type value tName; sum count each value tName; count value tName];
+    columns: cols $[99h ~ type value tName; first;] value tName;
+
     h (string tName), ":\n";
     h "  name: ", (string tName), "\n";
-    h "  size (MB): ", (string floor .mem.objsize[value tName] % 1024*1024), "\n";
-    h "  rowCount: ", (string count value tName), "\n";
-    h "  columnCount: ", (string count cols tName), "\n";
+    h "  size (MB): ", (string (.mem.objsize[value tName] div 1024) % 1024), "\n";
+    h "  rowCount: ", (string rowCount), "\n";
+    h "  columnCount: ", (string $[99h ~ type value tName;1+;]count columns), "\n";
     h "  columns: \n";
     {[h;tName;c]
       / enums stored as 'symbol'
-      t: $[0h ~ type tName c; `string; "s" ~ .Q.ty tName c; `symbol; key tName c];
+      t: $[99h ~ type value tName;first;] value tName;
+      ty: $[0h ~ type t c; `string; "s" ~ .Q.ty t c; `symbol; key t c];
       h "  - name: ", (string c), "\n";
-      h "    type: ", (string t), "\n";
-      h "    attr: ", (string meta[tName][c;`a]), "\n";
-      }[h; tName] each cols tName}' `master`trade`quote;
+      h "    type: ", (string ty), "\n";
+      h "    attr: ", (string meta[t][c;`a]), "\n";
+      }[h; tName] each columns}' `master`trade`quote;
+  h "sortcols: '", ("," sv string SORTCOLS), "'\n";
   hclose h
   }
 
@@ -258,6 +267,8 @@ loadKDBPartitionIntoMemory: {[db: `s; device: `C; writerFN; d: `d; sortCols:`S; 
   ts: .z.p-s;
   io,: getKBRead[device]`kB_read;
   writerFN[0; "load a partition into memory"; ("success"; ts, 2#0Nn; memusage; io, 2#0Nj; 0Nj)];
+  / no transformation, but we want to record the time and memory usage of the transformation step
+  writerFN[-1; "transform"; ("success"; 0D, 2#0Nn; 0j; 0j, 2#0Nj; 0Nj)];
 
   if[count sortCols;
     io: (), getKBRead[device]`kB_read;
@@ -413,24 +424,24 @@ Device: first system "./src/resolve_device.sh ", DB
 
 $[STORAGE_BACKEND ~ "memory"; [
   compparm: "0_0_0"; / data is not compressed in memory
-  WriterFN:: writeRes[resultH; (STORAGE_BACKEND; compparm; ENGINE; FORMAT; SORTCOLS; INDEXON)];
+  WriterFN:: writeRes[resultH; (STORAGE_BACKEND; compparm; ENGINE; FORMAT; INDEXON)];
   $[FORMAT = `TABLEDICT; [
     / For now we only support a single table dicitonary format and attr is ignored
-    loadKDBPartitionIntoMemoryTableDict[hsym `$DB; Device; WriterFN; "D"$o `date];
+    loadKDBPartitionIntoMemoryTableDict[hsym `$DB; Device; WriterFN; DATE];
     normalize: {cnt: count each x; ([] sym: where cnt) ,' raze x}]; / convert table dictionary to normal table
    [
     attrib: getAttrib[INDEXON; SORTCOLS];
-    loadKDBPartitionIntoMemory[hsym `$DB; Device; WriterFN; "D"$o `date; SORTCOLS; attrib]]
+    loadKDBPartitionIntoMemory[hsym `$DB; Device; WriterFN; DATE; SORTCOLS; attrib]]
    ]];
   [
     $[FORMAT like "PARQUET*"; [
       compparm: "nyi_nyi_nyi";
-      WriterFN:: writeRes[resultH; (STORAGE_BACKEND; compparm; ENGINE; FORMAT; SORTCOLS; INDEXON)];
+      WriterFN:: writeRes[resultH; (STORAGE_BACKEND; compparm; ENGINE; FORMAT; INDEXON)];
       loadParquetDB[DB; FORMAT ~ `PARQUET_ROWGROUP; Device; WriterFN]
     ]; FORMAT = `KDB; [
       compparmall: -21!hsym `$DB,"/",string[first key hsym `$DB],"/quote/sym";   // or assume that db dir name reflects compression
       compparm: $[count compparmall; "_" sv string @[;`logicalBlockSize`algorithm`zipLevel] compparmall; "0_0_0"];
-      WriterFN:: writeRes[resultH; (STORAGE_BACKEND; compparm; ENGINE; FORMAT; SORTCOLS; INDEXON)];
+      WriterFN:: writeRes[resultH; (STORAGE_BACKEND; compparm; ENGINE; FORMAT; INDEXON)];
       loadKDBDB[DB; Device; WriterFN]
     ]; [.log.error "Unknown format ", FORMAT; exit 1]]]];
 

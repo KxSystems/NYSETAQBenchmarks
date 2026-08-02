@@ -2,3 +2,6 @@ results
 /pysrc/**/__pycache__/
 external
 DATA
+test/testdb
+.vscode/
+.DS_Store
