@@ -309,6 +309,55 @@ Each benchmark query is run three times (one cold run followed by two warm runs)
 empty when a value does not apply (e.g. timing/IO columns for an `error` row, or warm-run
 columns for setup rows).
 
+#### Result Dashboard and benchmark.kx.com
+
+The raw PSV files are complete but hard to work with: with several engines,
+thread counts, machines and dozens of queries per run, slicing the numbers and
+comparing solutions in a text file (or a spreadsheet) quickly becomes tedious.
+
+To make the results consumable, the repository ships an interactive dashboard,
+[index.html](./index.html), that you can point at **your own** results. It lets
+you slice and dice the measurements — filter by solution, thread count, machine,
+data size, data date, cold/hot run, query complexity, instrument scope and query
+tags — and shows aggregates such as the geometric mean of per-query time ratios
+relative to a baseline solution of your choice, so you can read off how many
+times faster one solution is than another.
+
+KX also publishes its own curated results with this dashboard at
+[benchmark.kx.com](https://benchmark.kx.com).
+
+To use the dashboard locally, first convert your PSV results into the JavaScript
+format the page loads (`data.generated.js`) using
+[pysrc/convertToJSFormat.py](./pysrc/convertToJSFormat.py):
+
+```bash
+uv run pysrc/convertToJSFormat.py ./results/inmemory/${SIZE} ./results/inmemory/${SIZE}/data.generated.js
+```
+
+Your machine's CPU model must be listed in the `machines` mapping of
+[results/mappings.yaml](./results/mappings.yaml) (override the path with
+`--mappings`); the script stops with an explanatory message if it is not, since
+the dashboard groups results by machine.
+
+The script scans the input directory recursively for benchmark runs — any
+directory holding both `results.psv` and `environment.yaml`, plus the
+per-solution `<solution>/stats.yaml` files — merges the thread counts of the same
+(data date, machine, solution) triple, and keeps the latest measurement when
+runs overlap. It also refreshes
+`artifacts/queries/inmemory/querymeta.generated.js`, the fallback copy of the
+query metadata used when the page is opened via `file://` (browsers block
+`fetch()` for local files).
+
+You may then need to adjust the small configuration block at the top of
+[index.html](./index.html):
+
+* `available_sizes` lists the data sizes with published results, and
+  `default_size` the one shown initially. KX only publishes `full`, `xlarge` and
+  `large` results, so set these to the sizes you actually generated (e.g.
+  `['tiny']`).
+* The `data.generated.js` location is derived from the selected size as
+  `results/inmemory/<size>/data.generated.js`. Change that path if you keep your generated file elsewhere.
+
 ### 2. In-Memory KDB-X Attribute Benchmark — `benchmarks/inmemory/kdbAttributes.sh`
 
 Data is read into memory from kdb+ format. Convert the TAQ PSV files to this format using `./generateDB.sh`:
