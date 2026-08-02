@@ -177,6 +177,17 @@ error, so a new benchmark host needs an entry there. `index.html` picks its data
 `available_sizes` / `?size=` and falls back to the generated `querymeta.generated.js` copy when
 opened over `file://`.
 
+The dashboard is two pages over one engine: [assets/js/benchmark.js](assets/js/benchmark.js)
+owns everything (selectors, summary, charts, details, load times, URL state, accessibility) and
+is generic over the *series* being compared. Each page loads its results, defines a `page`
+object in a small inline script at the bottom of `<body>` and calls `startBenchmark()`:
+[index.html](index.html) compares solutions on one machine (series = `solution`, with the
+open-source / sort-columns / hardware inline filters and the memory, data-size and
+query-failure charts), [hardware/index.html](hardware/index.html) compares machines running
+one solution (series = `machine`, `page_solution` picks it). The contract of `page` is
+documented at the top of `benchmark.js`; a new comparison page should be another `page`
+object rather than a copy of the engine.
+
 ## Conventions and gotchas
 
 * **`results` is in `.gitignore`, yet audited results are tracked.** Existing files stay
