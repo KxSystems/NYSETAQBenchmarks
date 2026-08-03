@@ -1468,6 +1468,13 @@ async function initBenchmark() {
         footnote.focus({preventScroll: true});
     });
 
+    document.getElementById('goto-load-footnote')?.addEventListener('click', e => {
+        e.preventDefault();
+        const footnote = document.getElementById('load-footnote');
+        footnote.scrollIntoView({behavior: 'smooth', block: 'center'});
+        footnote.focus({preventScroll: true});
+    });
+
     document.addEventListener('keydown', event => {
         if (event.key === 'Escape') {
             document.querySelectorAll('.tooltip').forEach(tooltip => tooltip.classList.add('force-hidden'));
