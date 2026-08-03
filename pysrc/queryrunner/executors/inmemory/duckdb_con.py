@@ -154,7 +154,7 @@ class QueryExecutorDuckDBCon:
     def prepare_run(self) -> None:
         self.con.execute("DROP TABLE IF EXISTS res")
 
-    def get_parameters(self, parameter: str) -> list[Any]:
+    def get_parameters(self, query_str: str, parameter: str) -> list[Any]:
         return [eval(p.strip(), self.params) for p in parameter.split(",")] if parameter else []
 
     def execute_query(self, idx: int, tags: set, query_str: str, params: list[Any], runidx: int):

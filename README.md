@@ -18,7 +18,7 @@ export DATADATE=$(curl -s https://ftp.nyse.com/Historical%20Data%20Samples/DAILY
 # Step 2: download and prepare the PSV files
 ./external/kx/taq/scripts/getPSVs.sh --csvdir ${NYSEBENCHMARKDIR}/${SIZE}/psv --dates ${DATADATE} --size ${SIZE}
 
-# Step 3: generate the binary databases (kdb+ for kdb/kdbxsql/pykx, Parquet for duckdb/polars/pandas)
+# Step 3: generate the binary databases (kdb+ for kdb/kdbxsql/pykx, Parquet for duckdb/chdb/polars/pandas)
 DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATADATE}
 SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATADATE}
 
@@ -39,7 +39,7 @@ with queries that are representative of common financial industry workloads.
 
 The suite provides benchmarks to:
 
-* Compare in-memory query engines (KDB-X, KDB-X Python, Polars, Pandas, and DuckDB).
+* Compare in-memory query engines (KDB-X, KDB-X Python, Polars, Pandas, DuckDB, and chDB).
 * Evaluate the impact of KDB-X attributes and memory layout.
 
 Running any benchmark involves four steps:
@@ -180,7 +180,7 @@ rm -rf ${NYSEBENCHMARKDIR}/${SIZE}/psv
 
 Two benchmarks are available:
 
-1. **In-memory query engine benchmark** — compares query execution time across the KDB-X, KDB-X SQL, Polars, DuckDB, Pandas, and KDB-X Python (`pykx`) engines.
+1. **In-memory query engine benchmark** — compares query execution time across the KDB-X, KDB-X SQL, Polars, DuckDB, chDB, Pandas, and KDB-X Python (`pykx`) engines.
 1. **In-memory KDB-X attribute and table format comparison** — evaluates the impact of attributes and table dictionary formats.
 
 ### 1. In-Memory Query Engine Benchmark — `benchmarks/inmemory/queryEngines.sh`
@@ -193,15 +193,16 @@ Query engines read data into memory from Hive-partitioned Parquet or kdb+ format
 | `kdbxsql` | KDB-X SQL | kdb+ |
 | `pykx` | KDB-X Python (`pykx`) | kdb+ |
 | `duckdb` | DuckDB | Parquet |
+| `chdb` | chDB (embedded ClickHouse) | Parquet |
 | `polars` | Polars | Parquet |
 | `pandas` | Pandas | Parquet |
 
-So you only need the kdb+ database if you restrict the run to `kdb`/`kdbxsql`/`pykx` (e.g. `--engines kdb,kdbxsql`), and only the Parquet database if you restrict it to `duckdb`/`polars`/`pandas`. Convert the TAQ PSV files to the format(s) you need using `./generateDB.sh`:
+So you only need the kdb+ database if you restrict the run to `kdb`/`kdbxsql`/`pykx` (e.g. `--engines kdb,kdbxsql`), and only the Parquet database if you restrict it to `duckdb`/`chdb`/`polars`/`pandas`. Convert the TAQ PSV files to the format(s) you need using `./generateDB.sh`:
 
 ```bash
 # kdb+ format — needed for the kdb, kdbxsql, and pykx engines
 DATAFORMAT=kdb ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/kdb ${DATADATE}
-# Hive-partitioned Parquet — needed for the duckdb, polars, and pandas engines
+# Hive-partitioned Parquet — needed for the duckdb, chdb, polars, and pandas engines
 SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh ${NYSEBENCHMARKDIR}/${SIZE}/psv ${NYSEBENCHMARKDIR}/${SIZE}/parquet/rowgroup ${DATADATE}
 ```
 
@@ -225,7 +226,7 @@ And the following optional parameters:
 | Parameter | Description |
 | --- | --- |
 | `-t`, `--threads` | Space-separated list of secondary-thread counts to test, e.g. `"0 4 16 64"`. Each engine runs once per value. Default: `"1 4"`. |
-| `-e`, `--engines` | Comma-separated subset of engines to run. Valid values: `kdb`, `kdbxsql`, `duckdb`, `polars`, `pykx`, `pandas`. Default: all of them. |
+| `-e`, `--engines` | Comma-separated subset of engines to run. Valid values: `kdb`, `kdbxsql`, `duckdb`, `polars`, `chdb`, `pykx`, `pandas`. Default: all of them. |
 | `-s`, `--solutions` | Comma-separated subset of solutions to run, or `"ALL"` to run all available solutions. Solutions are named variants of engines with different attributes/indexes. Default: `"KDB-X,DuckDB (Index),Polars,Pandas"`. Examples: `-s "KDB-X,KDB-X (Parted),Polars"` or `-s "ALL"`. |
 | `-i`, `--idx` | Filter queries by index: single (`42`), comma-separated list (`32,42,50`), or range (`40-44`). Default: run all queries. |
 | `-r`, `--result-dir` | Directory to persist merged results. Default: `./results/inmemory`. |

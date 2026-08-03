@@ -4,7 +4,7 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-ENGINES="kdb,kdbxsql,duckdb,polars,pykx,pandas"
+ENGINES="kdb,kdbxsql,duckdb,chdb,polars,pykx,pandas"
 SOLUTIONS="KDB-X,DuckDB (Index),Polars,Pandas"
 RESULT_DIR="./results/inmemory"
 
@@ -100,6 +100,9 @@ function execute_queries () {
             if solution_enabled "DuckDB (Index)"; then
                 run_solution "DuckDB (Index)" env DUCKDB_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/duckdb.psv
             fi
+        fi
+        if engine_enabled chdb; then
+            run_solution "chDB" env CHDB_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine chdb -sortcols "time" -queryfile ./artifacts/queries/inmemory/chdb.psv
         fi
         if engine_enabled polars; then
             if solution_enabled "Polars"; then

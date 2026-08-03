@@ -101,7 +101,7 @@ class QueryExecutorPyKXInMemory:
     def prepare_run(self) -> None:
         pass
 
-    def get_parameters(self, parameter: str) -> str:
+    def get_parameters(self, query_str: str, parameter: str) -> str:
         return parameter
 
     def execute_query(self, idx: int, tags: set, query_str: str, parameter: str, runidx: int):

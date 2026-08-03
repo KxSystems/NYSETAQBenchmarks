@@ -2,6 +2,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
+#   "chdb>=4.1.0",
 #   "duckdb>=1.4",
 #   "numexpr",
 #   "numpy>=1.26",
@@ -19,10 +20,21 @@ Script to run queries on NYSE TAQ and collect performance metrics (like executio
 
 Environment variables:
   FLUSH               (required) Path to the cache-flush binary; called before each cold run
+  CHDB_THREADS        (optional) Number of threads for the chDB engine
   DUCKDB_THREADS      (optional) Number of threads for DuckDB engines
   NUMEXPR_NUM_THREADS (optional) Number of threads for the Pandas/numexpr engine
 """
+import os
+if 'CHDB_THREADS' in os.environ:
+    os.environ.setdefault('OMP_NUM_THREADS', os.environ['CHDB_THREADS'])
+    os.environ.setdefault('OMP_DYNAMIC', 'FALSE')
+    os.environ.setdefault('OPENBLAS_NUM_THREADS', os.environ['CHDB_THREADS'])
+    os.environ.setdefault('MKL_NUM_THREADS', os.environ['CHDB_THREADS'])
+
 import argparse
+import pyarrow as pa
+if 'CHDB_THREADS' in os.environ:
+    pa.set_cpu_count(int(os.environ['CHDB_THREADS']))
 import contextlib
 import csv
 import gc
@@ -119,7 +131,7 @@ def run_query(runner, db_path: Path, ios: IOStat, idx: str, tags: set, query: st
     """
     times: list[float] = []
     iostats: list[float] = []
-    params = runner.get_parameters(parameter)
+    params = runner.get_parameters(query, parameter)
     for runidx in range(3):
         iteration_label = "Cold" if runidx == 0 else f"Warm-{runidx}"
         logger.info("[%s] Run %s/3 (%s): %s ...", idx, runidx+1, iteration_label, query[:50])
@@ -181,6 +193,13 @@ def main(args: argparse.Namespace) -> None:
                 con.execute(f"SET threads = {os.environ['DUCKDB_THREADS']}")
             threadnr = con.sql("SELECT current_setting('threads')").fetchall()[0][0]
             logger.info("Using DuckDB with %s threads", threadnr)
+        elif engine == "chdb":
+            if len(args.indexon) > 0:
+                raise ValueError("chDB does not support indices")
+            from executors.inmemory.chdb import QueryExecutorChDB
+            runner = QueryExecutorChDB(params, sort_cols=args.sortcols, datadate=args.date)
+            threadnr = runner.threads
+            logger.info("Using chDB with %s threads", threadnr)
         elif engine == "pykx":
             from executors.inmemory.pykx import QueryExecutorPyKXInMemory
             import pykx as kx
@@ -225,6 +244,7 @@ def main(args: argparse.Namespace) -> None:
     file_ctx = (open(args.result, 'w', newline='', encoding='utf-8')
                 if args.result is not None
                 else contextlib.nullcontext(io.StringIO()))
+    logger.info(f"Pid of the tester process: {os.getpid()}")
     with file_ctx as f_out:
         writer = csv.writer(f_out, delimiter='|')
         if args.result is not None:
@@ -300,8 +320,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('-db', type=Path, required=True, help="Path to hive-partitioned parquet DB root")
     parser.add_argument('-storage_backend', type=str, choices=["memory", "disk"],
         required=True, help="Storage backend. Currently supported memory and disk")
-    parser.add_argument('-engine', type=str, choices=["polars", "duckdb_con", "pykx", "pandas"],
-        required=True, help="Query engine. Currently supported: polars, duckdb_con, pykx, and pandas")
+    parser.add_argument('-engine', type=str, choices=["polars", "duckdb_con", "chdb", "pykx", "pandas"],
+        required=True, help="Query engine. Currently supported: polars, duckdb_con, chdb, pykx, and pandas")
     parser.add_argument('-sortcols', type=parse_sortcols, required=False, help="Comma-separated columns to sort trade/quote by, e.g. 'time' or 'sym,time'.")
     parser.add_argument('-indexon', type=parse_sortcols, required=False, default=[], help="Comma-separated columns to add index to, e.g. 'sym' or 'sym,ex'.")
     parser.add_argument('-queryfile', type=Path, required=True, help="PSV file containing queries")
