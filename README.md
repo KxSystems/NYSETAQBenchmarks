@@ -389,6 +389,37 @@ export NUMANODE=0
 
 The scripts write the results as pipe-separated values (PSV) files of the same format as [queryEngines.sh](#results)
 
+## Limitations
+
+**No missing values.** The NYSE TAQ data is clean and complete. Real-world
+datasets often contain null or missing values, which can significantly impact
+query performance — engines differ in how they represent, filter, and aggregate
+over nulls. This benchmark does not evaluate:
+
+* Query engines' null-handling performance and memory footprint
+* Cost of null checks in filters and joins
+* Performance of coalesce, fill-forward, or imputation operations
+* Sparse data scenarios common in financial time-series (e.g., sparse quote
+  updates for inactive symbols)
+
+If your workload involves significant null handling or sparse data, benchmark
+results here may not reflect real-world performance for that use case.
+
+**No nested data.** Trade and quote records are flat — each row is a scalar
+record with no lists, maps, or nested structures in cells. kdb+'s vector
+processing and adverbs are particularly powerful on nested data; for example,
+arrays of trades per quote, or maps of custom attributes. This benchmark
+cannot demonstrate:
+
+* The performance advantage of kdb+'s functional operators on ragged or deeply
+  nested structures
+* Memory and query efficiency of columnar storage with nested payloads
+* Cross-engine performance on complex data reshaping (e.g., grouping trades
+  into vectors per quote)
+
+Benchmarks over flat tables may understate kdb+'s relative performance on
+nested-data workloads.
+
 ## Extending the Benchmarks
 
 The suite is designed to be extended in two common ways: adding another query
