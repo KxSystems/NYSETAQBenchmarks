@@ -59,8 +59,10 @@ rm -rf "${PARAM_DIR}"
 mkdir -p "${PARAM_DIR}"
 q ./artifacts/parameters/genParameters.q -db "${TESTDB}/kdb" -dst "${PARAM_DIR}" -q
 
-# queryEngines.sh's defaults plus the opt-in qlite arm, which is the only arm
-# that needs no KDB-X binary and so must not be left out of the smoke test.
+# What the smoke test covers, stated here rather than inherited from
+# queryEngines.sh's defaults, because it has to name the opt-in qlite arm --
+# the only arm that needs no KDB-X binary, and so the one that must not be
+# quietly dropped. Adding an engine to the suite means adding it here too.
 SMOKE_ENGINES="kdb,kdbxsql,duckdb,chdb,polars,pykx,pandas,qlite"
 SMOKE_SOLUTIONS="KDB-X,DuckDB (Index),Polars,Pandas,qlite"
 

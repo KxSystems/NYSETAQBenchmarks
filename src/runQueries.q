@@ -1,5 +1,7 @@
 // A version test rejects every q implementation that is not KDB-X, including
-// ones that can run the corpus; test for what this script actually calls.
+// ones that can run the corpus. Test instead for the .Q entry points every
+// path through this script needs; the ones a particular -format or -engine
+// needs (.Q.lo, .Q.MAP, .Q.id, .Q.f) fail at their own call sites.
 if[count missing: `opt`dd`ts`gc except key `.Q;
   -2 "this q build does not provide .Q.", ", .Q." sv string missing, ", which the benchmark runner requires";
   exit 1];
