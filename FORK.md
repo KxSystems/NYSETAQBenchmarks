@@ -40,7 +40,21 @@ Every fix offered to `KxSystems/NYSETAQBenchmarks`, and what happened.
 - **Rayforce onto the engine contract.** PR #14 was merged as-is at head
   `240964f4b8f66f06e74d7a2f2b493b8fa24eab93`; its `src/rayforce/runRayforce.sh` is a third
   parallel implementation of the runner contract. Phase 2 moves it onto
-  `docs/engine-contract.md` as that contract's second consumer.
+  `docs/engine-contract.md` as that contract's second consumer. Two specific deviations are
+  already visible and must be settled by that move, not before it:
+  - `src/rayforce/runQueries.rfl`'s `runq` executes each query **four** times — `run1`,
+    `run2`, `run3`, then a fourth `measure` pass under `.mem.ts` that `run3memKB`,
+    `ressizeKB` and the `queryoutput_<idx>.csv` are all taken from. Both existing runners
+    execute three times and take memory, result size and output from the third. The three
+    reported timings are still the first three runs, but `run3memKB` is not measured on run 3
+    and the per-query workload is 4 executions rather than 3.
+  - `src/compareOutput.q`, which PR #14 also rewrites, reads each CSV header with
+    `first read0 (file; 0; 65536)`. That is the byte-range form of `read0`, which yields a
+    character vector, so `first` selects a single character rather than the header line —
+    where the code it replaces used `first system "head -n 1 …"`. Every other `read0` in this
+    repo uses the line-oriented form. Flagged rather than fixed: confirming it, and any fix,
+    requires executing KDB-X, which this fork's maintainer does not do (see `CONTRIBUTING.md`
+    once Phase 1 lands). It is also feedback to send to upstream PR #14 while it is open.
 - **Rayforce arm verification.** Not executed; shape-checked only (`bash -n` over
   `src/rayforce/*.sh`, and `artifacts/queries/inmemory/rayforce.psv` confirmed 4-field and
   idx-aligned with `querymeta.psv`). Two independent blockers, both to be cleared in Phase 2:
