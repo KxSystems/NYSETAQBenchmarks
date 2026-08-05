@@ -472,7 +472,7 @@ reads the kdb+ database instead.
 5. **Add it to the driver.** In [benchmarks/inmemory/queryEngines.sh](./benchmarks/inmemory/queryEngines.sh),
    add an `engine_enabled <name>` block that calls
    `uv run pysrc/queryrunner/main.py ... -engine <name> -queryfile ./artifacts/queries/inmemory/<name>.psv ...`
-   followed by `add_nickname`, and add `<name>` to the default `ENGINES` list.
+   followed by `add_solution_name`, and add `<name>` to the default `ENGINES` list.
    Optionally add a matching run in `get_table_stats`. Each engine is launched
    once per requested thread count; if the library is configured through an
    environment variable, set it inline as the existing engines do (e.g.
@@ -480,7 +480,7 @@ reads the kdb+ database instead.
 
 6. **Test your solution.** You don't need to download real TAQ data: small test
    PSV files ship with the TAQ submodule in
-   [external/kx/taq/test/data/](./external/kx/taq/test/data/). The scripts in the
+   [external/kx/taq/test/data/](./external/kx/taq/test/data/) (fetch the submodule first). The scripts in the
    [test/](./test/) directory use them — [test/inmemory.sh](./test/inmemory.sh)
    generates a smaller than tiny kdb+ and Parquet database from the test PSVs and runs both
    benchmark scripts against it end-to-end. Run it after wiring in your engine
