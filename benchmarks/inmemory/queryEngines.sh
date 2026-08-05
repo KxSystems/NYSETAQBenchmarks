@@ -123,6 +123,19 @@ function execute_queries () {
                 run_solution "Pandas" env OMP_NUM_THREADS=$(( s > 1 ? s : 1 )) NUMEXPR_NUM_THREADS=$(( s > 1 ? s : 1 )) MKL_NUM_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine pandas -sortcols "time" -queryfile ./artifacts/queries/inmemory/pandas.psv
             fi
         fi
+        if engine_enabled qlite; then
+            # peachq is single-threaded, so every thread count would report
+            # threadcount 1 and emit a duplicate set of rows; run it once.
+            if solution_enabled "qlite" && [[ "${s}" == "${THREAD_NRS[0]}" ]]; then
+                # Resolved before the run so an unavailable binary fails here
+                # rather than as an empty command inside run_solution.
+                local QBIN_PATH
+                QBIN_PATH=$(bash ./src/qengine/qbin.sh)
+                run_solution "qlite" "${QBIN_PATH}" ./src/qengine/runQueries.lite.q \
+                    ${COMMONPARAMS} -db ${DB_DIR}/psv -sortcols "time" -indexon "sym" \
+                    -queryfile ./artifacts/queries/inmemory/kdb.psv
+            fi
+        fi
         if engine_enabled rayforce; then
             # Rayforce -c is its total execution-core count, including the main
             # worker, so the suite's zero-thread case maps to one core.
