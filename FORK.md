@@ -41,6 +41,18 @@ Every fix offered to `KxSystems/NYSETAQBenchmarks`, and what happened.
   `240964f4b8f66f06e74d7a2f2b493b8fa24eab93`; its `src/rayforce/runRayforce.sh` is a third
   parallel implementation of the runner contract. Phase 2 moves it onto
   `docs/engine-contract.md` as that contract's second consumer.
+- **Rayforce arm verification.** Not executed; shape-checked only (`bash -n` over
+  `src/rayforce/*.sh`, and `artifacts/queries/inmemory/rayforce.psv` confirmed 4-field and
+  idx-aligned with `querymeta.psv`). Two independent blockers, both to be cleared in Phase 2:
+  1. Its database generation path is not clean-room. `generateDB.sh`'s `rayforce` branch
+     requires the sibling `kdb` database to exist and then runs
+     `q ./src/rayforce/exportRayCSV.q` to bridge it to CSV, so producing a Rayforce DB needs
+     a kdb+ binary.
+  2. The pinned release artifact does not run on the development host. Release v2.5.11
+     (`rayforce-2.5.11-linux-x86_64.tar.gz`, sha256 `8f63ca…8ccd`) was fetched and its
+     checksum verified, but the binary requires `GLIBC_2.38` and the host provides 2.35.
+     Phase 2's `scripts/fetch-engines.sh` therefore needs a glibc floor recorded per engine,
+     or a container.
 - **Vendor the taq submodule.** Phase 2. This will be the first divergence that is *not*
   offerable upstream, which is why it is deliberately not bundled with the bump in
   divergence 1.
