@@ -33,7 +33,10 @@ Every fix offered to `KxSystems/NYSETAQBenchmarks`, and what happened.
 
 | Offered | PR | What | Outcome |
 |---|---|---|---|
-| _(filled in by Task 9)_ | | | |
+| 2026-08-05 | [KxSystems#15](https://github.com/KxSystems/NYSETAQBenchmarks/pull/15) | Bump the `taq` submodule gitlink `ecf6daa` → `dcfc9c6` (divergence 1) | offered |
+| 2026-08-05 | [KxSystems#16](https://github.com/KxSystems/NYSETAQBenchmarks/pull/16) | `duckdb.psv` idx 24–29: group on the aliased `minute` bucket (divergence 2) | offered |
+| 2026-08-05 | [KxSystems#17](https://github.com/KxSystems/NYSETAQBenchmarks/pull/17) | Pin `duckdb` exactly in the PEP 723 block and `pyproject.toml` (divergence 3) | offered |
+| 2026-08-05 | [KxSystems#18](https://github.com/KxSystems/NYSETAQBenchmarks/pull/18) | README: `add_nickname` → `add_solution_name`, and the submodule note (divergence 4) | offered |
 
 ## Follow-ups recorded, not yet done
 
