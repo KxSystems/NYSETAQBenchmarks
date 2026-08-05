@@ -2,11 +2,41 @@
 > [KxSystems/NYSETAQBenchmarks](https://github.com/KxSystems/NYSETAQBenchmarks), which remains
 > the origin of this benchmark's design and of the dashboard at
 > [benchmark.kx.com](https://benchmark.kx.com). The fork exists so that any query engine can be
-> added on equal terms — no vendor is privileged here, including our own. Every divergence from
+> added on equal terms. No vendor is privileged here, including our own. Its goals are
+> **[open, repeatable, comparable](#open-repeatable-comparable)**. Every divergence from
 > upstream is listed in **[FORK.md](FORK.md)**, together with which fixes have been offered back
 > to KX and what became of them.
 
 # KX NYSE TAQ Benchmarks
+
+## Open, repeatable, comparable
+
+Three goals, in that order. Everything this fork does differently from upstream serves one of
+them, and [FORK.md](FORK.md) records which.
+
+**Open: if it doesn't break anything, it gets merged.** Add your engine and we will take the
+PR. That is a commitment, so here is exactly what "doesn't break anything" means, and it is
+the whole bar: the shared runner contract still holds (same result columns in the same order,
+three runs per query, the setup rows), the existing engines still produce the results they
+produced before, and your query file stays row-aligned by `idx` with `querymeta.psv`. You own
+your queries and your adapter. You don't touch anyone else's. There is no maintainer taste
+test, no waiting on a vendor's review queue, and no engine, including ours, that gets a
+better deal than yours.
+
+**Repeatable: the aim is two commands on a stock cloud box.** A benchmark result nobody else
+can reproduce is an advertisement, not a measurement. So engines are pinned to published
+release artifacts by version and checksum rather than to whatever happened to be built on the
+maintainer's laptop, and the target is that a stranger can go from an empty machine to a
+results file without reading this README twice. This is a work in progress, not a claim.
+Follow [FORK.md](FORK.md) for where it has actually got to.
+
+**Comparable: same hardware, or the numbers mean nothing.** Timings are only meaningful
+against each other when they come off the same machine, which is why every run ships an
+`environment.yaml` describing the host and why a standard cloud instance is the goal rather
+than a nice-to-have. The gap is the big-iron end: matching the class of machine the published
+upstream numbers were produced on costs real money. **If you can help with hardware, by
+lending time on a suitable box or funding one, please open an issue.** It is the single thing
+most likely to make the comparison honest at the top end.
 
 ## QuickStart
 

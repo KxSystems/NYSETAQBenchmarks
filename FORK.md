@@ -10,8 +10,8 @@ Every divergence is listed below with whether it is offerable back to KX.
 
 ## Why this fork exists
 
-The upstream suite has one documented path for outside engines — "add a Python executor
-class" — and one external vendor PR in its history. This fork makes the same suite a venue
+The upstream suite has one documented path for outside engines ("add a Python executor
+class") and one external vendor PR in its history. This fork makes the same suite a venue
 any engine can enter on equal terms, against a written contract, while staying close enough
 to upstream that results remain comparable.
 
@@ -21,12 +21,12 @@ No vendor is privileged here, including peachq.
 
 | # | Divergence | Why | Offerable upstream? |
 |---|---|---|---|
-| 1 | taq submodule at `dcfc9c6`, not `ecf6daa` | The recorded pin breaks the smoke test, the QuickStart and three of six SIZEs | Yes — offered, see ledger |
-| 2 | `duckdb.psv` idx 24–29 `GROUP BY minute` | The queries never bound; six of 84 have no DuckDB answer in published results | Yes — offered, see ledger |
-| 3 | DuckDB pinned exactly | `duckdb>=1.4` makes published numbers irreproducible | Yes — offered, see ledger |
-| 4 | README `add_solution_name` + test-data path | Stale references | Yes — offered, see ledger |
-| 5 | PR #14 (rayforce adapter) merged | Upstream PR still open; the fork does not gate vendors on KX's review queue | N/A — it is upstream's own PR |
-| 6 | `duckdb_con.py` inlines parameters for `pivot`-tagged queries | DuckDB rejects bound parameters in a data-driven `PIVOT` source; without this, divergence 2 fixes nothing observable | Yes — folded into the same offer, see ledger |
+| 1 | taq submodule at `dcfc9c6`, not `ecf6daa` | The recorded pin breaks the smoke test, the QuickStart and three of six SIZEs | Yes, offered (see ledger) |
+| 2 | `duckdb.psv` idx 24–29 `GROUP BY minute` | The queries never bound; six of 84 have no DuckDB answer in published results | Yes, offered (see ledger) |
+| 3 | DuckDB pinned exactly | `duckdb>=1.4` makes published numbers irreproducible | Yes, offered (see ledger) |
+| 4 | README `add_solution_name` + test-data path | Stale references | Yes, offered (see ledger) |
+| 5 | PR #14 (rayforce adapter) merged | Upstream PR still open; the fork does not gate vendors on KX's review queue | N/A, it is upstream's own PR |
+| 6 | `duckdb_con.py` inlines parameters for `pivot`-tagged queries | DuckDB rejects bound parameters in a data-driven `PIVOT` source; without this, divergence 2 fixes nothing observable | Yes, folded into the same offer (see ledger) |
 
 ## Upstream ledger
 
@@ -46,7 +46,7 @@ Every fix offered to `KxSystems/NYSETAQBenchmarks`, and what happened.
   parallel implementation of the runner contract. Phase 2 moves it onto
   `docs/engine-contract.md` as that contract's second consumer. Two specific deviations are
   already visible and must be settled by that move, not before it:
-  - `src/rayforce/runQueries.rfl`'s `runq` executes each query **four** times — `run1`,
+  - `src/rayforce/runQueries.rfl`'s `runq` executes each query **four** times: `run1`,
     `run2`, `run3`, then a fourth `measure` pass under `.mem.ts` that `run3memKB`,
     `ressizeKB` and the `queryoutput_<idx>.csv` are all taken from. Both existing runners
     execute three times and take memory, result size and output from the third. The three
@@ -54,7 +54,7 @@ Every fix offered to `KxSystems/NYSETAQBenchmarks`, and what happened.
     and the per-query workload is 4 executions rather than 3.
   - `src/compareOutput.q`, which PR #14 also rewrites, reads each CSV header with
     `first read0 (file; 0; 65536)`. That is the byte-range form of `read0`, which yields a
-    character vector, so `first` selects a single character rather than the header line —
+    character vector, so `first` selects a single character rather than the header line,
     where the code it replaces used `first system "head -n 1 …"`. Every other `read0` in this
     repo uses the line-oriented form. Flagged rather than fixed: confirming it, and any fix,
     requires executing KDB-X, which this fork's maintainer does not do (see `CONTRIBUTING.md`
@@ -77,15 +77,15 @@ Every fix offered to `KxSystems/NYSETAQBenchmarks`, and what happened.
 - **`duckdb.psv` idx 24–29: resolved, with a disclosed mechanism difference.** Divergence 2
   fixed the unbindable `GROUP BY time`, which was masking a second, independent defect:
   DuckDB refuses a bound parameter in the source of a `PIVOT` whose pivot values are
-  extracted from the data, on every version tested from 1.2.2 to 1.5.5. Isolated on 1.5.5 —
+  extracted from the data, on every version tested from 1.2.2 to 1.5.5. Isolated on 1.5.5:
   a bound parameter alone binds, a `PIVOT` with a literal binds, the combination does not.
 
   Divergence 6 resolves it by inlining the parameter as a SQL literal for queries tagged
   `pivot`, leaving the other 78 on bound parameters. **This is a real mechanism difference
   and is disclosed rather than hidden:** those six are executed as literal SQL while the rest
-  are prepared. It is defensible because the q sibling has no bound parameters at all —
+  are prepared. It is defensible because the q sibling has no bound parameters at all.
   `src/getQueryParameters.q` defines `freqInstr`, `fiftyInstrs` and friends as globals that
-  `kdb.psv` references by name — so literal substitution is *closer* to what the q side does,
+  `kdb.psv` references by name, so literal substitution is *closer* to what the q side does,
   not further from it. Enumerating the `ON` values was rejected as the alternative: for idx
   24–25 it would hard-code the exchange list the q sibling derives from the data, and for idx
   26–29 the pivot values *are* the parameter list.
