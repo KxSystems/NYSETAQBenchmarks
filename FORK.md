@@ -26,6 +26,7 @@ No vendor is privileged here, including peachq.
 | 3 | DuckDB pinned exactly | `duckdb>=1.4` makes published numbers irreproducible | Yes — offered, see ledger |
 | 4 | README `add_solution_name` + test-data path | Stale references | Yes — offered, see ledger |
 | 5 | PR #14 (rayforce adapter) merged | Upstream PR still open; the fork does not gate vendors on KX's review queue | N/A — it is upstream's own PR |
+| 6 | `duckdb_con.py` inlines parameters for `pivot`-tagged queries | DuckDB rejects bound parameters in a data-driven `PIVOT` source; without this, divergence 2 fixes nothing observable | Yes — folded into the same offer, see ledger |
 
 ## Upstream ledger
 
@@ -73,14 +74,24 @@ Every fix offered to `KxSystems/NYSETAQBenchmarks`, and what happened.
 - **Vendor the taq submodule.** Phase 2. This will be the first divergence that is *not*
   offerable upstream, which is why it is deliberately not bundled with the bump in
   divergence 1.
-- **`duckdb.psv` idx 24–29 still fail.** Divergence 2 fixes the unbindable `GROUP BY time`,
-  which was masking a second, independent defect: DuckDB refuses a bound parameter in the
-  source of a `PIVOT` whose pivot values are extracted from the data
-  (`Parser Error: PIVOT statements with pivot elements extracted from the data cannot have
-  parameters in their source`), on every version tested from 1.2.2 to 1.5.5. The six queries
-  therefore still report `status=error`. Enumerating the `ON` values is not a rename — for
-  idx 24–25 it would hard-code the exchange list the q sibling derives from the data, and for
-  idx 26–29 the pivot values *are* the parameter list, which DuckDB will not accept in list
-  form — so it is out of scope under the minimal-binding-fix rule and belongs with `duckv2`.
+- **`duckdb.psv` idx 24–29: resolved, with a disclosed mechanism difference.** Divergence 2
+  fixed the unbindable `GROUP BY time`, which was masking a second, independent defect:
+  DuckDB refuses a bound parameter in the source of a `PIVOT` whose pivot values are
+  extracted from the data, on every version tested from 1.2.2 to 1.5.5. Isolated on 1.5.5 —
+  a bound parameter alone binds, a `PIVOT` with a literal binds, the combination does not.
+
+  Divergence 6 resolves it by inlining the parameter as a SQL literal for queries tagged
+  `pivot`, leaving the other 78 on bound parameters. **This is a real mechanism difference
+  and is disclosed rather than hidden:** those six are executed as literal SQL while the rest
+  are prepared. It is defensible because the q sibling has no bound parameters at all —
+  `src/getQueryParameters.q` defines `freqInstr`, `fiftyInstrs` and friends as globals that
+  `kdb.psv` references by name — so literal substitution is *closer* to what the q side does,
+  not further from it. Enumerating the `ON` values was rejected as the alternative: for idx
+  24–25 it would hard-code the exchange list the q sibling derives from the data, and for idx
+  26–29 the pivot values *are* the parameter list.
+
+  Result: all 84 queries return `status=success` for DuckDB for the first time. Output
+  equivalence against the q sibling remains unestablished for these six and needs Phase 1's
+  `qlite` seam.
 - **`duckv2`.** A separate DuckDB query set, deliberately out of scope for Phases 0–2. The
   existing `duckdb.psv` queries are not to be improved or tuned in the meantime.
