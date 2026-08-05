@@ -24,6 +24,16 @@ import duckdb
 logger = logging.getLogger(__name__)
 
 
+def sql_literal(value: Any) -> str:
+    if isinstance(value, (list, tuple, set)):
+        return "(" + ", ".join(sql_literal(v) for v in value) + ")"
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, (int, float)):
+        return repr(value)
+    return "'" + str(value).replace("'", "''") + "'"
+
+
 class QueryExecutorDuckDBCon:
     """
     Handles the setup, execution of DuckDB in-memory queries.
@@ -158,6 +168,12 @@ class QueryExecutorDuckDBCon:
         return [eval(p.strip(), self.params) for p in parameter.split(",")] if parameter else []
 
     def execute_query(self, idx: int, tags: set, query_str: str, params: list[Any], runidx: int):
+        # DuckDB rejects bound parameters in the source of a PIVOT whose columns are
+        # derived from the data, so pivot queries get their parameters inlined instead.
+        if "pivot" in tags and params:
+            for i in range(len(params), 0, -1):
+                query_str = query_str.replace(f"${i}", sql_literal(params[i - 1]))
+            params = []
         try:
             self.con.execute(f"CREATE TABLE res AS {query_str}", parameters=params)
         except Exception as e:
