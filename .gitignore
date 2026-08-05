@@ -1,4 +1,5 @@
 results
+.claude/
 /pysrc/**/__pycache__/
 external
 DATA
