@@ -1,0 +1,37 @@
+;; Build the Rayforce native database for the in-memory benchmark.
+;;
+;; This is the Rayforce data-generation step: a one-pass converter from the
+;; source CSV to Rayforce splayed tables. `.csv.splayed` parses, columnarises
+;; and persists in a single streaming pass, building the accelerator indexes
+;; (STR dictionaries, per-chunk numeric min/max) that `.db.splayed.get` relies
+;; on for fast mmap loads. `.csv.parted` (row-chunked) is the on-disk / rowgroup
+;; variant; the in-memory benchmark loads a whole table, so it uses splayed.
+;;
+;; Sorting is intentionally NOT done here: the runner sorts by `time` as a
+;; measured load step, so the conversion stays a plain format transform.
+;;
+;; Inputs (environment variables):
+;;   RAY_CSVDIR  directory containing master.csv, trade.csv and quote.csv
+;;               (comma-delimited, with a header row of column names)
+;;   RAY_DBDIR   date-specific output directory; writes
+;;               RAY_DBDIR/master, RAY_DBDIR/trade and RAY_DBDIR/quote
+
+(set csvdir (.os.getenv "RAY_CSVDIR"))
+(set dbdir  (.os.getenv "RAY_DBDIR"))
+
+;; Column type schemas — order matches src/rayforce/exportRayCSV.q. The CSV
+;; carries a header row, so column names are taken from it automatically.
+(.csv.splayed [SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL B8 SYMBOL SYMBOL I16 I16 SYMBOL F64 SYMBOL SYMBOL SYMBOL I16 SYMBOL B8 B8 B8 B8 B8 B8 B8 B8 B8 B8 B8 B8 B8 B8 B8 B8 SYMBOL SYMBOL B8 B8 B8]
+              (concat csvdir "/master.csv") (concat dbdir "/master"))
+(println "master -> splayed done")
+
+(.csv.splayed [I64 SYMBOL SYMBOL SYMBOL F32 F32 SYMBOL I16 I32 I64 SYMBOL SYMBOL I64 I64 B8]
+              (concat csvdir "/trade.csv") (concat dbdir "/trade"))
+(println "trade -> splayed done")
+
+(.csv.splayed [I64 SYMBOL SYMBOL F32 I32 F32 I32 SYMBOL I32 SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL SYMBOL I64 I64 SYMBOL SYMBOL]
+              (concat csvdir "/quote.csv") (concat dbdir "/quote"))
+(println "quote -> splayed done")
+
+(println "Rayforce DB build complete.")
+(exit 0)
