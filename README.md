@@ -1,3 +1,11 @@
+> **This is a community fork** of
+> [KxSystems/NYSETAQBenchmarks](https://github.com/KxSystems/NYSETAQBenchmarks), which remains
+> the origin of this benchmark's design and of the dashboard at
+> [benchmark.kx.com](https://benchmark.kx.com). The fork exists so that any query engine can be
+> added on equal terms — no vendor is privileged here, including our own. Every divergence from
+> upstream is listed in **[FORK.md](FORK.md)**, together with which fixes have been offered back
+> to KX and what became of them.
+
 # KX NYSE TAQ Benchmarks
 
 ## QuickStart
