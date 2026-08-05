@@ -1,4 +1,8 @@
-if[(5.0>.z.K); -2 "kdb+ 5 is required";exit 1];
+// A version test rejects every q implementation that is not KDB-X, including
+// ones that can run the corpus; test for what this script actually calls.
+if[count missing: `opt`dd`ts`gc except key `.Q;
+  -2 "this q build does not provide .Q.", ", .Q." sv string missing, ", which the benchmark runner requires";
+  exit 1];
 
 USAGE: "usage: q ", string[.z.f], " [-help] -db DB -paramdir DIR -queryfile FILE -querymeta FILE",
   " -storage_backend (memory|disk) [-format (KDB|TABLEDICT|PARQUET|PARQUET_ROWGROUP)]",
