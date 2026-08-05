@@ -23,6 +23,18 @@ RESULTDIR=${script_dir}/results/inmemory
 # Remove the generated database and results on exit, even if a benchmark fails.
 trap 'rm -rf "${TESTDB}" "${RESULTDIR}"' EXIT
 
+# Every arm but qlite needs a KDB-X binary to build its database. Say so and
+# skip; a silent pass here would hide that nothing was exercised.
+if ! command -v q > /dev/null; then
+    echo "SKIP: no 'q' on PATH. test/inmemory.sh builds its kdb+ database with" >&2
+    echo "      KDB-X, so every arm except qlite needs one. Run the qlite arm on" >&2
+    echo "      its own with:" >&2
+    echo "        ./benchmarks/inmemory/queryEngines.sh --db-dir DIR --param-dir ... \\" >&2
+    echo "          --datadate ... --engines qlite --solutions qlite" >&2
+    echo "      where DIR/psv holds the TAQ PSV files (see ${TESTPSV})." >&2
+    exit 77
+fi
+
 # Generate the test database.
 #
 # SIZE=full (letters A-Z) is deliberate: the test data only ships BBO_Y and
@@ -34,6 +46,11 @@ rm -rf "${TESTDB}/parquet/rowgroup"
 SIZE=full DATAFORMAT=kdb ./generateDB.sh "${TESTPSV}" "${TESTDB}/kdb" "${TESTDBDATE}"
 SIZE=full SYMBOLSTOREDAS=ROWGROUP DATAFORMAT=parquet ./generateDB.sh "${TESTPSV}" "${TESTDB}/parquet/rowgroup" "${TESTDBDATE}"
 
+# The qlite arm reads the PSV files themselves, from the same --db-dir layout
+# the generated databases live in.
+mkdir -p "${TESTDB}/psv"
+cp "${TESTPSV}"/*.psv "${TESTDB}/psv/"
+
 # Generate the current query-parameter contract from this exact database. This
 # avoids stale checked-in smoke fixtures when parameter names/query coverage
 # evolve and guarantees the selected symbols exist in the test data.
@@ -42,7 +59,11 @@ rm -rf "${PARAM_DIR}"
 mkdir -p "${PARAM_DIR}"
 q ./artifacts/parameters/genParameters.q -db "${TESTDB}/kdb" -dst "${PARAM_DIR}" -q
 
-QUERY_ENGINE_ARGS=()
+# queryEngines.sh's defaults plus the opt-in qlite arm, which is the only arm
+# that needs no KDB-X binary and so must not be left out of the smoke test.
+SMOKE_ENGINES="kdb,kdbxsql,duckdb,chdb,polars,pykx,pandas,qlite"
+SMOKE_SOLUTIONS="KDB-X,DuckDB (Index),Polars,Pandas,qlite"
+
 if [[ "${RAYFORCE_SMOKE:-0}" == "1" ]]; then
     RAYFORCE_BIN="${RAYFORCE_BIN:-$(cd .. && pwd)/rayforce/rayforce}"
     [[ -x "${RAYFORCE_BIN}" ]] || {
@@ -53,11 +74,10 @@ if [[ "${RAYFORCE_SMOKE:-0}" == "1" ]]; then
     SIZE=full DATAFORMAT=rayforce RAYFORCE_BIN="${RAYFORCE_BIN}" \
         ./generateDB.sh "${TESTPSV}" "${TESTDB}/rayforce" "${TESTDBDATE}"
     export RAYFORCE_BIN
-    QUERY_ENGINE_ARGS=(
-        --engines "kdb,kdbxsql,duckdb,polars,pykx,pandas,rayforce"
-        --solutions "KDB-X,DuckDB (Index),Polars,Pandas,Rayforce,Rayforce Parted"
-    )
+    SMOKE_ENGINES="${SMOKE_ENGINES},rayforce"
+    SMOKE_SOLUTIONS="${SMOKE_SOLUTIONS},Rayforce,Rayforce Parted"
 fi
+QUERY_ENGINE_ARGS=(--engines "${SMOKE_ENGINES}" --solutions "${SMOKE_SOLUTIONS}")
 
 # Run the benchmarks.
 rm -rf "${RESULTDIR}"
