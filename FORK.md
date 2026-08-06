@@ -45,14 +45,21 @@ Every fix offered to `KxSystems/NYSETAQBenchmarks`, and what happened.
 ## Follow-ups recorded, not yet done
 
 - **Delete `src/qengine/runQueries.lite.q`.** It exists only because `src/runQueries.q` cannot
-  be *parsed* by a q implementation without KDB-X typed lambda parameters (`{[x:`C] ...}`, 12
-  signatures) and progressive blocks inside a conditional (`$[c;[a;b];[c;d]]`, the whole
-  storage-backend dispatch). Neither is reachable by a capability shim, and rewriting both in
-  a shared file would be a fork of it rather than a divergence from it. The `qlite` arm should
-  move back onto `src/runQueries.q` as soon as an implementation parses them; divergence 8
-  (the relaxed guard) is the prerequisite and is already in place. Until then the repo carries
-  a third implementation of `docs/engine-contract.md`, which is exactly the thing the contract
-  was written to stop, and the lite runner is documented as delete-only, not extend.
+  be *parsed* by a q implementation lacking three KDB-X syntactic features. Neither is
+  reachable by a capability shim, and rewriting them in a shared file would be a fork of it
+  rather than a divergence from it. Status against peachq:
+
+  | feature | sites | 0.71 | 0.74 |
+  |---|---|---|---|
+  | progressive blocks in a conditional, `$[c;[a;b];…]` | 6 | parse error | **fixed** |
+  | typed lambda params, `{[x:`C] …}` | 15 | parse error | parse error |
+  | parameter destructuring, `{[(a;b)] …}` | 1 (`writeRes`, also typed) | parse error | parse error |
+
+  Two of the three remain, so the lite runner stays for now. The `qlite` arm moves back onto
+  `src/runQueries.q` as soon as an implementation parses all three; divergence 8 (the relaxed
+  guard) is the prerequisite and is already in place. Until then the repo carries a third
+  implementation of `docs/engine-contract.md` — exactly what the contract was written to stop —
+  and the lite runner is documented as delete-only, not extend.
 - **`qlite` setup rows are not comparable with the kdb+ arms'.** The arm reads PSV files, so
   its `idx 0` row measures PSV parsing, not a kdb+ database load, and it reports `rowCount`s
   that a `check_table_stats` run will compare against the kdb+ arms'. Query rows (`idx` 1–84)

@@ -14,8 +14,8 @@ set -euo pipefail
 
 # Bump these three together to pin a new release.
 QLITE_ENGINE="peachq"
-QLITE_VERSION="0.71.0"
-QLITE_SHA256="b61c58d26e89ae01179f5b269c5de82c887803d0f1fa4084ca8583ab37821339"
+QLITE_VERSION="0.74.0"
+QLITE_SHA256="f2b7e9bef845d1c10a02a1058c5a680031627a0a24d1eda2cfdb4fd00e3c21e4"
 
 QLITE_URL_BASE="${QLITE_URL_BASE:-https://peachq.org/file}"
 QLITE_TARBALL="${QLITE_ENGINE}-v${QLITE_VERSION}-linux-x86_64.tar.gz"
