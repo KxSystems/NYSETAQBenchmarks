@@ -27,6 +27,9 @@ No vendor is privileged here, including peachq.
 | 4 | README `add_solution_name` + test-data path | Stale references | Yes, offered (see ledger) |
 | 5 | PR #14 (rayforce adapter) merged | Upstream PR still open; the fork does not gate vendors on KX's review queue | N/A, it is upstream's own PR |
 | 6 | `duckdb_con.py` inlines parameters for `pivot`-tagged queries | DuckDB rejects bound parameters in a data-driven `PIVOT` source; without this, divergence 2 fixes nothing observable | Yes, folded into the same offer (see ledger) |
+| 7 | `qlite` engine arm, `QBIN`-selected | Lets any q implementation run the benchmark; upstream has no path for one | Yes, in principle |
+| 8 | `src/runQueries.q` version guard relaxed to a capability check | `5.0>.z.K` rejects every non-KDB-X q, including ones that can run the corpus | Yes, standalone |
+| 9 | Capability shim for `.log.*` / `.mem.objsize` — landed as `src/qengine/runQueries.lite.q`, not as a shim | Both come from KDB-X modules unavailable to other implementations. A shim turned out not to be enough: `src/runQueries.q` uses KDB-X typed lambda parameters and progressive blocks inside a conditional, which a second implementation cannot **parse**, so no amount of predefining names helps. See "Follow-ups" | No — it is a fork-owned file, meant to be deleted |
 
 ## Upstream ledger
 
@@ -40,6 +43,31 @@ Every fix offered to `KxSystems/NYSETAQBenchmarks`, and what happened.
 | 2026-08-05 | [KxSystems#18](https://github.com/KxSystems/NYSETAQBenchmarks/pull/18) | README: `add_nickname` → `add_solution_name`, and the submodule note (divergence 4) | offered |
 
 ## Follow-ups recorded, not yet done
+
+- **Delete `src/qengine/runQueries.lite.q`.** It exists only because `src/runQueries.q` cannot
+  be *parsed* by a q implementation lacking three KDB-X syntactic features. Neither is
+  reachable by a capability shim, and rewriting them in a shared file would be a fork of it
+  rather than a divergence from it. Status against peachq:
+
+  | feature | sites | 0.71 | 0.74 |
+  |---|---|---|---|
+  | progressive blocks in a conditional, `$[c;[a;b];…]` | 6 | parse error | **fixed** |
+  | typed lambda params, `{[x:`C] …}` | 15 | parse error | parse error |
+  | parameter destructuring, `{[(a;b)] …}` | 1 (`writeRes`, also typed) | parse error | parse error |
+
+  Two of the three remain, so the lite runner stays for now. The `qlite` arm moves back onto
+  `src/runQueries.q` as soon as an implementation parses all three; divergence 8 (the relaxed
+  guard) is the prerequisite and is already in place. Until then the repo carries a third
+  implementation of `docs/engine-contract.md` — exactly what the contract was written to stop —
+  and the lite runner is documented as delete-only, not extend.
+- **`qlite` setup rows are not comparable with the kdb+ arms'.** The arm reads PSV files, so
+  its `idx 0` row measures PSV parsing, not a kdb+ database load, and it reports `rowCount`s
+  that a `check_table_stats` run will compare against the kdb+ arms'. Query rows (`idx` 1–84)
+  are comparable, since the data is in memory either way. Stage B replaces the PSV load with a
+  plain-q PSV→splayed converter to restore it.
+- **`qlite` reports `threadcount` 1 for every run.** peachq's `system "s"` is `0`, so the arm
+  runs once for the first `--threads` value rather than once per value, which would emit
+  duplicate `threadcount 1` rows and double the query list `convertToJSFormat.py` builds.
 
 - **Rayforce onto the engine contract.** PR #14 was merged as-is at head
   `240964f4b8f66f06e74d7a2f2b493b8fa24eab93`; its `src/rayforce/runRayforce.sh` is a third
