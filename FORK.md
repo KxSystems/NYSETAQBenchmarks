@@ -37,10 +37,36 @@ Every fix offered to `KxSystems/NYSETAQBenchmarks`, and what happened.
 
 | Offered | PR | What | Outcome |
 |---|---|---|---|
-| 2026-08-05 | [KxSystems#15](https://github.com/KxSystems/NYSETAQBenchmarks/pull/15) | Bump the `taq` submodule gitlink `ecf6daa` → `dcfc9c6` (divergence 1) | offered |
-| 2026-08-05 | [KxSystems#16](https://github.com/KxSystems/NYSETAQBenchmarks/pull/16) | `duckdb.psv` idx 24–29: group on the aliased `minute` bucket (divergence 2) | offered |
-| 2026-08-05 | [KxSystems#17](https://github.com/KxSystems/NYSETAQBenchmarks/pull/17) | Pin `duckdb` exactly in the PEP 723 block and `pyproject.toml` (divergence 3) | offered |
-| 2026-08-05 | [KxSystems#18](https://github.com/KxSystems/NYSETAQBenchmarks/pull/18) | README: `add_nickname` → `add_solution_name`, and the submodule note (divergence 4) | offered |
+| 2026-08-05 | [KxSystems#15](https://github.com/KxSystems/NYSETAQBenchmarks/pull/15) | Bump the `taq` submodule gitlink `ecf6daa` → `dcfc9c6` (divergence 1) | **merged** `ce8cc8e`, 2026-08-06 |
+| 2026-08-05 | [KxSystems#16](https://github.com/KxSystems/NYSETAQBenchmarks/pull/16) | `duckdb.psv` idx 24–29: group on the aliased `minute` bucket, plus parameter inlining (divergence 2, 6) | **part-applied** as `9e40b75`; second commit declined |
+| 2026-08-05 | [KxSystems#17](https://github.com/KxSystems/NYSETAQBenchmarks/pull/17) | Pin `duckdb` exactly in the PEP 723 block and `pyproject.toml` (divergence 3) | **declined**, with rationale |
+| 2026-08-05 | [KxSystems#18](https://github.com/KxSystems/NYSETAQBenchmarks/pull/18) | README: `add_nickname` → `add_solution_name`, and the submodule note (divergence 4) | **merged** `345d42a`, 2026-08-06 |
+
+### What the responses tell us
+
+Three of four offers were taken in whole or in substance, within a day, from an outside
+contributor. **Upstream accepts bug fixes readily**, and the fork's working assumption should
+be that a defect found here is worth offering rather than hoarding. Whether upstream would
+accept a *vendor engine* is a separate and still-untested question — PR #14, the Rayforce
+adapter, has been open since 2026-08-02.
+
+Two declines, both reasoned, both now recorded as deliberate divergences rather than
+oversights:
+
+- **#16, second commit** (parameter inlining for `pivot`-tagged queries): *"I consider the
+  second commit to be a workaround to a DuckDB bug. DuckDB engineers are aware of this pivot,
+  parsing issue."* Correct on the merits — it is a workaround. The fork keeps it because
+  divergence 6 is what actually makes idx 24–29 return rows, and waiting on a DuckDB release
+  means six queries stay dark. Upstream now has the `GROUP BY` fix without the inlining, so
+  **upstream's idx 24–29 still error**; ours do not. Revisit when DuckDB fixes the underlying
+  parser issue, and drop divergence 6 at that point.
+- **#17** (pinning DuckDB): *"We intentionally don't pin versions in the inline script
+  metadata… Results are published across a range of library versions, which users can look up
+  in the `stats.yaml` files or via the hover tooltip at benchmark.kx.com."* A legitimate
+  design choice for a suite publishing a moving picture of engine progress. This fork pins
+  because **repeatable** is one of its three stated goals and an unpinned dependency makes a
+  published number unreproducible. Divergence 3 is therefore permanent and deliberate, not a
+  fix awaiting acceptance.
 
 ## Follow-ups recorded, not yet done
 
