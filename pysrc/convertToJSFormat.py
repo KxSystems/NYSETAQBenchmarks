@@ -33,7 +33,10 @@ entry mirrors the ClickBench result format with these differences:
   * datadate     : the data date (parameters.datadate), ISO-formatted (replaces
                    ClickBench's "date"); the environment "test date" is used
                    only to pick the latest run per triple
-  * machine      : mappings.yaml["machines"][cpu.model]
+  * machine      : mappings.yaml["machines"][cpu.model]. A machine listed under
+                   mappings.yaml["dev_machines"] is a development box whose
+                   timings are not comparable with the benchmark hosts', so its
+                   runs are dropped unless --include-dev-machines is given
   * proprietary  : from the solution's stats.yaml
   * engineversion : version of the engine library, from the solution's
                    stats.yaml (null for runs predating the field)
@@ -328,6 +331,36 @@ def process_run(run_dir: Path, machines: dict, mappings_path: Path):
             yield datadate, machine, solution, tc, date, payload
 
 
+def drop_dev_machine_runs(run_dirs, machines: dict, dev_machines: set):
+    """The run directories not produced on a development machine.
+
+    A run whose CPU model is unmapped is kept, so process_run still raises the
+    "add an entry to mappings.yaml" error rather than this silently swallowing
+    it. An input tree holding nothing but development runs is an error: writing
+    an empty data file would look like a successful publish.
+    """
+    kept, dropped = [], []
+    for run_dir in run_dirs:
+        env = yaml.safe_load((run_dir / "environment.yaml").read_text())
+        target = dropped if machines.get(cpu_model_of(env)) in dev_machines else kept
+        target.append(run_dir)
+
+    if dropped:
+        print(f"skipping {len(dropped)} run(s) from development machines "
+              f"(mappings.yaml 'dev_machines'); their timings are not "
+              f"comparable with the benchmark hosts'. Pass "
+              f"--include-dev-machines to emit them anyway:", file=sys.stderr)
+        for run_dir in dropped:
+            print(f"  {run_dir}", file=sys.stderr)
+    if not kept:
+        raise SystemExit(
+            f"Every run under the input directory is from a development "
+            f"machine, so there is nothing publishable to write. Re-run with "
+            f"--include-dev-machines to validate the pipeline."
+        )
+    return kept
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -339,6 +372,12 @@ def main():
     parser.add_argument("--mappings", type=Path,
                         default=Path("./results/mappings.yaml"),
                         help="Path to mappings.yaml (default: %(default)s)")
+    parser.add_argument("--include-dev-machines", action="store_true",
+                        help="Also emit runs from machines listed under "
+                             "mappings.yaml 'dev_machines'. Their timings are "
+                             "not comparable with the benchmark hosts', so the "
+                             "output is for validating the pipeline, not for "
+                             "publishing.")
     args = parser.parse_args()
 
     input_dir = args.input_dir.resolve()
@@ -348,7 +387,9 @@ def main():
     mappings_path = args.mappings
     if not mappings_path.is_file():
         parser.error(f"mappings.yaml not found: {mappings_path}")
-    machines = yaml.safe_load(mappings_path.read_text()).get("machines", {})
+    mappings = yaml.safe_load(mappings_path.read_text())
+    machines = mappings.get("machines", {})
+    dev_machines = set(mappings.get("dev_machines") or [])
 
     # Discover runs: any directory holding both environment.yaml and results.psv.
     run_dirs = sorted({env.parent for env in input_dir.rglob("environment.yaml")
@@ -356,6 +397,9 @@ def main():
     if not run_dirs:
         parser.error(f"No benchmark runs (environment.yaml + results.psv) "
                      f"found under {input_dir}")
+
+    if dev_machines and not args.include_dev_machines:
+        run_dirs = drop_dev_machine_runs(run_dirs, machines, dev_machines)
 
     # Keep the latest-dated measurement per (datadate, machine, solution,
     # threadcount); a triple's thread counts may be spread over several runs.

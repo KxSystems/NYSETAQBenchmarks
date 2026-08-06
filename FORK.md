@@ -31,6 +31,33 @@ No vendor is privileged here, including peachq.
 | 8 | `src/runQueries.q` version guard relaxed to a capability check | `5.0>.z.K` rejects every non-KDB-X q, including ones that can run the corpus | Yes, standalone |
 | 9 | Capability shim for `.log.*` / `.mem.objsize` — landed as `src/qengine/runQueries.lite.q`, not as a shim | Both come from KDB-X modules unavailable to other implementations. A shim turned out not to be enough: `src/runQueries.q` uses KDB-X typed lambda parameters and progressive blocks inside a conditional, which a second implementation cannot **parse**, so no amount of predefining names helps. See "Follow-ups" | No — it is a fork-owned file, meant to be deleted |
 | 10 | `runQueries.lite.q` renders an unmeasured cell as the empty string rather than through `string` | peachq's `string 0Nj` is `"0Nl"` where kdb+'s is `""`, so every qlite `results.psv` carried `0Nl` in the null timing and IO columns and `convertToJSFormat.py` died parsing it | No — a fork-owned file, working around a second implementation's formatting |
+| 11 | `results/mappings.yaml` names development machines and `convertToJSFormat.py` drops their runs unless `--include-dev-machines` is passed | The only host this fork has is a laptop. Without a mapping entry no dashboard data can be generated at all; with a bare one, laptop timings can land on the same chart as an EPYC's | Yes, in principle — see below |
+
+### Development-machine results are not published
+
+The one machine this fork can run on is a `12th Gen Intel(R) Core(TM) i7-12700H` laptop.
+`convertToJSFormat.py` hard-errors on a CPU model missing from `results/mappings.yaml`, so
+until it was added, **no dashboard data could be generated here at all** and every result
+existed only as a PSV. The other two entries are server parts, and README promises publicly
+that timings are "comparable: same hardware, or the numbers mean nothing".
+
+Adding the laptop next to them silently would have broken that promise, so the entry comes
+with both halves of the guard:
+
+- **A name that states the class.** `DEV_INTEL_CORE_I7_12700H`, so the hardware page's machine
+  selector reads as a dev box at a glance rather than as a third server.
+- **An enforced rule.** `mappings.yaml` gained a `dev_machines:` list; `convertToJSFormat.py`
+  drops those runs, names each directory it dropped, and **exits non-zero if that left nothing
+  to write** rather than emitting an empty data file that looks like a successful publish.
+  `--include-dev-machines` is the deliberate opt-in that makes the pipeline runnable here.
+
+Rejected: a documented convention alone. Publishing already needs an explicit `git add -f`
+(`results/` is gitignored), and a rule that only lives in prose fails exactly when someone is
+in a hurry — which is when it matters. Also rejected: filtering by a `DEV_` name prefix, which
+makes a publication decision turn on string matching; the list is data and says what it means.
+
+The mechanism is fork-specific policy rather than a bug fix, so it is offerable upstream only
+as a feature. Upstream has the same exposure the moment anyone benchmarks on a workstation.
 
 ## Upstream ledger
 

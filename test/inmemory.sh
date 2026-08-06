@@ -87,6 +87,9 @@ rm -rf "${RESULTDIR}"
 ./benchmarks/inmemory/queryEngines.sh --db-dir "${TESTDB}" --param-dir "${PARAM_DIR}" --datadate "${TESTDBDATE}" --threads "4 16" --result-dir "${RESULTDIR}" "${QUERY_ENGINE_ARGS[@]}"
 ./benchmarks/inmemory/kdbAttributes.sh --db-dir "${TESTDB}" --param-dir "${PARAM_DIR}" --datadate "${TESTDBDATE}" --threads "4 16" --result-dir "${RESULTDIR}"
 
-python3 ./pysrc/convertToJSFormat.py "${RESULTDIR}" "${RESULTDIR}/data.generated.js"
+# --include-dev-machines because this asserts that the pipeline runs, which is
+# exactly the case the flag exists for; without it the last step fails on any
+# host listed under mappings.yaml 'dev_machines'.
+python3 ./pysrc/convertToJSFormat.py --include-dev-machines "${RESULTDIR}" "${RESULTDIR}/data.generated.js"
 
 popd

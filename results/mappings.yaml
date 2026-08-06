@@ -1,3 +1,10 @@
 machines:
   AMD EPYC 9575F 64-Core Processor: AMD_EPYC_9575F
   Intel(R) Xeon(R) 6738P: INTEL_XEON_6738P
+  12th Gen Intel(R) Core(TM) i7-12700H: DEV_INTEL_CORE_I7_12700H
+
+# Machines whose numbers validate the pipeline but are never published: laptops,
+# workstations, anything thermally or memory constrained next to a server part.
+# convertToJSFormat.py drops them unless asked for with --include-dev-machines.
+dev_machines:
+  - DEV_INTEL_CORE_I7_12700H
