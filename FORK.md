@@ -139,8 +139,8 @@ oversights:
     character vector, so `first` selects a single character rather than the header line,
     where the code it replaces used `first system "head -n 1 …"`. Every other `read0` in this
     repo uses the line-oriented form. Flagged rather than fixed: confirming it, and any fix,
-    requires executing KDB-X, which this fork's maintainer does not do (see `CONTRIBUTING.md`
-    once Phase 1 lands). It is also feedback to send to upstream PR #14 while it is open.
+    requires executing KDB-X, which this fork's maintainer does not do (see `CONTRIBUTING.md`).
+    It is also feedback to send to upstream PR #14 while it is open.
 - **Rayforce arm verification.** Not executed; shape-checked only (`bash -n` over
   `src/rayforce/*.sh`, and `artifacts/queries/inmemory/rayforce.psv` confirmed 4-field and
   idx-aligned with `querymeta.psv`). Two independent blockers, both to be cleared in Phase 2:
