@@ -135,13 +135,20 @@ resSize: {[res] r: @[.mem.objsize; res; {x}]; $[-7h ~ type r; string r div 1024;
 
 SEP: "|"
 COMPPARAM: "0_0_0"   / data is not compressed in memory
+
+// A cell the runner did not measure is the empty one -- that is what
+// src/runQueries.q emits and what convertToJSFormat.py parses. kdb+'s `string`
+// renders a null long that way already; peachq renders it "0Nl", which reaches
+// the dashboard converter as an unparsable timing.
+nullStr: {[v] $[null v; ""; string v]}
+
 writeRes: {[idx; query; status; ts; memusage; io; ressize]
   if[null resultH; :()];
   fixed: (STORAGE_BACKEND; COMPPARAM; string 1 | system "s"; "qlite"; string ENGINE;
     string lower FORMAT; INDEXON; idx; query; status);
-  times: string `long$ 3 # ts, 3 # 0Nn;
-  mem: $[10h ~ type memusage; memusage; string memusage div 1000];
-  ios: string 1 _ deltas 4 # io, 4 # 0Nj;
+  times: nullStr each `long$ 3 # ts, 3 # 0Nn;
+  mem: $[10h ~ type memusage; memusage; nullStr memusage div 1000];
+  ios: nullStr each 1 _ deltas 4 # io, 4 # 0Nj;
   resultH (SEP sv fixed, times, (enlist mem), ios, enlist ressize), "\n"}
 
 flushCaches: {[] -1 raze system getenv[`FLUSH], " ", DB;}

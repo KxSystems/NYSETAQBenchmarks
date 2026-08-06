@@ -30,6 +30,7 @@ No vendor is privileged here, including peachq.
 | 7 | `qlite` engine arm, `QBIN`-selected | Lets any q implementation run the benchmark; upstream has no path for one | Yes, in principle |
 | 8 | `src/runQueries.q` version guard relaxed to a capability check | `5.0>.z.K` rejects every non-KDB-X q, including ones that can run the corpus | Yes, standalone |
 | 9 | Capability shim for `.log.*` / `.mem.objsize` — landed as `src/qengine/runQueries.lite.q`, not as a shim | Both come from KDB-X modules unavailable to other implementations. A shim turned out not to be enough: `src/runQueries.q` uses KDB-X typed lambda parameters and progressive blocks inside a conditional, which a second implementation cannot **parse**, so no amount of predefining names helps. See "Follow-ups" | No — it is a fork-owned file, meant to be deleted |
+| 10 | `runQueries.lite.q` renders an unmeasured cell as the empty string rather than through `string` | peachq's `string 0Nj` is `"0Nl"` where kdb+'s is `""`, so every qlite `results.psv` carried `0Nl` in the null timing and IO columns and `convertToJSFormat.py` died parsing it | No — a fork-owned file, working around a second implementation's formatting |
 
 ## Upstream ledger
 
