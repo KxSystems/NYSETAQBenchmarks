@@ -132,7 +132,8 @@ function execute_queries () {
                 local QBIN_PATH
                 QBIN_PATH=$(bash ./src/qengine/qbin.sh)
                 run_solution "qlite" "${QBIN_PATH}" ./src/qengine/runQueries.lite.q \
-                    ${COMMONPARAMS} -db ${DB_DIR}/psv -sortcols "time" -indexon "sym" \
+                    ${COMMONPARAMS} -db ${DB_DIR}/splayed -format splayed \
+                    -sortcols "time" -indexon "sym" \
                     -queryfile ./artifacts/queries/inmemory/kdb.psv
             fi
         fi

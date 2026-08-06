@@ -32,6 +32,7 @@ No vendor is privileged here, including peachq.
 | 9 | Capability shim for `.log.*` / `.mem.objsize` — landed as `src/qengine/runQueries.lite.q`, not as a shim | Both come from KDB-X modules unavailable to other implementations. A shim turned out not to be enough: `src/runQueries.q` uses KDB-X typed lambda parameters and progressive blocks inside a conditional, which a second implementation cannot **parse**, so no amount of predefining names helps. See "Follow-ups" | No — it is a fork-owned file, meant to be deleted |
 | 10 | `runQueries.lite.q` renders an unmeasured cell as the empty string rather than through `string` | peachq's `string 0Nj` is `"0Nl"` where kdb+'s is `""`, so every qlite `results.psv` carried `0Nl` in the null timing and IO columns and `convertToJSFormat.py` died parsing it | No — a fork-owned file, working around a second implementation's formatting |
 | 11 | `results/mappings.yaml` names development machines and `convertToJSFormat.py` drops their runs unless `--include-dev-machines` is passed | The only host this fork has is a laptop. Without a mapping entry no dashboard data can be generated at all; with a bare one, laptop timings can land on the same chart as an EPYC's | Yes, in principle — see below |
+| 12 | `DATAFORMAT=splayed` and `src/qengine/psvToSplayed.q`, a plain-q PSV→splayed kdb converter | `src/taqToKDB.q` needs the KDB-X module system and typed lambda parameters, so no other q implementation can build a kdb database. Without one, the `qlite` arm's `idx 0` row measured PSV parsing and was not comparable with the kdb+ arms' | Yes, in principle — it gives upstream a kdb data path with no KDB-X in it |
 
 ### Development-machine results are not published
 
@@ -58,6 +59,43 @@ makes a publication decision turn on string matching; the list is data and says 
 
 The mechanism is fork-specific policy rather than a bug fix, so it is offerable upstream only
 as a feature. Upstream has the same exposure the moment anyone benchmarks on a workstation.
+
+### Where the splayed converter lives, and why
+
+`generateDB.sh` is its home rather than a sibling script. It already dispatches on
+`DATAFORMAT`, and its `rayforce` branch already resolves an engine binary and drives it — a
+`splayed` branch that resolves `src/qengine/qbin.sh` is the same shape, one line of dispatch,
+and it keeps "how do I build the data for engine X" a single question with a single answer. A
+sibling script would have been a second place to look for the same thing.
+
+The layout is `DST/sym`, `DST/exnames` and `DST/<date>/{master,trade,quote}/`, which is what
+the kdb+ database looks like on disk, so `src/loadSplayedDataset.q` can follow
+`loadKDBDBIntoMemory`'s shape. It is **not** a partitioned database: no `par.txt`, nothing is
+loaded as a partitioned view, and the loader reads each splay by path. peachq does not do
+partitioned databases and the in-memory suite does not need one — the date directory is there
+so two dates cannot read each other's data, the same reason the `rayforce` branch has one.
+
+Rejected: writing the tables at the database root with no date directory. It is marginally
+simpler and makes the database silently wrong the first time anyone generates a second date
+into it.
+
+The converter has no `-batchsize`: it holds the day in memory, as parsing does anyway. That is
+a real limit against `full`, and it is recorded here rather than discovered later.
+
+### peachq gaps found building Stage B
+
+All against the pinned v0.74.0. None blocked the work; each has a workaround in the tree.
+
+| expression | peachq | kdb+ | worked around by |
+|---|---|---|---|
+| `string 0Nj` | `"0Nl"` | `""` | `nullStr` in `runQueries.lite.q` (divergence 10) |
+| ``get `:db/2026.04.01/trade`` | `error: io` | the table | asking for `trade/`, with the trailing slash |
+| ``` `time xasc get `:db/2026.04.01/trade/ ``` | `error: type` | the sorted table | `select ... where i>-1` first, which the shared runner does anyway |
+
+The second and third only bite a table read straight off disk; the same expressions on an
+in-memory table are fine. The third is why `src/loadSplayedDataset.q` materialises rather than
+leaving the tables mapped — which is what the benchmark wants regardless, so the workaround
+costs nothing and is not a divergence.
 
 ## Upstream ledger
 
@@ -114,11 +152,9 @@ oversights:
   guard) is the prerequisite and is already in place. Until then the repo carries a third
   implementation of `docs/engine-contract.md` — exactly what the contract was written to stop —
   and the lite runner is documented as delete-only, not extend.
-- **`qlite` setup rows are not comparable with the kdb+ arms'.** The arm reads PSV files, so
-  its `idx 0` row measures PSV parsing, not a kdb+ database load, and it reports `rowCount`s
-  that a `check_table_stats` run will compare against the kdb+ arms'. Query rows (`idx` 1–84)
-  are comparable, since the data is in memory either way. Stage B replaces the PSV load with a
-  plain-q PSV→splayed converter to restore it.
+- ~~**`qlite` setup rows are not comparable with the kdb+ arms'.**~~ **Done**, by divergence
+  12. The arm loads a splayed kdb database, so `idx 0` is a database load on both sides. The
+  PSV path stays reachable with `-format psv` and keeps the caveat.
 - **`qlite` reports `threadcount` 1 for every run.** peachq's `system "s"` is `0`, so the arm
   runs once for the first `--threads` value rather than once per value, which would emit
   duplicate `threadcount 1` rows and double the query list `convertToJSFormat.py` builds.

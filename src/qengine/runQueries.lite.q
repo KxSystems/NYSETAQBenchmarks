@@ -10,16 +10,21 @@
 // are both parse errors elsewhere. It is meant to be deleted, not extended:
 // when those parse, the qlite arm should run src/runQueries.q instead.
 //
-// It is memory-backend only and loads PSVs, so its setup rows measure PSV
-// parsing rather than a kdb+ database load and are NOT comparable with the
-// kdb+ arms'. Query rows are, since the data is in memory either way.
+// It is memory-backend only. -format SPLAYED loads the splayed kdb database
+// src/qengine/psvToSplayed.q writes, which is what makes the setup rows
+// comparable with the kdb+ arms': both are then loading a kdb-format database.
+// -format PSV parses the PSV files directly instead and needs no converter run,
+// but its idx 0 row measures PSV parsing and is NOT comparable. Query rows are
+// comparable either way, since the data is in memory by the time they run.
 
 USAGE: "usage: q ", string[.z.f], " [-help] -db DB -paramdir DIR -queryfile FILE -querymeta FILE",
-  " -storage_backend memory [-format PSV] [-engine q-sql] [-sortcols COLS] [-indexon COL]",
+  " -storage_backend memory [-format (PSV|SPLAYED)] [-engine q-sql] [-sortcols COLS] [-indexon COL]",
   " [-date DATE] [-queryOutputDir DIR] [-result FILE] [-tableStatsDir DIR] [-tags TAGS]",
   " [-instrument (single|multi|all)] [-idx FILTER] [-debug]\n\n",
-  "Loads one day of NYSE TAQ PSV files into memory and runs the benchmark queries\n",
-  "against them, writing the contract's per-query result PSV.\n\n",
+  "Loads one day of NYSE TAQ data into memory and runs the benchmark queries\n",
+  "against it, writing the contract's per-query result PSV. -db is a splayed kdb\n",
+  "database from src/qengine/psvToSplayed.q, or a directory of PSV files with\n",
+  "-format PSV.\n\n",
   "See docs/engine-contract.md for the CLI, the result columns and the protocol."
 
 // .Q.opt is documented to give each option a list of strings; take the first
@@ -56,12 +61,16 @@ if[not ENGINE ~ `$"q-sql"; -2 "Unsupported engine ", string ENGINE; exit 2]
 \l src/pivot.q
 \l src/memusage.q
 \l src/loadPSVDataset.q
+\l src/loadSplayedDataset.q
 \l src/getQueryParameters.q
 
 DB: opt `db
 DATE: "D"$opt `date
 PARAMDIR: hsym `$opt `paramdir
-FORMAT: $[count f: upper opt `format; `$f; `PSV]
+FORMAT: $[count f: upper opt `format; `$f; `SPLAYED]
+if[not FORMAT in `PSV`SPLAYED;
+  -2 "Unsupported format ", string[FORMAT], " (expected PSV or SPLAYED)"; exit 2]
+LOADDATASET: $[FORMAT ~ `SPLAYED; loadSplayedDataset; loadPSVDataset]
 INDEXON: trim lower opt `$"indexon"
 SORTCOLS: (`$"," vs opt `sortcols) except `
 QUERYOUTPUT: $[count d: opt `queryOutputDir; hsym `$d; `]
@@ -184,8 +193,8 @@ getAttrib: {[indexon; sortcols]
 loadIntoMemory: {[db; date; sortCols; attrib]
   flushCaches[];
   GC[];
-  -1 "loading PSV dataset at ", db;
-  r: timed[loadPSVDataset; (db; date)];
+  -1 "loading ", lower string[FORMAT], " dataset at ", db;
+  r: timed[LOADDATASET; (db; date)];
   setupRow[0; "load a partition into memory"; statusOf r; r 0; r 1; r 2; NYI];
   / no transformation, but we want to record the time and memory usage of the transformation step
   setupRow[-1; "transform"; "success"; 0D; 0j; 0j; NYI];

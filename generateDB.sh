@@ -16,6 +16,13 @@ LETTERS=$(get_letters $SIZE)
 if [[ ${DATAFORMAT} == "parquet" ]]; then
   echo "Generating parquet dataset..."
   uv run ./pysrc/taqToParquet/main.py -date "$DATE" -src "$CSVDIR" -dst "$DST" -letters "$LETTERS"
+elif [[ ${DATAFORMAT} == "splayed" ]]; then
+  # A kdb-format database for q implementations that cannot run src/taqToKDB.q,
+  # built by the same binary the qlite arm benchmarks. The letter range comes
+  # from the BBO filenames in $CSVDIR rather than from $LETTERS.
+  echo "Generating splayed kdb dataset..."
+  QLITE_BIN=$(bash "${script_dir}/src/qengine/qbin.sh")
+  "${QLITE_BIN}" ./src/qengine/psvToSplayed.q -src "$CSVDIR" -dst "$DST" -date "$DATE" -q
 elif [[ ${DATAFORMAT} == "rayforce" ]]; then
   # Rayforce ingests via CSV, so it bridges through the generated on-disk DB:
   # export the master/trade/quote columns to comma-CSV, then build the native

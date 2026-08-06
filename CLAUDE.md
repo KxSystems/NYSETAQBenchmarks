@@ -110,8 +110,9 @@ q artifacts/parameters/genParameters.q -db ${NYSEBENCHMARKDIR}/${SIZE}/kdb -dst 
 
 ### Four-stage pipeline
 
-`getPSVs.sh` (submodule) → parser (`src/taqToKDB.q` for kdb+, `pysrc/taqToParquet/` for
-Hive-partitioned Parquet, both behind `generateDB.sh`) → benchmark driver → merged
+`getPSVs.sh` (submodule) → parser (`src/taqToKDB.q` for partitioned kdb+,
+`pysrc/taqToParquet/` for Hive-partitioned Parquet, `src/qengine/psvToSplayed.q` for the
+splayed kdb database the `qlite` arm reads, all behind `generateDB.sh`) → benchmark driver → merged
 `results.psv` → optional dashboard JS. Each stage's output is the next stage's input on disk;
 data lives outside the repo tree under `$NYSEBENCHMARKDIR`.
 
