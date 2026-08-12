@@ -232,7 +232,10 @@ loadKDBDBIntoMemory: ('[{[params]
   .Q.dd[dpath] {[getPath; tName]
       .log.info "loading table ", string[tName], " into memory";
       tName set select from get[getPath tName] where i>-1;
+      / use symbols instead of enums agains global sym vector
+      @[tName; where 20h=type each flip value tName; value];
       .log.info "Shape of ", string[tName], ": ", string[count value tName], " x ", string count cols tName; }' tbls;
+    delete sym from `.;
   }; enlist])
 
 sortTradeQuoteTables: {[sortCols]
