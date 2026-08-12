@@ -296,7 +296,7 @@ The file starts with a header row. The columns are:
 | `indexon` | Columns an index/attribute was applied to, e.g. `sym`. Empty if none. |
 | `idx` | Query index. Positive integers are benchmark queries; non-positive values are setup steps: `0` = load a partition into memory, `-1` = transform, `-2` = sort, `-3` = index. |
 | `query` | The query text that was executed (or a short description for setup rows). |
-| `status` | Outcome: `success`, `error` (query raised an exception), `idxfiltered` (skipped by the `--idx` filter), `tagfiltered` (skipped by the `--tags` filter), or `instrumentfiltered` (skipped by the `--instrument` filter). |
+| `status` | Outcome: `success`, `error` (query raised an exception), `skip` (skipped by commenting out by a `#` in the query string),`idxfiltered` (skipped by the `--idx` filter), `tagfiltered` (skipped by the `--tags` filter), or `instrumentfiltered` (skipped by the `--instrument` filter). |
 | `run1timeNS` | Execution time of run 1 (cold) in nanoseconds. Setup rows record their elapsed time here. |
 | `run2timeNS` | Execution time of run 2 (warm) in nanoseconds. |
 | `run3timeNS` | Execution time of run 3 (warm) in nanoseconds. |

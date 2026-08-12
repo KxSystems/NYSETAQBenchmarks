@@ -336,8 +336,8 @@ runQuery: {[db: `C; device: `C; writerFN; filters; querytuple]
   if[not count query;
     writerFN[idx; query; ("emptyquery"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
     :()];
-  if["#" ~ first idx;
-    writerFN[1_idx; query; ("skip"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
+  if["#" ~ first query;
+    writerFN[idx; 1_query; ("skip"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
     :()];
   if[count[idxFilter] and not ("J"$idx) in idxFilter;
     writerFN[idx; query; ("idxfiltered"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
