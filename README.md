@@ -29,7 +29,23 @@ export NUMANODE=0
 
 Results are written to `./results/inmemory/${SIZE}/results.psv` (one row per
 query, as a pipe-separated values file). See [Results](#results) for the column
-descriptions.
+descriptions. You can also view the results in the bundled dashboard:
+
+```bash
+uv run pysrc/convertToJSFormat.py ./results/inmemory/${SIZE} ./results/inmemory/${SIZE}/data.generated.js
+```
+
+Two local adjustments are needed before the page shows your data — see
+[Result Dashboard and benchmark.kx.com](#result-dashboard-and-benchmarkkxcom) for details:
+
+* Your CPU model must appear in the `machines` mapping of
+  [results/mappings.yaml](./results/mappings.yaml), otherwise the conversion
+  stops with an explanatory error.
+* [index.html](./index.html) ships configured for the sizes KX publishes
+  (`full`, `xlarge`, `large`), so set `available_sizes` and `default_size` at the
+  top of the file to the size you generated, e.g. `['tiny']` / `'tiny'`.
+
+Then open `index.html` in a browser.
 
 ## Overview
 
@@ -296,7 +312,7 @@ The file starts with a header row. The columns are:
 | `indexon` | Columns an index/attribute was applied to, e.g. `sym`. Empty if none. |
 | `idx` | Query index. Positive integers are benchmark queries; non-positive values are setup steps: `0` = load a partition into memory, `-1` = transform, `-2` = sort, `-3` = index. |
 | `query` | The query text that was executed (or a short description for setup rows). |
-| `status` | Outcome: `success`, `error` (query raised an exception), `idxfiltered` (skipped by the `--idx` filter), `tagfiltered` (skipped by the `--tags` filter), or `instrumentfiltered` (skipped by the `--instrument` filter). |
+| `status` | Outcome: `success`, `error` (query raised an exception), `skip` (skipped by commenting out by a `#` in the query string),`idxfiltered` (skipped by the `--idx` filter), `tagfiltered` (skipped by the `--tags` filter), or `instrumentfiltered` (skipped by the `--instrument` filter). |
 | `run1timeNS` | Execution time of run 1 (cold) in nanoseconds. Setup rows record their elapsed time here. |
 | `run2timeNS` | Execution time of run 2 (warm) in nanoseconds. |
 | `run3timeNS` | Execution time of run 3 (warm) in nanoseconds. |

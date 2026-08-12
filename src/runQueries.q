@@ -33,7 +33,7 @@ USAGE: "usage: q ", string[.z.f], " [-help] -db DB -paramdir DIR -queryfile FILE
   "  IOSTAT               Set to 'false' to disable IO statistics collection\n",
   "  QMAP                 Set to 'true' to run .Q.MAP[] after loading the database"
 
-ko: key o: first each .Q.opt .z.x;
+ko: key o: (trim first@) each .Q.opt .z.x;
 if[`help in ko; .log.info USAGE; exit 0]
 
 MANDATORY: `db`paramdir`queryfile`querymeta`storage_backend;
@@ -79,10 +79,10 @@ if[not count key hsym `$DB, "/", string DATE;
 PARAMDIR: hsym `$o`paramdir
 
 
-INDEXON: trim lower o `$"indexon"
+INDEXON: lower o `$"indexon"
 FORMAT: `$upper o `format
 ENGINE: (`$"q-sql")^`$upper o `engine
-SORTCOLS: `$"," vs o `sortcols
+SORTCOLS: `$$[count o `sortcols; "," vs o `sortcols; ()]
 QUERYOUTPUT: hsym `$o `queryOutputDir
 
 checkInputFileExistence: {[f]
@@ -232,7 +232,10 @@ loadKDBDBIntoMemory: ('[{[params]
   .Q.dd[dpath] {[getPath; tName]
       .log.info "loading table ", string[tName], " into memory";
       tName set select from get[getPath tName] where i>-1;
+      / use symbols instead of enums agains global sym vector
+      @[tName; where 20h=type each flip value tName; value];
       .log.info "Shape of ", string[tName], ": ", string[count value tName], " x ", string count cols tName; }' tbls;
+    delete sym from `.;
   }; enlist])
 
 sortTradeQuoteTables: {[sortCols]
@@ -336,8 +339,8 @@ runQuery: {[db: `C; device: `C; writerFN; filters; querytuple]
   if[not count query;
     writerFN[idx; query; ("emptyquery"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
     :()];
-  if["#" ~ first idx;
-    writerFN[1_idx; query; ("skip"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
+  if["#" ~ first query;
+    writerFN[idx; 1_query; ("skip"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
     :()];
   if[count[idxFilter] and not ("J"$idx) in idxFilter;
     writerFN[idx; query; ("idxfiltered"; 3#0Nn; 0Nj; 4#0Nj; 0Nj)];
