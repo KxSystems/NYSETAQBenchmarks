@@ -33,7 +33,7 @@ USAGE: "usage: q ", string[.z.f], " [-help] -db DB -paramdir DIR -queryfile FILE
   "  IOSTAT               Set to 'false' to disable IO statistics collection\n",
   "  QMAP                 Set to 'true' to run .Q.MAP[] after loading the database"
 
-ko: key o: first each .Q.opt .z.x;
+ko: key o: (trim first@) each .Q.opt .z.x;
 if[`help in ko; .log.info USAGE; exit 0]
 
 MANDATORY: `db`paramdir`queryfile`querymeta`storage_backend;
@@ -79,10 +79,10 @@ if[not count key hsym `$DB, "/", string DATE;
 PARAMDIR: hsym `$o`paramdir
 
 
-INDEXON: trim lower o `$"indexon"
+INDEXON: lower o `$"indexon"
 FORMAT: `$upper o `format
 ENGINE: (`$"q-sql")^`$upper o `engine
-SORTCOLS: `$"," vs o `sortcols
+SORTCOLS: `$$[count o `sortcols; "," vs o `sortcols; ()]
 QUERYOUTPUT: hsym `$o `queryOutputDir
 
 checkInputFileExistence: {[f]
