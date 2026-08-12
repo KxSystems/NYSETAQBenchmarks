@@ -29,7 +29,23 @@ export NUMANODE=0
 
 Results are written to `./results/inmemory/${SIZE}/results.psv` (one row per
 query, as a pipe-separated values file). See [Results](#results) for the column
-descriptions.
+descriptions. You can also view the results in the bundled dashboard:
+
+```bash
+uv run pysrc/convertToJSFormat.py ./results/inmemory/${SIZE} ./results/inmemory/${SIZE}/data.generated.js
+```
+
+Two local adjustments are needed before the page shows your data — see
+[Result Dashboard and benchmark.kx.com](#result-dashboard-and-benchmarkkxcom) for details:
+
+* Your CPU model must appear in the `machines` mapping of
+  [results/mappings.yaml](./results/mappings.yaml), otherwise the conversion
+  stops with an explanatory error.
+* [index.html](./index.html) ships configured for the sizes KX publishes
+  (`full`, `xlarge`, `large`), so set `available_sizes` and `default_size` at the
+  top of the file to the size you generated, e.g. `['tiny']` / `'tiny'`.
+
+Then open `index.html` in a browser.
 
 ## Overview
 
