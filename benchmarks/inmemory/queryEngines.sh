@@ -102,7 +102,9 @@ function execute_queries () {
             fi
         fi
         if engine_enabled chdb; then
-            run_solution "chDB" env CHDB_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine chdb -sortcols "time" -queryfile ./artifacts/queries/inmemory/chdb.psv
+            if solution_enabled "chDB"; then
+                run_solution "chDB" env CHDB_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine chdb -sortcols "time" -queryfile ./artifacts/queries/inmemory/chdb.psv
+            fi
         fi
         if engine_enabled polars; then
             if solution_enabled "Polars"; then
