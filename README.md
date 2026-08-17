@@ -209,7 +209,7 @@ Query engines read data into memory from Hive-partitioned Parquet or kdb+ format
 | `kdbxsql` | KDB-X SQL | kdb+ |
 | `pykx` | KDB-X Python (`pykx`) | kdb+ |
 | `duckdb` | DuckDB | Parquet |
-| `chdb` | chDB (embedded ClickHouse) | Parquet |
+| `chdb` | chDB (embedded ClickHouse). Three solutions: `chDB (Memory)` loads the Parquet files with ClickHouse's `file()` function into `ENGINE = Memory` tables, `chDB (Memory, Compressed)` does the same with the two big tables LZ4-compressed in memory (`ENGINE = Memory SETTINGS compress = 1`), `chDB (PyArrow)` queries Arrow tables through chDB's `Python()` table function | Parquet |
 | `polars` | Polars | Parquet |
 | `pandas` | Pandas | Parquet |
 
@@ -509,7 +509,7 @@ reads the kdb+ database instead.
 
 Queries are defined **per engine** in PSV files under
 [artifacts/queries/inmemory/](./artifacts/queries/inmemory/) (`kdb.psv`,
-`sql.psv`, `duckdb.psv`, `polars.psv`, `pandas.psv`, `pykx.psv`, and the
+`sql.psv`, `duckdb.psv`, `chdb.psv`, `polars.psv`, `pandas.psv`, `pykx.psv`, and the
 attribute-benchmark variants `kdb_noattr.psv`, `kdb_tabledict.psv`). Each file
 has the columns:
 

@@ -20,21 +20,12 @@ Script to run queries on NYSE TAQ and collect performance metrics (like executio
 
 Environment variables:
   FLUSH               (required) Path to the cache-flush binary; called before each cold run
-  CHDB_THREADS        (optional) Number of threads for the chDB engine
+  CHDB_THREADS        (optional) Number of threads for the chDB engines
+  CHDB_COMPRESS       (optional) Hold the chDB Memory tables compressed
   DUCKDB_THREADS      (optional) Number of threads for DuckDB engines
   NUMEXPR_NUM_THREADS (optional) Number of threads for the Pandas/numexpr engine
 """
-import os
-if 'CHDB_THREADS' in os.environ:
-    os.environ.setdefault('OMP_NUM_THREADS', os.environ['CHDB_THREADS'])
-    os.environ.setdefault('OMP_DYNAMIC', 'FALSE')
-    os.environ.setdefault('OPENBLAS_NUM_THREADS', os.environ['CHDB_THREADS'])
-    os.environ.setdefault('MKL_NUM_THREADS', os.environ['CHDB_THREADS'])
-
 import argparse
-import pyarrow as pa
-if 'CHDB_THREADS' in os.environ:
-    pa.set_cpu_count(int(os.environ['CHDB_THREADS']))
 import contextlib
 import csv
 import gc
@@ -193,13 +184,18 @@ def main(args: argparse.Namespace) -> None:
                 con.execute(f"SET threads = {os.environ['DUCKDB_THREADS']}")
             threadnr = con.sql("SELECT current_setting('threads')").fetchall()[0][0]
             logger.info("Using DuckDB with %s threads", threadnr)
-        elif engine == "chdb":
+        elif engine in ("chdb", "chdb_pyarrow"):
             if len(args.indexon) > 0:
                 raise ValueError("chDB does not support indices")
-            from executors.inmemory.chdb import QueryExecutorChDB
-            runner = QueryExecutorChDB(params, sort_cols=args.sortcols, datadate=args.date)
+            # chdb queries ClickHouse Memory tables, chdb_pyarrow queries the
+            # Arrow tables through chDB's Python() table function.
+            if engine == "chdb":
+                from executors.inmemory.chdb import QueryExecutorChDB as ChDBExecutor
+            else:
+                from executors.inmemory.chdb_pyarrow import QueryExecutorChDBPyArrow as ChDBExecutor
+            runner = ChDBExecutor(params, sort_cols=args.sortcols, datadate=args.date)
             threadnr = runner.threads
-            logger.info("Using chDB with %s threads", threadnr)
+            logger.info("Using %s with %s threads", ChDBExecutor.__name__, threadnr)
         elif engine == "pykx":
             from executors.inmemory.pykx import QueryExecutorPyKXInMemory
             import pykx as kx
@@ -320,8 +316,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('-db', type=Path, required=True, help="Path to hive-partitioned parquet DB root")
     parser.add_argument('-storage_backend', type=str, choices=["memory", "disk"],
         required=True, help="Storage backend. Currently supported memory and disk")
-    parser.add_argument('-engine', type=str, choices=["polars", "duckdb_con", "chdb", "pykx", "pandas"],
-        required=True, help="Query engine. Currently supported: polars, duckdb_con, chdb, pykx, and pandas")
+    parser.add_argument('-engine', type=str, choices=["polars", "duckdb_con", "chdb", "chdb_pyarrow", "pykx", "pandas"],
+        required=True, help="Query engine. Currently supported: polars, duckdb_con, chdb, chdb_pyarrow, pykx, and pandas")
     parser.add_argument('-sortcols', type=parse_sortcols, required=False, help="Comma-separated columns to sort trade/quote by, e.g. 'time' or 'sym,time'.")
     parser.add_argument('-indexon', type=parse_sortcols, required=False, default=[], help="Comma-separated columns to add index to, e.g. 'sym' or 'sym,ex'.")
     parser.add_argument('-queryfile', type=Path, required=True, help="PSV file containing queries")
