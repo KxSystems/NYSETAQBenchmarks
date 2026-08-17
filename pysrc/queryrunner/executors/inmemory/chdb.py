@@ -1,236 +1,199 @@
 """
-chDB (embedded ClickHouse) in-memory query executor.
+chDB (embedded ClickHouse) in-memory query executor over ClickHouse Memory tables.
 
-The tables (master, trade, quote, exnames, timeBuckets) are stored in memory
-as Apache Arrow tables. Queries are ClickHouse SQL and reference the tables
-through chDB's Python() table function (e.g. SELECT ... FROM Python(trade)),
-which scans the Arrow data directly, so Arrow remains the storage format.
+The tables (master, trade, quote, exnames, timeBuckets) are ClickHouse Memory
+tables (CREATE TABLE ... ENGINE = Memory) that the queries name directly
+(SELECT ... FROM trade), so both the storage and the scan are ClickHouse's own.
+ClickHouse also reads the data: every load step is a CREATE TABLE ... AS SELECT,
+the first one straight from the Parquet files through the file() table function,
+with no Arrow table in between.
 
-Time-of-day columns are kept as Arrow duration[ns] (surfaced by chDB as
-IntervalNanosecond), so queries compare and bucket them with INTERVAL literals
-and nanosecond arithmetic rather than DateTime64 timestamps.
+A Memory table cannot be altered in place, so each step (load, transform, sort)
+builds the next table beside the current one and swaps it in -- see _rebuild --
+which is also what keeps the steps separately measurable:
 
-Every query runs with session_timezone='UTC' so that any date/time functions
-behave consistently regardless of the host timezone.
+  * load      -- file() into Memory tables. Hive partitioning is switched off:
+                 the date partition column is constant within the partition, and
+                 the time-of-day columns stay date-less. trade and quote also
+                 keep the parquet row's position (_file, _row_number) for the
+                 sort below.
+  * transform -- the types the queries expect, which are the ones the Arrow
+                 executor gets for free from its duration[ns] and
+                 dictionary-encoded columns: IntervalNanosecond for the
+                 time-of-day columns (ClickHouse's Parquet reader sees them as
+                 plain Int64 nanoseconds) and LowCardinality for every string
+                 column -- the encoding all of them but master's free-text
+                 description have in the Arrow executor.
+  * sort      -- trade and quote ordered by sortcols, ties broken by the parquet
+                 row position so the numbering matches the Arrow executor's
+                 stable sort. Unlike there, the rowid numbering cannot be split
+                 off from the sort, so its cost is part of the sort step.
+
+With CHDB_COMPRESS set, the two big tables are held as compressed Memory tables
+(ENGINE = Memory SETTINGS compress = 1) instead: the same storage and the same
+scan, with the blocks LZ4-compressed in memory, so the table takes less of it and
+every scan pays the decompression. The small tables are unaffected, there being
+nothing to gain on them.
+
+Everything that is not about Memory tables being the storage lives in
+chdb_base.py, next to the Arrow executor (chdb_pyarrow.py) that shares it.
 
 Environment variables:
-  CHDB_THREADS (optional) Number of threads (ClickHouse max_threads) per query.
+  CHDB_THREADS  (optional) Number of threads (ClickHouse max_threads) per query.
+  CHDB_COMPRESS (optional) Boolean, false by default: hold trade and quote as
+                compressed Memory tables.
 """
 import logging
 import os
-import time
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-import chdb
-import numpy as np
-import pyarrow as pa
-import pyarrow.compute as pc
-import pyarrow.dataset as pa_ds
+from executors.inmemory.chdb_base import QueryExecutorChDBBase
 
 logger = logging.getLogger(__name__)
 
+# What CHDB_COMPRESS is read as; anything else is a typo rather than a setting,
+# and silently benchmarking the wrong thing is the one outcome to avoid.
+_FALSE, _TRUE = ('', '0', 'false', 'no', 'off'), ('1', 'true', 'yes', 'on')
 
-class QueryExecutorChDB:
+
+def _env_bool(name: str) -> bool:
+    """Read a boolean environment variable; false when unset or empty."""
+    value = os.environ.get(name, '').strip().lower()
+    if value in _FALSE:
+        return False
+    if value in _TRUE:
+        return True
+    raise ValueError(f"{name} must be one of {_FALSE[1:] + _TRUE}, not {os.environ[name]!r}")
+
+
+class QueryExecutorChDB(QueryExecutorChDBBase):
     """
-    Handles the setup, execution of chDB queries over in-memory Arrow tables.
+    Handles the setup, execution of chDB queries over ClickHouse Memory tables.
     """
+
+    # The time-of-day columns each table stores as int64 nanoseconds. Parquet
+    # keeps their duration[ns] type in the Arrow schema only, which ClickHouse
+    # does not read, so they are named here -- see the time_cols arguments of
+    # pysrc/taqToParquet/table_converters.py.
+    DURATION_COLUMNS: dict[str, tuple[str, ...]] = {
+        "master": (),
+        "trade": ("time", "participantTimestamp", "tradeReportingFacilityTRFTimestamp"),
+        "quote": ("time", "participantTimestamp", "FINRAADFTimestamp"),
+    }
+    # The parquet row position, kept on the tables that are sorted.
+    ROW_POSITION: tuple[str, ...] = ("_src_file", "_src_row")
+    # The tables CHDB_COMPRESS applies to: the two the data is in.
+    COMPRESSED_TABLES: tuple[str, ...] = ("trade", "quote")
 
     def __init__(self, param: dict[str, Any], sort_cols: list[str], datadate: date) -> None:
-        self.params: dict[str, Any] = param
-        self.sort_cols: list[str] = sort_cols
+        # Read before the base __init__, which creates the first Memory table.
+        self.compress: bool = _env_bool('CHDB_COMPRESS')
+        super().__init__(param, sort_cols, datadate)
+        logger.info("holding %s as compressed Memory tables: %s",
+                    ", ".join(self.COMPRESSED_TABLES), self.compress)
 
-        settings = ["session_timezone = 'UTC'"]
-        if 'CHDB_THREADS' in os.environ:
-            settings.append(f"max_threads = {int(os.environ['CHDB_THREADS'])}")
-        self.settings_clause: str = " SETTINGS " + ", ".join(settings)
-        self.threads: int = int(str(chdb.query(
-            f"SELECT getSetting('max_threads'){self.settings_clause}", "CSV")).strip())
+    def _table_ref(self, name: str) -> str:
+        """How the queries reach the table: by its Memory table name."""
+        return name
 
-        timebuckets_rows = list(self.params.pop('timeBuckets').items())
-        bounds = [(d.days * 86_400 + d.seconds) * 1_000_000_000 + d.microseconds * 1_000
-                  for _, d in timebuckets_rows]
-        self.tables: dict[str, pa.Table] = {
-            "timeBuckets": pa.table({
-                "bucket": pa.array([b for b, _ in timebuckets_rows]),
-                "bound": pa.array(bounds, pa.duration('ns')),
-                "rowid": pa.array(range(len(bounds)), pa.uint64()),
-            })
-        }
-        # Query parameters pre-rendered as SQL literals, interpolated into the
-        # queries' {name} placeholders with str.format.
-        self.sql_params: dict[str, str] = {k: self._sql_literal(v) for k, v in self.params.items()}
+    def _add_timebuckets(self, rows: list[tuple[str, int]]) -> None:
+        self._query("CREATE TABLE timeBuckets (bucket Nullable(String),"
+                    " bound Nullable(IntervalNanosecond), rowid Nullable(UInt64))"
+                    " ENGINE = Memory", "CSV")
+        values = ", ".join(
+            f"({self._sql_literal(bucket)}, toIntervalNanosecond({bound}), {rowid})"
+            for rowid, (bucket, bound) in enumerate(rows))
+        self._query(f"INSERT INTO timeBuckets VALUES {values}", "CSV")
 
-    def _transform(self, tbl: pa.Table) -> pa.Table:
-        """Dictionary-encode the sym column."""
-        if 'sym' in tbl.column_names and not pa.types.is_dictionary(tbl['sym'].type):
-            idx = tbl.column_names.index('sym')
-            tbl = tbl.set_column(idx, 'sym', tbl['sym'].dictionary_encode())
-        return tbl
+    def _load(self, db_path: Path, datadate: date) -> None:
+        partition = {name: db_path / name / f"date={datadate}" / "*.parquet"
+                     for name in self.REPORTED_TABLES}
+        for name, src in {"exnames": db_path / "exnames.parquet", **partition}.items():
+            logger.info("loading %s", name)
+            columns = "*"
+            if name in self.SORTED_TABLES:
+                columns += ", _file AS _src_file, _row_number AS _src_row"
+            self._create(name, f"SELECT {columns} FROM file({self._sql_literal(str(src))}, Parquet)",
+                         " SETTINGS use_hive_partitioning = 0")
 
-    @staticmethod
-    def _append_rowid(tbl: pa.Table) -> pa.Table:
-        """Number the rows by their sorted position. sort_by is stable, so this
-        matches DuckDB's implicit rowid after its ORDER BY ..., rowid rebuild."""
-        return tbl.append_column('rowid', pa.array(np.arange(tbl.num_rows, dtype=np.uint64)))
-
-    def load_resources(self, db_path: Path, datadate: date, writer, row_start, ios) -> None:
-        logger.info("loading hive-partitioned tables at %s", db_path)
-
-        io_load_start = ios.get_io_stat()
-        t_load_start = time.perf_counter_ns()
-        exnames = pa_ds.dataset(db_path / "exnames.parquet", format="parquet").to_table()
-        # The date partition column is constant within the partition and the
-        # time-of-day columns stay date-less durations, so it is not read.
-        master = pa_ds.dataset(db_path / "master" / f"date={datadate}", format="parquet").to_table()
-        logger.info("loading trade")
-        trade = pa_ds.dataset(db_path / "trade" / f"date={datadate}", format="parquet").to_table()
-        logger.info("loading quote")
-        quote = pa_ds.dataset(db_path / "quote" / f"date={datadate}", format="parquet").to_table()
-        t_load_elapsed = time.perf_counter_ns() - t_load_start
-        io_load_end = ios.get_io_stat()
-        writer.writerow(row_start + [0, "load a partition into memory", "success", t_load_elapsed, None, None,
-                         None, io_load_end - io_load_start, None, None, sum(self.get_table_size(t) for t in (master, trade, quote))])
-
-        io_load_start = ios.get_io_stat()
-        t_load_start = time.perf_counter_ns()
+    def _transform_tables(self) -> None:
         logger.info("applying transformations")
-        master = self._transform(master)
-        logger.info("Shape of master: %s x %s", master.shape[0], master.shape[1])
-        trade = self._transform(trade)
-        logger.info("Shape of trade: %s x %s", trade.shape[0], trade.shape[1])
-        quote = self._transform(quote)
-        logger.info("Shape of quote: %s x %s", quote.shape[0], quote.shape[1])
-        t_transform_elapsed = time.perf_counter_ns() - t_load_start
-        io_transform = ios.get_io_stat() - io_load_start
+        for name in self.REPORTED_TABLES:
+            replace = [f"toIntervalNanosecond({c}) AS {c}" for c in self.DURATION_COLUMNS[name]]
+            replace += [f"CAST({c} AS LowCardinality(Nullable(String))) AS {c}"
+                        for c in self._columns(name, of_type="Nullable(String)")]
+            self._rebuild(name, f"SELECT * REPLACE ({', '.join(replace)}) FROM {name}")
+            logger.info("Shape of %s: %s x %s", name, *self._shape(name))
 
-        io_load_start = ios.get_io_stat()
-        t_load_start = time.perf_counter_ns()
-        logger.info("ordering trade by %s", ", ".join(self.sort_cols))
-        trade = trade.sort_by([(c, 'ascending') for c in self.sort_cols])
-        logger.info("ordering quote by %s", ", ".join(self.sort_cols))
-        quote = quote.sort_by([(c, 'ascending') for c in self.sort_cols])
-        t_sort_elapsed = time.perf_counter_ns() - t_load_start
-        io_sort = ios.get_io_stat() - io_load_start
+    def _sort_tables(self) -> None:
+        order_by = ", ".join(list(self.sort_cols) + list(self.ROW_POSITION))
+        for name in self.SORTED_TABLES:
+            logger.info("ordering %s by %s", name, order_by)
+            self._rebuild(name, f"SELECT * EXCEPT ({', '.join(self.ROW_POSITION)}),"
+                                " toUInt64(row_number() OVER"
+                                f" (ORDER BY {order_by} ROWS BETWEEN UNBOUNDED PRECEDING"
+                                f" AND UNBOUNDED FOLLOWING) - 1) AS rowid FROM {name}")
 
-        # rowid is transform work, but it has to run after the sort so it
-        # numbers rows by sorted position; fold its cost into the transform row.
-        io_load_start = ios.get_io_stat()
-        t_load_start = time.perf_counter_ns()
-        trade = self._append_rowid(trade)
-        quote = self._append_rowid(quote)
-        t_transform_elapsed += time.perf_counter_ns() - t_load_start
-        io_transform += ios.get_io_stat() - io_load_start
+    def _engine(self, table: str) -> str:
+        """The engine clause the table is built with: Memory, compressed for the
+        big ones when CHDB_COMPRESS is set."""
+        if self.compress and table in self.COMPRESSED_TABLES:
+            return "Memory SETTINGS compress = 1"
+        return "Memory"
 
-        writer.writerow(row_start + [-1, "transform", "success", t_transform_elapsed, None, None,
-                         None, io_transform, None, None, sum(self.get_table_size(t) for t in (master, trade, quote))])
-        writer.writerow(row_start + [-2, "sort", "success", t_sort_elapsed, None, None,
-                         None, io_sort, None, None, sum(self.get_table_size(t) for t in (master, trade, quote))])
+    def _create(self, name: str, select: str, settings: str = "", table: str | None = None) -> None:
+        """Build the Memory table `name` from `select`.
 
-        self.tables["exnames"] = exnames
-        self.tables["master"] = master
-        self.tables["trade"] = trade
-        self.tables["quote"] = quote
-
-    @staticmethod
-    def get_table_size(df: pa.Table) -> int:
-        return df.nbytes // 1024
-
-    @classmethod
-    def _type_str(cls, t: pa.DataType) -> str:
-        """Arrow prints float32 as 'float' and float64 as 'double'; persist unambiguous names."""
-        if pa.types.is_dictionary(t):
-            return f"dictionary<{cls._type_str(t.value_type)}>"
-        if pa.types.is_floating(t):
-            return f"float{t.bit_width}"
-        return str(t)
-
-    def get_table_stats(self) -> dict[str, Any]:
-        import importlib.metadata
-        table_stats_dict = {"proprietary": "no"}
-        table_stats_dict["engineversion"] = importlib.metadata.version('chdb')
-        for t_name in ["master", "trade", "quote"]:
-            df = self.tables[t_name]
-            fields = list(df.schema)
-            table_stats = {
-                "name": t_name,
-                "size (MB)": self.get_table_size(df) / 1024,
-                "rowCount": df.shape[0],
-                "columnCount": len(fields),
-                "columns": [
-                    {"name": f.name, "type": self._type_str(f.type)}
-                    for f in fields
-                ],
-            }
-            table_stats_dict[t_name] = table_stats
-        return table_stats_dict
-
-    def prepare_run(self) -> None:
-        pass
-
-    def get_parameters(self, query_str: str, parameter: str) -> str:
-        """Render the final SQL: interpolate the parameter literals and append the settings clause."""
-        return query_str.format(**self.sql_params) + self.settings_clause
-
-    @classmethod
-    def _sql_literal(cls, value: Any) -> str:
-        if isinstance(value, str):
-            return "'" + value.replace("'", "''") + "'"
-        if isinstance(value, date):
-            return f"toDateTime64('{value} 00:00:00', 9)"
-        if isinstance(value, (list, tuple)):
-            return "(" + ", ".join(cls._sql_literal(v) for v in value) + ")"
-        return str(value)
-
-    def execute_query(self, idx: int, tags: set, query_str: str, sql: str, runidx: int):
-        # Local bindings: chDB's Python() table function resolves the table
-        # names from the caller's scope.
-        master = self.tables["master"]            # noqa: F841
-        trade = self.tables["trade"]              # noqa: F841
-        quote = self.tables["quote"]              # noqa: F841
-        exnames = self.tables["exnames"]          # noqa: F841
-        timeBuckets = self.tables["timeBuckets"]  # noqa: F841
-        try:
-            return chdb.query(sql, "ArrowTable")
-        except Exception as e:
-            logger.error("query execution failed: %s", e)
-            raise
-
-    @staticmethod
-    def _fmt_duration(col: pa.ChunkedArray, name: str) -> pa.ChunkedArray:
-        """Format a duration column as a kdb-style timespan string, 0DHH:MM:SS.nnnnnnnnn.
-
-        The "minute" column is rendered without the 0D day prefix.
+        `table` names the table whose engine clause applies, for when `name` is
+        only a stand-in for it -- the {name}_next of a rebuild.
         """
-        ns = pc.cast(col, pa.int64())
-        def pad(values: pa.ChunkedArray, width: int) -> pa.ChunkedArray:
-            return pc.utf8_lpad(pc.cast(values, pa.string()), width, '0')
-        def divmod_(x: pa.ChunkedArray, d: int) -> tuple[pa.ChunkedArray, pa.ChunkedArray]:
-            q = pc.divide(x, d)
-            return q, pc.subtract(x, pc.multiply(q, d))
-        secs, subsec = divmod_(ns, 1_000_000_000)
-        mins, ss = divmod_(secs, 60)
-        hh, mm = divmod_(mins, 60)
-        prefix = '' if name == 'minute' else '0D'
-        return pc.binary_join_element_wise(prefix, pad(hh, 2), ':', pad(mm, 2), ':', pad(ss, 2), '.', pad(subsec, 9), '')
+        self._query(f"CREATE TABLE {name} ENGINE = {self._engine(table or name)}"
+                    f" AS {select}{settings}", "CSV")
 
-    def write_csv(self, res: pa.Table, out_file: Path) -> None:
-        import pyarrow.csv as pa_csv
-        columns = {}
-        for f in res.schema:
-            col = res[f.name]
-            if pa.types.is_duration(f.type):
-                col = self._fmt_duration(col, f.name)
-            elif pa.types.is_boolean(f.type):
-                col = pc.cast(col, pa.int8())
-            elif pa.types.is_dictionary(f.type):
-                col = pc.cast(col, f.type.value_type)
-            columns[f.name] = col
-        tbl = pa.table(columns)
-        # Write the header ourselves and disable value quoting: pyarrow quotes
-        # all string values (and header names) by default, unlike the other
-        # engines' CSV writers.
-        with pa.OSFile(str(out_file), 'wb') as f:
-            f.write((','.join(tbl.column_names) + '\n').encode())
-            pa_csv.write_csv(tbl, f, pa_csv.WriteOptions(include_header=False, quoting_style='none'))
+    def _rebuild(self, name: str, select: str) -> None:
+        """Replace the Memory table `name` with the result of `select` over it.
+
+        The new table is built next to the current one and swapped in, so the
+        previous copy is only freed -- by the DROP -- once the step succeeded.
+        """
+        self._create(f"{name}_next", select, table=name)
+        self._query(f"DROP TABLE {name}", "CSV")
+        self._query(f"RENAME TABLE {name}_next TO {name}", "CSV")
+
+    def _columns(self, name: str, of_type: str | None = None) -> list[str]:
+        """The table's column names in order, optionally only those of one type."""
+        res = self._query(
+            "SELECT name FROM system.columns WHERE database = currentDatabase()"
+            f" AND table = {self._sql_literal(name)}"
+            + (f" AND type = {self._sql_literal(of_type)}" if of_type else "")
+            + " ORDER BY position", "ArrowTable")
+        return res["name"].to_pylist()
+
+    def _table_info(self, name: str) -> tuple[int, int]:
+        """The table's row count and size in bytes."""
+        res = self._query(
+            "SELECT total_rows, total_bytes FROM system.tables"
+            f" WHERE database = currentDatabase() AND name = {self._sql_literal(name)}", "ArrowTable")
+        return res["total_rows"][0].as_py(), res["total_bytes"][0].as_py()
+
+    def _shape(self, name: str) -> tuple[int, int]:
+        return self._table_info(name)[0], len(self._columns(name))
+
+    def _tables_size_kb(self) -> int:
+        return sum(self._table_info(t)[1] for t in self.REPORTED_TABLES) // 1024
+
+    def _table_stats(self, name: str) -> dict[str, Any]:
+        rows, size = self._table_info(name)
+        desc = self._query(f"DESCRIBE TABLE {name}", "ArrowTable")
+        return {
+            "name": name,
+            "size (MB)": size / 1024 / 1024,
+            "rowCount": rows,
+            "columnCount": desc.num_rows,
+            "columns": [
+                {"name": n, "type": t}
+                for n, t in zip(desc["name"].to_pylist(), desc["type"].to_pylist())
+            ],
+        }
