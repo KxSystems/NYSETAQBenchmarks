@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-PG938LS"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>KX NYSE TAQ Benchmark — Thread Scaling</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="../../assets/css/benchmark.css">
+    <script type="text/javascript">
+        /// Results are published per data size under results/inmemory/<size>/,
+        /// each with its own data.generated.js declaring the same globals, so
+        /// only one of them can be loaded per page. The selected size travels
+        /// in the ?size= query parameter (the rest of the selector state lives
+        /// in the URL hash) and switching size reloads the page.
+        const available_sizes = ['full', 'xlarge', 'large'];  /// sizes with published results
+        const default_size = 'large';
+        const size_param = new URLSearchParams(window.location.search).get('size');
+        const selected_size = available_sizes.includes(size_param) ? size_param : default_size;
+        document.write(`<script type="text/javascript" src="../../results/inmemory/${selected_size}/data.generated.js"><\/script>`);
+    </script>
+    <!-- Fallback copy of querymeta.psv for when the page is opened via file:// and fetch() is blocked.
+         Refreshed by pysrc/convertToJSFormat.py -->
+    <script type="text/javascript" src="../../artifacts/queries/inmemory/querymeta.generated.js"></script>
+    <!-- The dashboard engine shared with the other comparisons; the page configures it at the bottom of <body>. -->
+    <script type="text/javascript" src="../../assets/js/benchmark.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to benchmark results</a>
+
+<header class="header stick-left">
+    <span class="nowrap themes">
+        <button id="toggle-theme" aria-label="Change theme" title="Dark/Light View">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm40-83q119-15 199.5-104.5T800-480q0-123-80.5-212.5T520-797v634Z"/></svg>
+        </button>
+    </span>
+    <h1><a href="https://kx.com" target="_blank" rel="noopener noreferrer" title="kx.com"><svg class="kx-logo" viewBox="0 0 48 26" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="KX"><path d="M0 25.5H7.1488V0.5H0V25.5Z"/><path d="M15.3193 0.500002L7.14881 12.9983V13.0016L15.3193 25.5H23.4897L15.3193 12.9983L23.4897 0.500002H15.3193Z"/><path d="M39.8299 0.500002L35.7449 6.74937L31.6599 0.500002H23.4897L31.6599 12.9988L23.4897 25.5H31.6599L35.7449 19.2506L39.8299 25.5H48L39.8299 12.9988L48 0.500027L39.8299 0.500002Z"/></svg></a> NYSE TAQ Benchmark — Thread Scaling</h1>
+    <nav class="resource-nav" aria-label="Benchmark resources">
+        <a href="https://kx.com/blog/the-kx-nyse-taq-benchmark/">Methodology and motivation</a>
+        <a href="https://github.com/KxSystems/NYSETAQBenchmarks">Reproduce and validate results</a>
+        <a href="../../">Compare query engines</a>
+        <a href="../hardware/">Hardware comparison</a>
+    </nav>
+</header>
+
+<main id="main-content">
+<section class="benchmark-intro" aria-labelledby="benchmark-intro-title">
+    <p>Results show how one solution's query (and data load) performance scales with the number of
+       threads it is given. Instead of comparing solutions at a fixed thread count, every
+       <strong>thread count</strong> of the selected solution is put side by side on one machine.
+       Data resides in memory, so scaling here reflects how well the engine parallelises over
+       <strong>CPU cores and memory bandwidth</strong>.
+       Filters update the summary charts and detailed comparison below.</p>
+    <p id="results-status" role="status" aria-live="polite"></p>
+    <div class="benchmark-actions">
+        <button class="action-button" type="button" id="reset-filters">Reset filters</button>
+        <button class="action-button" type="button" id="copy-comparison-link">Copy comparison link</button>
+    </div>
+</section>
+
+<section aria-labelledby="filters-heading">
+<h2 id="filters-heading">Benchmark filters</h2>
+<table class="selectors-container stick-left">
+    <tr>
+        <th>Threads: </th>
+        <td id="selectors_threadcount">
+            <a id="select-all-series" class="selector selector-active">All</a>
+        </td>
+    </tr>
+    <tr title="Baseline thread count to use in calculating ratios">
+        <th>Baseline: </th>
+        <td id="selectors_baseline">
+        </td>
+    </tr>
+    <tr class="selector-separator"><td colspan="2"></td></tr>
+    <tr title="The solution whose thread scaling is shown. Only one at a time, so the compared series are thread counts.">
+        <th>Solution: </th>
+        <td id="selectors_solution">
+        </td>
+    </tr>
+    <tr title="The machine the selected solution was benchmarked on. Hover to see its hardware.">
+        <th>Machine: </th>
+        <td id="selectors_machine">
+        </td>
+    </tr>
+    <tr>
+        <th>Metric: </th>
+        <td>
+            <span class="inline-filter">
+                <span id="selectors_run">
+                    <a class="selector selector-active" id="selector-metric-cold">Cold Run</a>
+                    <a class="selector" id="selector-metric-hot">Hot Run</a>
+                    <a class="selector" id="selector-metric-hot2">Second Hot Run</a>
+                </span>
+            </span>
+        </td>
+    </tr>
+    <tr>
+        <th>Data: </th>
+        <td>
+            <span class="inline-filter" title="Amount of TAQ data loaded (see the README for what each size covers); switching reloads the page with that size's results.">
+                <span class="inline-filter-label">Size:</span>
+                <span id="selectors_size"></span>
+            </span>
+            <span class="inline-filter-separator"></span>
+            <span class="inline-filter">
+                <span class="inline-filter-label">Data date:</span>
+                <span id="selectors_date"></span>
+            </span>
+        </td>
+    </tr>
+    <!-- The engine's own single-selection thread row: on this page the thread counts are the
+         compared series instead, so every entry carries one collapsed key and this row is hidden. -->
+    <tr hidden>
+        <th>Threads (engine): </th>
+        <td id="selectors_threads"></td>
+    </tr>
+    <tr class="selector-separator"><td colspan="2"></td></tr>
+    <tr class="selector-group-title">
+        <th colspan="2">Query Filters</th>
+    </tr>
+    <tr id="instrument-row" title="How many instruments the query works on: a single one, a few hundred, or the full universe (no instrument filter in the query).">
+        <th>Instrument filter: </th>
+        <td id="selectors_instrument">
+        </td>
+    </tr>
+    <tr id="complexity-row" title="How involved the query logic is; only queries of the selected complexities are compared.">
+        <th>Complexity filter: </th>
+        <td id="selectors_complexity">
+        </td>
+    </tr>
+    <tr id="tag-include-row" title="Only queries carrying at least one of the selected tags are compared. Nothing selected = all queries.">
+        <th>Include tags: </th>
+        <td id="selectors_tag_include">
+        </td>
+    </tr>
+    <tr id="tag-exclude-row" title="Queries carrying any of the selected tags are left out of the comparison.">
+        <th>Exclude tags: </th>
+        <td id="selectors_tag_exclude">
+        </td>
+    </tr>
+    <tr class="selector-separator"><td colspan="2"></td></tr>
+</table>
+</section>
+
+<section aria-labelledby="summary-heading">
+<h2 id="summary-heading">Benchmark summary</h2>
+<div class="stick-left comparison summary-container results-content">
+    <table class="summary-table">
+        <thead>
+            <tr>
+                <th class="summary-name">
+                    Threads
+                </th>
+                <th colspan="2">
+                    Geometric mean of per-query time ratios relative to <span id="baseline-name"></span> (lower is better).<br/>
+                    <span id="scale_hint"></span>
+                </th>
+            </tr>
+        </thead>
+        <tbody id="summary">
+        </tbody>
+    </table>
+</div>
+
+<div class="stick-left comparison summary-charts results-content">
+    <div id="winners-panel">
+        <div id="winners-title">Wins per thread count<br/>
+            <span id="winners-hint">on how many of the compared queries that thread count posts the fastest time</span>
+        </div>
+        <svg id="winners-pie" viewBox="-1.05 -1.05 2.1 2.1" role="img" aria-label="Pie chart of win counts per thread count"></svg>
+        <div id="winners-legend"></div>
+    </div>
+</div>
+
+<div id="nothing-selected" class="stick-left" hidden>
+    No results match the selected filters. Select a thread count above or use Reset filters.
+</div>
+
+<div class="stick-left comparison results-content">
+    <h2>Detailed Comparison</h2>
+</div>
+
+<div
+    class="table-scroll results-content"
+    tabindex="0"
+    role="region"
+    aria-label="Scrollable detailed comparison table"
+>
+    <table id="details" class="responsive-data-table">
+        <thead>
+            <tr id="details_head"></tr>
+        </thead>
+        <tbody id="details_body"></tbody>
+    </table>
+</div>
+</section>
+
+<section id="load-times-section" class="results-content" aria-labelledby="load-times-heading-text">
+<div class="stick-left comparison" id="load-times-heading">
+    <h2 id="load-times-heading-text">Load Times<sup><a id="goto-load-footnote" href="#load-footnote">[1]</a></sup></h2>
+</div>
+
+<div
+    class="table-scroll"
+    tabindex="0"
+    role="region"
+    aria-label="Scrollable load-times table"
+>
+    <table id="load_times" class="responsive-data-table">
+        <thead>
+            <tr id="load_times_head"></tr>
+        </thead>
+        <tbody id="load_times_body"></tbody>
+    </table>
+</div>
+</section>
+
+<div class="stick-left comparison results-content" id="load-footnote" tabindex="-1">
+    [1] The "load a partition into memory:" phase duration depends primarily on disk speed, not CPU/memory performance. It can be ignored when comparing thread counts in this in-memory benchmark.
+</div>
+</main>
+<footer class="site-footer">
+    <div class="footer-lower">
+        <div class="footer-copyright">
+            ©2026 KX. All Rights Reserved. KX® and kdb+ are registered trademarks of KX Systems, Inc., a subsidiary of KX Software Limited.
+        </div>
+
+        <nav id="footer-navigation" class="footer-navigation" aria-label="Footer menu">
+            <ul class="footer-menu">
+                <li><a href="https://kx.com/privacy-policy/">Privacy Policy</a></li>
+                <li>
+                    <button type="button" class="footer-cookie-settings" id="footer-cookie-settings">Cookie Settings</button>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</footer>
+
+<script type="text/javascript">
+
+/// Page configuration of the thread scaling comparison: the series put side by side are the
+/// thread counts of a single solution on a single machine. Everything else lives in
+/// assets/js/benchmark.js.
+///
+/// The engine keys measurements as result[thread count] and picks one via the single-selection
+/// `selectors.threads`. Here the thread count is the series instead, so the data is reshaped:
+/// each (solution, machine, datadate, thread count) becomes its own entry whose result and
+/// load_time are re-keyed under one shared, collapsed thread key. `selectors.threads` then
+/// resolves for every series at once, and its selector row is hidden.
+
+const collapsed_thread_key = 'all';
+
+/// The kdb+ solutions offered on this page. The scaling of a q-sql/SQL/pykx solution is the
+/// question here; the other engines are compared on the main page.
+const page_solutions = [
+    'KDB-X',
+    'KDB-X (Parted)',
+    'KDB-X (Manual Opt)',
+    'KDB-X (NoAttr)',
+    'KDB-X (Time Sorted)',
+    'KDB-X SQL',
+    'pykx',
+];
+
+const default_solution = 'KDB-X';
+
+/// One entry per thread count, with result/load_time re-keyed under collapsed_thread_key.
+function byThreadCount(entries) {
+    const out = [];
+    for (const entry of entries) {
+        if (!page_solutions.includes(entry.solution)) { continue; }
+        for (const tc of Object.keys(entry.result ?? {})) {
+            out.push({
+                ...entry,
+                threadcount: Number(tc),
+                load_time: Object.fromEntries(
+                    Object.entries(entry.load_time ?? {})
+                        .filter(([, times]) => times[tc] != null)
+                        .map(([phase, times]) => [phase, {[collapsed_thread_key]: times[tc]}])),
+                result: {[collapsed_thread_key]: entry.result[tc]},
+            });
+        }
+    }
+    return out;
+}
+
+/// `data` is declared const by data.generated.js, so the reshaped entries replace its
+/// contents in place rather than rebinding the name the engine reads.
+const reshaped = byThreadCount(data);
+data.length = 0;
+data.push(...reshaped);
+
+/// Series labels are strings: they key selectors.threadcount and are compared against
+/// selectors.baseline by the engine. Ascending, so a thread count keeps its chart colour.
+const unique_threadcounts = [... new Set(data.map(elem => elem.threadcount))]
+    .sort((a, b) => a - b)
+    .map(String);
+
+/// Solutions and machines that actually have results, in the page's preferred order.
+const available_solutions = page_solutions.filter(
+    solution => data.some(elem => elem.solution == solution));
+
+function machinesOf(solution) {
+    return [... new Set(data.filter(elem => elem.solution == solution).map(elem => elem.machine))]
+        .sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
+}
+
+/// The lowest thread count is the baseline, so the ratios read as speed-ups over it.
+const default_baseline = unique_threadcounts[0];
+
+const page = {
+    base: '../../',
+    series_name: 'thread count',
+    series_key: 'threadcount',
+    series_container: document.getElementById('selectors_threadcount'),
+    unique_series: unique_threadcounts,
+    default_baseline: default_baseline,
+
+    seriesLabel: elem => String(elem.threadcount),
+
+    /// Every thread count starts selected: the point of the page is comparing all of them.
+    isDefaultSeries: label => true,
+
+    seriesTooltip: label => `${label} secondary threads`,
+
+    seriesNameNode: label => {
+        let name = document.createElement('span');
+        name.appendChild(document.createTextNode(`${label} threads`));
+        return name;
+    },
+
+    initialSelectors: () => ({
+        "threadcount": {},
+        "solution": default_solution,
+        "machine": null,
+        "date": null,
+        "threads": collapsed_thread_key,
+        "baseline": default_baseline,
+        "metric": default_metric,
+        "instrument": {},
+        "complexity": {},
+        "tag_include": {},
+        "tag_exclude": {},
+        "queries": [],
+    }),
+
+    /// A URL from an older state (or another page) may carry no solution/machine.
+    applyStateDefaults: () => {
+        if (!available_solutions.includes(selectors.solution)) {
+            selectors.solution = available_solutions.includes(default_solution)
+                ? default_solution : available_solutions[0];
+        }
+        selectors.threads = collapsed_thread_key;
+    },
+
+    /// Both page selectors are single-selection and depend on each other, so they are
+    /// rebuilt on every render by rebuildSelectors() instead of wired once here.
+    buildSelectors: () => {},
+    updateSelectors: () => {},
+
+    /// A solution has results on its own set of machines; keep the machine valid.
+    reconcile: base => {
+        const machines = machinesOf(selectors.solution);
+        if (!machines.includes(selectors.machine)) { selectors.machine = machines[0]; }
+    },
+
+    rebuildSelectors: base => {
+        buildRadio(document.getElementById('selectors_solution'), available_solutions,
+                   selectors.solution, value => { selectors.solution = value; });
+        buildRadio(document.getElementById('selectors_machine'), machinesOf(selectors.solution),
+                   selectors.machine, value => { selectors.machine = value; });
+        [...document.getElementById('selectors_machine').childNodes].forEach(
+            elem => attachMachineEnvironment(elem, elem.dataset.value));
+    },
+
+    matches: elem => elem.solution == selectors.solution,
+
+    machineScope: elem => elem.machine == selectors.machine,
+
+    /// The baseline thread count sets the ratios even when it is not among the compared ones.
+    baselineScope: elem => true,
+
+    /// Not every solution/machine ran every thread count, so the baseline is offered only
+    /// among those that did — otherwise the ratios would silently fall back to another series.
+    baselineChoices: base => [... new Set(base
+        .filter(elem => page.machineScope(elem) && elem.datadate == selectors.date)
+        .map(page.seriesLabel))].sort((a, b) => a - b),
+};
+
+startBenchmark();
+
+</script>
+</body>
+</html>

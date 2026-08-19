@@ -17,7 +17,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖥️</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="../assets/css/benchmark.css">
+    <link rel="stylesheet" href="../../assets/css/benchmark.css">
     <script type="text/javascript">
         /// Results are published per data size under results/inmemory/<size>/,
         /// each with its own data.generated.js declaring the same globals, so
@@ -29,13 +29,13 @@
         const default_size = 'large';
         const size_param = new URLSearchParams(window.location.search).get('size');
         const selected_size = available_sizes.includes(size_param) ? size_param : default_size;
-        document.write(`<script type="text/javascript" src="../results/inmemory/${selected_size}/data.generated.js"><\/script>`);
+        document.write(`<script type="text/javascript" src="../../results/inmemory/${selected_size}/data.generated.js"><\/script>`);
     </script>
     <!-- Fallback copy of querymeta.psv for when the page is opened via file:// and fetch() is blocked.
          Refreshed by pysrc/convertToJSFormat.py -->
-    <script type="text/javascript" src="../artifacts/queries/inmemory/querymeta.generated.js"></script>
+    <script type="text/javascript" src="../../artifacts/queries/inmemory/querymeta.generated.js"></script>
     <!-- The dashboard engine shared with the solution comparison; the page configures it at the bottom of <body>. -->
-    <script type="text/javascript" src="../assets/js/benchmark.js"></script>
+    <script type="text/javascript" src="../../assets/js/benchmark.js"></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to benchmark results</a>
@@ -50,7 +50,8 @@
     <nav class="resource-nav" aria-label="Benchmark resources">
         <a href="https://kx.com/blog/the-kx-nyse-taq-benchmark/">Methodology and motivation</a>
         <a href="https://github.com/KxSystems/NYSETAQBenchmarks">Reproduce and validate results</a>
-        <a href="../">Compare query engines</a>
+        <a href="../../">Compare query engines</a>
+        <a href="../threadscaling/index.html">Thread scaling</a>
     </nav>
 </header>
 
