@@ -114,6 +114,10 @@
             </span>
         </td>
     </tr>
+    <tr title="NUMA node the benchmark process was pinned to with numactl; 'all' means it was not pinned and could use every node.">
+        <th>NUMA node: </th>
+        <td id="selectors_numanode"></td>
+    </tr>
     <tr>
         <th>Machine: </th>
         <td>
@@ -324,6 +328,7 @@ const page = {
         "opensource": {"yes": true, "no": true},
         "sortcols": {"time": true, "symtime": true},
         "hardware": {"cpu": true, "gpu": false},
+        "numanode": {},
         "metric": default_metric,
         "instrument": {},
         "complexity": {},
@@ -341,6 +346,9 @@ const page = {
         }
         if (!selectors.hardware) {
             selectors.hardware = {"cpu": true, "gpu": false};
+        }
+        if (!selectors.numanode) {
+            selectors.numanode = {};
         }
     },
 
@@ -376,7 +384,8 @@ const page = {
     matches: elem =>
         ((selectors.opensource.yes && elem.proprietary === "no") || (selectors.opensource.no && elem.proprietary === "yes")) &&
         ((selectors.sortcols.time && (elem.sortcols === "time" || !elem.sortcols)) || (selectors.sortcols.symtime && elem.sortcols === "sym,time")) &&
-        ((selectors.hardware.cpu && (elem.hardware === "cpu" || !elem.hardware)) || (selectors.hardware.gpu && elem.hardware === "gpu")),
+        ((selectors.hardware.cpu && (elem.hardware === "cpu" || !elem.hardware)) || (selectors.hardware.gpu && elem.hardware === "gpu")) &&
+        numanodeSelected(elem),
 
     /// Only one machine is compared at a time, and the baseline solution is taken from it too.
     machineScope: elem => elem.machine == selectors.machine,
@@ -396,6 +405,8 @@ const page = {
     rebuildSelectors: base => {
         buildRadio(machines, availableMachines(base), selectors.machine, value => { selectors.machine = value; });
         [...machines.querySelectorAll('a')].forEach(elem => attachMachineEnvironment(elem, elem.dataset.value));
+        buildMultiSelect(document.getElementById('selectors_numanode'),
+                         availableNumanodes(), selectors.numanode);
     },
 };
 

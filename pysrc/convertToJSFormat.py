@@ -10,12 +10,17 @@ for benchmark runs; a run is any directory that contains both:
 alongside per-solution ``<solution>/stats.yaml`` table statistics. The run's
 "test date" is taken from environment.yaml; directory names carry no meaning.
 
-Entries are keyed by the (datadate, machine, solution) triple. A triple's
+Entries are keyed by the (datadate, machine, solution, numanode) tuple. A key's
 measurements may be split across several run directories (e.g. one directory
 per thread count); all their thread counts are merged into a single entry.
-When the same thread count of a triple appears in several runs, only the run
+When the same thread count of a key appears in several runs, only the run
 with the latest "test date" is kept; proprietary, engineversion and data_size
 come from the latest run overall.
+
+The NUMA node is part of the key rather than just a reported field: a run pinned
+to one node with ``numactl`` and an unpinned one see different core counts and
+memory bandwidth, so their thread counts must not be merged into a single entry
+as if they were one scaling curve.
 
 The kept entries are written to a single JavaScript file in the style of
 https://github.com/ClickHouse/ClickBench/blob/main/data.generated.js :
@@ -34,6 +39,9 @@ entry mirrors the ClickBench result format with these differences:
                    ClickBench's "date"); the environment "test date" is used
                    only to pick the latest run per triple
   * machine      : mappings.yaml["machines"][cpu.model]
+  * numanode     : the NUMANODE the run was pinned to with numactl, from
+                   environment.yaml "envvars"; ``NUMANODE_UNPINNED`` ("all") when
+                   the variable was empty, i.e. the run could use every node
   * proprietary  : from the solution's stats.yaml
   * engineversion : version of the engine library, from the solution's
                    stats.yaml (null for runs predating the field)
@@ -78,6 +86,10 @@ import yaml
 
 QUERYMETA_PSV = (Path(__file__).resolve().parent.parent
                  / "artifacts" / "queries" / "inmemory" / "querymeta.psv")
+
+# Value reported for a run that was not pinned to a NUMA node (empty NUMANODE),
+# i.e. one free to use all of them. Kept out of the numeric node names on purpose.
+NUMANODE_UNPINNED = "all"
 
 
 def write_querymeta_js():
@@ -147,6 +159,19 @@ def parse_max_res_mem(os_txt_path: Path):
     match = re.search(r"Maximum resident set size \(kbytes\)\s*:\s*(\d+)",
                       os_txt_path.read_text())
     return int(match.group(1)) if match else None
+
+
+def numanode_of(env: dict):
+    """The NUMA node a run was pinned to, from environment.yaml "envvars".
+
+    common.sh writes ``NUMANODE: "${NUMANODE:-}"`` and only builds a ``numactl``
+    prefix when it is non-empty, so an empty (or absent) value means the run was
+    free to use every node - reported as NUMANODE_UNPINNED.
+    """
+    envvars = env.get("envvars") or {}
+    value = envvars.get("NUMANODE")
+    # An absent key, an explicit YAML null and "" all mean "not pinned".
+    return NUMANODE_UNPINNED if value is None else (str(value).strip() or NUMANODE_UNPINNED)
 
 
 def cpu_model_of(env: dict):
@@ -250,12 +275,13 @@ def build_queries(runs):
     return [texts[idx] for idx in sorted(texts)]
 
 
-def build_entry(solution, runs, date, machine, proprietary, engineversion, sortcols, data_size, max_res_mem):
+def build_entry(solution, runs, date, machine, numanode, proprietary, engineversion, sortcols, data_size, max_res_mem):
     engines = {payload["engine"] for payload in runs.values() if "engine" in payload}
     return OrderedDict([
         ("solution", solution),
         ("datadate", date),
         ("machine", machine),
+        ("numanode", numanode),
         ("engine", engines.pop() if engines else None),
         ("engineversion", engineversion),
         ("sortcols", sortcols),
@@ -273,12 +299,13 @@ def build_entry(solution, runs, date, machine, proprietary, engineversion, sortc
 def process_run(run_dir: Path, machines: dict, mappings_path: Path):
     """Extract per-(solution, thread count) measurements from one run directory.
 
-    Yields (datadate, machine, solution, threadcount, date, payload) tuples,
-    where payload holds the load/query rows for that thread count plus the
+    Yields (datadate, machine, solution, numanode, threadcount, date, payload)
+    tuples, where payload holds the load/query rows for that thread count plus the
     solution's proprietary/data_size stats.
     """
     env = yaml.safe_load((run_dir / "environment.yaml").read_text())
     date = str(env["test date"])
+    numanode = numanode_of(env)
     datadate = str(env["parameters"]["datadate"])
     # ISO-format an 8-digit datadate (20260401 -> 2026-04-01); leave any other
     # format untouched.
@@ -325,7 +352,7 @@ def process_run(run_dir: Path, machines: dict, mappings_path: Path):
                            proprietary=proprietary, engineversion=engineversion,
                            sortcols=sortcols,
                            data_size=data_size, max_res_mem=max_res_mem)
-            yield datadate, machine, solution, tc, date, payload
+            yield datadate, machine, solution, numanode, tc, date, payload
 
 
 def main():
@@ -358,12 +385,12 @@ def main():
                      f"found under {input_dir}")
 
     # Keep the latest-dated measurement per (datadate, machine, solution,
-    # threadcount); a triple's thread counts may be spread over several runs.
+    # numanode, threadcount); a key's thread counts may be spread over several runs.
     latest = {}
     for run_dir in run_dirs:
-        for datadate, machine, solution, tc, date, payload in process_run(
+        for datadate, machine, solution, numanode, tc, date, payload in process_run(
                 run_dir, machines, mappings_path):
-            key = (datadate, machine, solution, tc)
+            key = (datadate, machine, solution, numanode, tc)
             if key not in latest or date > latest[key][0]:
                 latest[key] = (date, payload)
 
@@ -381,20 +408,20 @@ def main():
         if machine not in machine_envs or stamp > machine_envs[machine][0]:
             machine_envs[machine] = (stamp, text)
 
-    # Merge the thread counts of each triple into a single entry.
-    by_triple = defaultdict(dict)
-    for (datadate, machine, solution, tc), dated_payload in latest.items():
-        by_triple[(datadate, machine, solution)][tc] = dated_payload
+    # Merge the thread counts of each key into a single entry.
+    by_key = defaultdict(dict)
+    for (datadate, machine, solution, numanode, tc), dated_payload in latest.items():
+        by_key[(datadate, machine, solution, numanode)][tc] = dated_payload
 
     entries = []
-    for (datadate, machine, solution) in sorted(by_triple):
-        runs = by_triple[(datadate, machine, solution)]
+    for (datadate, machine, solution, numanode) in sorted(by_key):
+        runs = by_key[(datadate, machine, solution, numanode)]
         # proprietary/engineversion/sortcols/data_size/max_res_mem from the
-        # latest-dated measurement of the triple
+        # latest-dated measurement of the key
         _, newest = max(runs.values(), key=lambda dated: dated[0])
         entries.append(build_entry(
             solution, {tc: payload for tc, (_, payload) in runs.items()},
-            datadate, machine, newest["proprietary"], newest["engineversion"],
+            datadate, machine, numanode, newest["proprietary"], newest["engineversion"],
             newest["sortcols"], newest["data_size"], newest["max_res_mem"]))
 
     # Match ClickBench data.generated.js: leading commas on every entry except
