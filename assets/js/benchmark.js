@@ -150,6 +150,35 @@ function buildRadio(container, values, current, onSelect) {
     });
 }
 
+/// A multi-selection row of selectors backed by a {value -> bool} map in `selectors`,
+/// rebuilt on every render like buildRadio(). Values not present in the map yet start
+/// selected, so a data file gaining a new value does not silently filter it out.
+/// Used by the NUMA node filter of every comparison page. `onToggle` runs before the
+/// re-render, for pages whose single selections can be invalidated by the toggle:
+/// reconcile() bails out before page.reconcile() once the filter leaves no entry
+/// matching them, so they have to be fixed up here instead.
+function buildMultiSelect(container, values, state, onToggle) {
+    clearElement(container);
+    values.forEach(value => {
+        if (state[value] === undefined) { state[value] = true; }
+        let selector = document.createElement('a');
+        selector.className = state[value] ? 'selector selector-active' : 'selector';
+        selector.dataset.value = value;
+        selector.appendChild(document.createTextNode(value));
+        container.appendChild(selector);
+        selector.addEventListener('click', e => {
+            state[value] = !state[value];
+            /// Reflect the toggle here rather than relying on the rebuild: with every
+            /// value deselected nothing matches, and rebuildDynamicSelectors() returns
+            /// before this row is rebuilt - the chip would keep its stale class.
+            selector.classList.toggle('selector-active', state[value]);
+            onToggle?.();
+            render();
+            updateHistory();
+        });
+    });
+}
+
 /// The size selector stands apart from the others: each size's results are a
 /// separate data.generated.js picked in <head>, so instead of re-rendering it
 /// reloads the page with the new ?size= parameter. The URL hash (and with it
@@ -441,6 +470,26 @@ function availableMachines(base) {
 
 function availableDates(base) {
     return [... new Set(base.filter(page.machineScope).map(elem => elem.datadate))].sort();
+}
+
+/// The NUMA node an entry's run was pinned to ('all' when it was free to use every
+/// node). Data files predating the field report 'n/a' rather than silently claiming
+/// one, so a stale generated file stays readable.
+function numanodeOf(elem) {
+    return elem.numanode ?? 'n/a';
+}
+
+/// Every NUMA node in the loaded data, numeric nodes first. Deliberately not scoped
+/// to the current selection: a node the filter hides must stay togglable.
+function availableNumanodes() {
+    return [... new Set(data.map(numanodeOf))]
+        .sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
+}
+
+/// Whether an entry passes the page's NUMA node filter. A value the selector has not
+/// built yet counts as selected - filterEntries() runs before rebuildDynamicSelectors().
+function numanodeSelected(elem) {
+    return selectors.numanode?.[numanodeOf(elem)] !== false;
 }
 
 function availableThreads(base) {

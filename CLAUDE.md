@@ -170,23 +170,36 @@ runs) and `<solution>/{stats.yaml,os.txt}` (per-table stats incl. `proprietary`/
 `sortcols`, and `/usr/bin/time -v` output).
 
 [pysrc/convertToJSFormat.py](pysrc/convertToJSFormat.py) turns a tree of such run directories
-into one `data.generated.js` (ClickBench-style), keyed by `(datadate, machine, solution)` and
-merging thread counts across runs, keeping the latest per key. Machine names come from the CPU
+into one `data.generated.js` (ClickBench-style), keyed by
+`(datadate, machine, solution, numanode)` and merging thread counts across runs, keeping the
+latest per key. `numanode` is the run's `NUMANODE` (`"all"` when it was empty, i.e. unpinned)
+and belongs in the key: a pinned and an unpinned run see different core counts, so their thread
+counts must not merge into one entry. Machine names come from the CPU
 model → name map in [results/mappings.yaml](results/mappings.yaml); an unmapped CPU is a hard
 error, so a new benchmark host needs an entry there. `index.html` picks its data file from
 `available_sizes` / `?size=` and falls back to the generated `querymeta.generated.js` copy when
 opened over `file://`.
 
-The dashboard is two pages over one engine: [assets/js/benchmark.js](assets/js/benchmark.js)
+The dashboard is three pages over one engine: [assets/js/benchmark.js](assets/js/benchmark.js)
 owns everything (selectors, summary, charts, details, load times, URL state, accessibility) and
 is generic over the *series* being compared. Each page loads its results, defines a `page`
 object in a small inline script at the bottom of `<body>` and calls `startBenchmark()`:
 [index.html](index.html) compares solutions on one machine (series = `solution`, with the
 open-source / sort-columns / hardware inline filters and the memory, data-size and
-query-failure charts), [hardware/index.html](hardware/index.html) compares machines running
-one solution (series = `machine`, `page_solution` picks it). The contract of `page` is
-documented at the top of `benchmark.js`; a new comparison page should be another `page`
-object rather than a copy of the engine.
+query-failure charts), [pages/hardware/index.html](pages/hardware/index.html) compares machines
+running one solution (series = `machine`, `page_solution` picks it), and
+[pages/threadscaling/index.html](pages/threadscaling/index.html) compares the thread counts of
+one solution on one machine (series = the thread count). All three carry the NUMA node filter,
+built with the engine's `buildMultiSelect` from `availableNumanodes()` and applied in
+`page.matches` via `numanodeSelected`. The contract of `page` is documented at the top of
+`benchmark.js`; a new comparison page should be another `page` object rather than a copy of
+the engine.
+
+The thread scaling page is the one that reshapes its data: the engine keys measurements as
+`result[thread count]` and picks one with the single-selection `selectors.threads`, so the page
+splits each entry per thread count and re-keys `result`/`load_time` under one collapsed key,
+freeing the thread count to be the series. Its `selectors_threads` row is therefore hidden, and
+its `baselineScope` must pin the machine - unlike the hardware page, its series label does not.
 
 ## Conventions and gotchas
 

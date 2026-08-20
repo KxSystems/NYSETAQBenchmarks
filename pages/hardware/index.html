@@ -50,7 +50,7 @@
     <nav class="resource-nav" aria-label="Benchmark resources">
         <a href="https://kx.com/blog/the-kx-nyse-taq-benchmark/">Methodology and motivation</a>
         <a href="https://github.com/KxSystems/NYSETAQBenchmarks">Reproduce and validate results</a>
-        <a href="../../">Compare query engines</a>
+        <a href="../../index.html">Compare query engines</a>
         <a href="../threadscaling/index.html">Thread scaling</a>
     </nav>
 </header>
@@ -97,6 +97,10 @@
                 </span>
             </span>
         </td>
+    </tr>
+    <tr title="NUMA node the benchmark process was pinned to with numactl; 'all' means it was not pinned and could use every node.">
+        <th>NUMA node: </th>
+        <td id="selectors_numanode"></td>
     </tr>
     <tr>
         <th>Data: </th>
@@ -277,6 +281,7 @@ const page = {
         "date": null,
         "threads": null,
         "baseline": default_baseline,
+        "numanode": {},
         "metric": default_metric,
         "instrument": {},
         "complexity": {},
@@ -285,15 +290,21 @@ const page = {
         "queries": [],
     }),
 
-    /// No page-specific selectors beyond the machine group, so there is nothing to
-    /// build, wire, reflect or reconcile here.
-    applyStateDefaults: () => {},
+    /// Beyond the machine group and the NUMA node filter there is nothing page-specific
+    /// to build, wire, reflect or reconcile here.
+    applyStateDefaults: () => {
+        if (!selectors.numanode) { selectors.numanode = {}; }
+    },
     buildSelectors: () => {},
     updateSelectors: () => {},
     reconcile: base => {},
-    rebuildSelectors: base => {},
 
-    matches: elem => elem.solution == page_solution,
+    rebuildSelectors: base => {
+        buildMultiSelect(document.getElementById('selectors_numanode'),
+                         availableNumanodes(), selectors.numanode);
+    },
+
+    matches: elem => elem.solution == page_solution && numanodeSelected(elem),
 
     /// Dates and thread counts are offered when at least one selected machine has them.
     /// With no machine selected every machine counts, so those selectors keep their
