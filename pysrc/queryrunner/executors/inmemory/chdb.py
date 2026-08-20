@@ -21,13 +21,41 @@ which is also what keeps the steps separately measurable:
                  executor gets for free from its duration[ns] and
                  dictionary-encoded columns: IntervalNanosecond for the
                  time-of-day columns (ClickHouse's Parquet reader sees them as
-                 plain Int64 nanoseconds) and LowCardinality for every string
-                 column -- the encoding all of them but master's free-text
-                 description have in the Arrow executor.
+                 plain Int64 nanoseconds) and LowCardinality for the string
+                 columns the Arrow executor holds encoded -- every one of them
+                 but master's free-text description, which stays a plain String
+                 here too. The sorted tables get their strings encoded by the
+                 sort step instead, for the reason given there.
   * sort      -- trade and quote ordered by sortcols, ties broken by the parquet
                  row position so the numbering matches the Arrow executor's
-                 stable sort. Unlike there, the rowid numbering cannot be split
-                 off from the sort, so its cost is part of the sort step.
+                 stable sort. Unlike there, neither the rowid numbering nor the
+                 LowCardinality encoding can be split off from the sort, so the
+                 cost of both is part of the sort step:
+
+                 The rows are numbered with rowNumberInAllBlocks() over a sorted
+                 subquery rather than with a row_number() window function,
+                 because a window function's rows do not reach the new Memory
+                 table in the order it put them in: ClickHouse fans the window
+                 transform's output back out over max_threads streams, and the
+                 blocks are stored in whatever order those finish in. A plain
+                 ORDER BY keeps its single stream all the way to the table.
+                 Stored order is what the queries with no ORDER BY of their own
+                 return, so it matters: on the tiny partition the window
+                 formulation stored quote's 145 blocks in 95 runs of
+                 consecutive rowids instead of one, leaving 5.0M of its 9.4M
+                 rows away from the position their rowid gives them.
+
+                 The strings are encoded in that same statement, and not by the
+                 transform step above, because ClickHouse merges the sorted runs
+                 a row at a time and every LowCardinality value crossing that
+                 merge goes through the column's dictionary. On the tiny
+                 partition, sorting quote already encoded takes ~57s and sorting
+                 it as plain strings -- 2.7x the bytes -- 4s; encoding on the way
+                 out adds ~0.2s, against ~0.5s as a second pass, which would
+                 also have to be single-threaded to keep the order. Holding the
+                 strings unencoded until the sort costs nothing in peak memory,
+                 the window function's buffer for its whole-partition frame
+                 having been larger than the unencoded columns are.
 
 With CHDB_COMPRESS set, the two big tables are held as compressed Memory tables
 (ENGINE = Memory SETTINGS compress = 1) instead: the same storage and the same
@@ -86,6 +114,11 @@ class QueryExecutorChDB(QueryExecutorChDBBase):
     ROW_POSITION: tuple[str, ...] = ("_src_file", "_src_row")
     # The tables CHDB_COMPRESS applies to: the two the data is in.
     COMPRESSED_TABLES: tuple[str, ...] = ("trade", "quote")
+    # The string columns left unencoded, being unencoded in the other engines
+    # too: master's free-text description, which the Parquet schema keeps a
+    # plain string where every other string column of the table is
+    # dictionary-encoded -- see pysrc/taqToParquet/schemas.py.
+    PLAIN_STRING_COLUMNS: dict[str, tuple[str, ...]] = {"master": ("description",)}
 
     def __init__(self, param: dict[str, Any], sort_cols: list[str], datadate: date) -> None:
         # Read before the base __init__, which creates the first Memory table.
@@ -118,12 +151,20 @@ class QueryExecutorChDB(QueryExecutorChDBBase):
             self._create(name, f"SELECT {columns} FROM file({self._sql_literal(str(src))}, Parquet)",
                          " SETTINGS use_hive_partitioning = 0")
 
+    def _low_cardinality(self, name: str) -> list[str]:
+        """The REPLACE terms that encode the table's string columns, bar the
+        PLAIN_STRING_COLUMNS the other engines keep unencoded as well."""
+        plain = self.PLAIN_STRING_COLUMNS.get(name, ())
+        return [f"CAST({c} AS LowCardinality(Nullable(String))) AS {c}"
+                for c in self._columns(name, of_type="Nullable(String)") if c not in plain]
+
     def _transform_tables(self) -> None:
         logger.info("applying transformations")
         for name in self.REPORTED_TABLES:
             replace = [f"toIntervalNanosecond({c}) AS {c}" for c in self.DURATION_COLUMNS[name]]
-            replace += [f"CAST({c} AS LowCardinality(Nullable(String))) AS {c}"
-                        for c in self._columns(name, of_type="Nullable(String)")]
+            # The sorted tables are encoded by the sort step instead; see there.
+            if name not in self.SORTED_TABLES:
+                replace += self._low_cardinality(name)
             self._rebuild(name, f"SELECT * REPLACE ({', '.join(replace)}) FROM {name}")
             logger.info("Shape of %s: %s x %s", name, *self._shape(name))
 
@@ -131,10 +172,10 @@ class QueryExecutorChDB(QueryExecutorChDBBase):
         order_by = ", ".join(list(self.sort_cols) + list(self.ROW_POSITION))
         for name in self.SORTED_TABLES:
             logger.info("ordering %s by %s", name, order_by)
-            self._rebuild(name, f"SELECT * EXCEPT ({', '.join(self.ROW_POSITION)}),"
-                                " toUInt64(row_number() OVER"
-                                f" (ORDER BY {order_by} ROWS BETWEEN UNBOUNDED PRECEDING"
-                                f" AND UNBOUNDED FOLLOWING) - 1) AS rowid FROM {name}")
+            self._rebuild(name, f"SELECT * EXCEPT ({', '.join(self.ROW_POSITION)})"
+                                f" REPLACE ({', '.join(self._low_cardinality(name))}),"
+                                " rowNumberInAllBlocks() AS rowid"
+                                f" FROM (SELECT * FROM {name} ORDER BY {order_by})")
 
     def _engine(self, table: str) -> str:
         """The engine clause the table is built with: Memory, compressed for the
