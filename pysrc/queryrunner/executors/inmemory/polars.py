@@ -27,18 +27,19 @@ class QueryExecutorPolarsInMemory:
             "datadate": datadate,
             **self.params,
         }
+        self.eval_context["timeBuckets"] = self.eval_context["timeBuckets"].lazy()
 
     def load_resources(self, db_path: Path, datadate: date, writer, row_start, ios) -> None:
         logger.info("loading hive-partitioned tables at %s", db_path)
 
         io_load_start = ios.get_io_stat()
         t_load_start = time.perf_counter_ns()
-        exnames = pl.scan_parquet(db_path / "exnames.parquet").collect()
-        master = pl.scan_parquet(db_path / "master" / f"date={datadate}" / "*.parquet").collect()
+        exnames = pl.scan_parquet(db_path / "exnames.parquet").collect(engine="streaming")
+        master = pl.scan_parquet(db_path / "master" / f"date={datadate}" / "*.parquet").collect(engine="streaming")
         logger.info("loading trade")
-        trade = pl.scan_parquet(db_path / "trade" / f"date={datadate}" / "*.parquet").collect()
+        trade = pl.scan_parquet(db_path / "trade" / f"date={datadate}" / "*.parquet").collect(engine="streaming")
         logger.info("loading quote")
-        quote = pl.scan_parquet(db_path / "quote" / f"date={datadate}" / "*.parquet").collect()
+        quote = pl.scan_parquet(db_path / "quote" / f"date={datadate}" / "*.parquet").collect(engine="streaming")
         t_load_elapsed = time.perf_counter_ns() - t_load_start
         io_load_end = ios.get_io_stat()
         writer.writerow(row_start + [0, "load a partition into memory", "success", t_load_elapsed, None, None,
@@ -47,11 +48,11 @@ class QueryExecutorPolarsInMemory:
 
         io_load_start = ios.get_io_stat()
         t_load_start = time.perf_counter_ns()
-        master = master.with_columns(pl.col("sym").cast(pl.Categorical))
+        master = master.lazy().with_columns(pl.col("sym").cast(pl.Categorical)).collect(engine="streaming")
         logger.info("Shape of master: %s x %s", master.shape[0], master.shape[1])
-        trade = trade.with_columns(pl.col("sym").cast(pl.Categorical))
+        trade = trade.lazy().with_columns(pl.col("sym").cast(pl.Categorical)).collect(engine="streaming")
         logger.info("Shape of trade: %s x %s", trade.shape[0], trade.shape[1])
-        quote = quote.with_columns(pl.col("sym").cast(pl.Categorical))
+        quote = quote.lazy().with_columns(pl.col("sym").cast(pl.Categorical)).collect(engine="streaming")
         logger.info("Shape of quote: %s x %s", quote.shape[0], quote.shape[1])
         t_load_elapsed = time.perf_counter_ns() - t_load_start
         io_load_end = ios.get_io_stat()
@@ -61,17 +62,18 @@ class QueryExecutorPolarsInMemory:
 
         io_load_start = ios.get_io_stat()
         t_load_start = time.perf_counter_ns()
-        trade = trade.sort(self.sort_cols)
-        quote = quote.sort(self.sort_cols)
+        trade = trade.lazy().sort(self.sort_cols).collect(engine="in-memory")
+        quote = quote.lazy().sort(self.sort_cols).collect(engine="in-memory")
         t_load_elapsed = time.perf_counter_ns() - t_load_start
         io_load_end = ios.get_io_stat()
         writer.writerow(row_start + [-2, "sort", "success", t_load_elapsed, None, None,
                          None, io_load_end - io_load_start, None, None, self.get_table_size(master) + self.get_table_size(trade) + self.get_table_size(quote)])
 
+        self._tables: dict[str, pl.DataFrame] = {"master": master, "trade": trade, "quote": quote}
         self.eval_context["exnames"] = dict(zip(exnames["ex"], exnames["name"]))
-        self.eval_context["master"] = master
-        self.eval_context["trade"] = trade
-        self.eval_context["quote"] = quote
+        self.eval_context["master"] = master.lazy()
+        self.eval_context["trade"] = trade.lazy()
+        self.eval_context["quote"] = quote.lazy()
 
     @staticmethod
     def get_table_size(df) -> int:
@@ -80,7 +82,7 @@ class QueryExecutorPolarsInMemory:
     def get_table_stats(self) -> dict[str, Any]:
         table_stats_dict = {"proprietary": "no", "engineversion": pl.__version__}
         for t_name in ["master", "trade", "quote"]:
-            df = self.eval_context[t_name]
+            df = self._tables[t_name]
             table_stats = {
                 "name": t_name,
                 "size (MB)": self.get_table_size(df) / 1024,
@@ -101,7 +103,10 @@ class QueryExecutorPolarsInMemory:
         return parameter
 
     def execute_query(self, idx: int, tags: set, query_str: str, parameter: str, runidx: int):
-        return eval(query_str, self.eval_context)
+        res = eval(query_str, self.eval_context)
+        if isinstance(res, pl.LazyFrame):
+            res = res.collect(engine="streaming")
+        return res
 
     @staticmethod
     def _fmt_minute(col: str) -> pl.Expr:
