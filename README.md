@@ -210,7 +210,7 @@ Query engines read data into memory from Hive-partitioned Parquet or kdb+ format
 | `pykx` | KDB-X Python (`pykx`) | kdb+ |
 | `duckdb` | DuckDB | Parquet |
 | `chdb` | chDB (embedded ClickHouse). Three solutions: `chDB (Memory)` loads the Parquet files with ClickHouse's `file()` function into `ENGINE = Memory` tables, `chDB (Memory, Compressed)` does the same with the two big tables LZ4-compressed in memory (`ENGINE = Memory SETTINGS compress = 1`), `chDB (PyArrow)` queries Arrow tables through chDB's `Python()` table function | Parquet |
-| `polars` | Polars | Parquet |
+| `polars` | Polars. Two solutions, selected with the runner's `-mode` flag: `Polars (Eager)` (`-mode eager`) keeps the tables as `DataFrame`s and runs every query through the eager API, `Polars (Lazy)` (`-mode lazy`) hands the queries `LazyFrame`s and collects them with the streaming engine. Each mode has its own query file (`polars.psv` / `polars_lazy.psv`) | Parquet |
 | `pandas` | Pandas | Parquet |
 
 So you only need the kdb+ database if you restrict the run to `kdb`/`kdbxsql`/`pykx` (e.g. `--engines kdb,kdbxsql`), and only the Parquet database if you restrict it to `duckdb`/`chdb`/`polars`/`pandas`. Convert the TAQ PSV files to the format(s) you need using `./generateDB.sh`:
@@ -243,10 +243,10 @@ And the following optional parameters:
 | --- | --- |
 | `-t`, `--threads` | Space-separated list of secondary-thread counts to test, e.g. `"0 4 16 64"`. Each engine runs once per value. Default: `"1 4"`. |
 | `-e`, `--engines` | Comma-separated subset of engines to run. Valid values: `kdb`, `kdbxsql`, `duckdb`, `polars`, `chdb`, `pykx`, `pandas`. Default: all of them. |
-| `-s`, `--solutions` | Comma-separated subset of solutions to run, or `"ALL"` to run all available solutions. Solutions are named variants of engines with different attributes/indexes. Default: `"KDB-X,DuckDB (Index),Polars,Pandas"`. Examples: `-s "KDB-X,KDB-X (Parted),Polars"` or `-s "ALL"`. |
+| `-s`, `--solutions` | Comma-separated subset of solutions to run, or `"ALL"` to run all available solutions. Solutions are named variants of engines with different attributes/indexes. Default: `"KDB-X,DuckDB (Index),Polars (Lazy),Pandas"`. Examples: `-s "KDB-X,KDB-X (Parted),Polars (Eager)"` or `-s "ALL"`. |
 | `-i`, `--idx` | Filter queries by index: single (`42`), comma-separated list (`32,42,50`), or range (`40-44`). Default: run all queries. |
 | `-r`, `--result-dir` | Directory to persist merged results. Default: `./results/inmemory`. |
-| `-q`, `--query-output-dir` | Directory to persist query outputs. Each engine writes its results as `queryoutput_<idx>.csv` into a per-engine subdirectory, for cross-engine correctness checks (see [Verifying Query Output Correctness](#verifying-query-output-correctness)). Default: outputs are not persisted. |
+| `-q`, `--query-output-dir` | Directory to persist query outputs. Each solution writes its results as `queryoutput_<idx>.csv` into a per-solution subdirectory, for cross-engine correctness checks (see [Verifying Query Output Correctness](#verifying-query-output-correctness)). Default: outputs are not persisted. |
 | `-h`, `--help` | Show usage and exit. |
 
 The `NUMANODE` environment variable is also honoured: when set, every engine is launched
@@ -451,10 +451,24 @@ Each engine is a single class that is driven by the shared runner
 flushing, timing (one cold run followed by two warm runs), result writing, and
 PSV output; your class only has to load the data and execute queries.
 
-Use an existing executor as a template. [polars.py](./pysrc/queryrunner/executors/inmemory/polars.py)
+Use an existing executor as a template. [polars_eager.py](./pysrc/queryrunner/executors/inmemory/polars_eager.py)
 and [pandas.py](./pysrc/queryrunner/executors/inmemory/pandas.py) read the
 Hive-partitioned Parquet database; [pykx.py](./pysrc/queryrunner/executors/inmemory/pykx.py)
 reads the kdb+ database instead.
+
+When one engine is benchmarked in several configurations, the shared machinery
+lives in a base class and each variant is a thin subclass — see
+[polars_base.py](./pysrc/queryrunner/executors/inmemory/polars_base.py) with
+[polars_eager.py](./pysrc/queryrunner/executors/inmemory/polars_eager.py) /
+[polars_lazy_streaming.py](./pysrc/queryrunner/executors/inmemory/polars_lazy_streaming.py),
+and [chdb_base.py](./pysrc/queryrunner/executors/inmemory/chdb_base.py) with
+[chdb.py](./pysrc/queryrunner/executors/inmemory/chdb.py) /
+[chdb_pyarrow.py](./pysrc/queryrunner/executors/inmemory/chdb_pyarrow.py). The
+Polars base class implements `load_resources`, the stats and the CSV writer once
+and leaves the API-specific steps (`_scan`, `_transform`, `_sort`, `_frame`,
+`_collect`) to the subclasses, so the eager variant is `DataFrame`s throughout
+while the lazy one keeps `LazyFrame`s in the eval context and collects results
+with the streaming engine.
 
 1. **Create the executor class.** Implement the informal interface the runner
    expects (see [main.py](./pysrc/queryrunner/main.py) and the existing
@@ -469,7 +483,7 @@ reads the kdb+ database instead.
    | `execute_query(self, idx, tags, query_str, params, runidx)` | Execute the query and return the result object. |
    | `get_table_size(df)` (static) | Result/table size in KB, or `None` if unavailable. |
    | `get_table_stats(self)` | Per-table stats dict written to the `--stats-dir` YAML files. Must include the top-level `proprietary` and `engineversion` (version string of the engine library) keys. |
-   | `write_csv(self, res, out_file)` | Serialize a result to CSV for cross-engine output comparison. The CSV must be in **kdb+-loadable format**, so values need special formatting: booleans as `1`/`0` (not `true`/`false`), and temporal values as kdb+ literals (e.g. timespans like `0D09:30:00.000000000`). See the `write_csv` implementations in [polars.py](./pysrc/queryrunner/executors/inmemory/polars.py) and [pandas.py](./pysrc/queryrunner/executors/inmemory/pandas.py) for the duration/boolean conversions. |
+   | `write_csv(self, res, out_file)` | Serialize a result to CSV for cross-engine output comparison. The CSV must be in **kdb+-loadable format**, so values need special formatting: booleans as `1`/`0` (not `true`/`false`), and temporal values as kdb+ literals (e.g. timespans like `0D09:30:00.000000000`). See the `write_csv` implementations in [polars_base.py](./pysrc/queryrunner/executors/inmemory/polars_base.py) and [pandas.py](./pysrc/queryrunner/executors/inmemory/pandas.py) for the duration/boolean conversions. |
 
 2. **Wire it into the runner.** In [main.py](./pysrc/queryrunner/main.py), add an
    `elif engine == "<name>":` branch inside the `inmemory` block that imports and
@@ -509,9 +523,13 @@ reads the kdb+ database instead.
 
 Queries are defined **per engine** in PSV files under
 [artifacts/queries/inmemory/](./artifacts/queries/inmemory/) (`kdb.psv`,
-`sql.psv`, `duckdb.psv`, `chdb.psv`, `polars.psv`, `pandas.psv`, `pykx.psv`, and the
-attribute-benchmark variants `kdb_noattr.psv`, `kdb_tabledict.psv`). Each file
-has the columns:
+`sql.psv`, `duckdb.psv`, `chdb.psv`, `polars.psv`, `polars_lazy.psv`,
+`pandas.psv`, `pykx.psv`, and the attribute-benchmark variants
+`kdb_noattr.psv`, `kdb_tabledict.psv`). A single engine can have more than one
+query file when it is benchmarked in several configurations: `polars.psv` holds
+the eager-API queries and `polars_lazy.psv` the same queries written against
+`LazyFrame`s — identical except that the six `pivot` queries have to `collect()`
+first, since `pivot` has no lazy equivalent. Each file has the columns:
 
 | Column | Meaning |
 | --- | --- |
@@ -595,8 +613,8 @@ To check this, persist each engine's query outputs and compare them:
 1. **Persist the outputs.** Both driver scripts
    ([queryEngines.sh](./benchmarks/inmemory/queryEngines.sh) and
    [kdbAttributes.sh](./benchmarks/inmemory/kdbAttributes.sh)) accept
-   `-q, --query-output-dir <dir>`. When given, each engine writes its results as
-   `queryoutput_<idx>.csv` into a per-engine subdirectory of `<dir>`. The CSVs are
+   `-q, --query-output-dir <dir>`. When given, each solution writes its results as
+   `queryoutput_<idx>.csv` into a per-solution subdirectory of `<dir>`. The CSVs are
    in kdb+-loadable format (see the `write_csv` requirement in
    [Adding a New Engine](#adding-a-new-python-based-in-memory-query-engine)).
 
@@ -616,9 +634,13 @@ To check this, persist each engine's query outputs and compare them:
 
    ```bash
    q src/compareOutput.q -querymeta ./artifacts/queries/inmemory/querymeta.psv \
-       -queryoutput1 ./results/inmemory/output/kdb \
-       -queryoutput2 ./results/inmemory/output/duckdb
+       -queryoutput1 ./results/inmemory/output/KDB-X \
+       -queryoutput2 ./results/inmemory/output/Polars_Eager_
    ```
+
+   The subdirectory is named after the **solution**, with every character outside
+   `[a-zA-Z0-9._-]` replaced by `_` — so `DuckDB (Index)` becomes
+   `DuckDB_Index_` and `Polars (Lazy)` becomes `Polars_Lazy_`.
 
    It exits `0` when every query matches; otherwise it logs the differences and
    continues per query. Pass `-idx` to restrict the comparison to specific query

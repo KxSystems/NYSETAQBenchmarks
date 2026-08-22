@@ -1,4 +1,4 @@
-solution: Polars
+solution: Polars (Eager)
 proprietary: 'no'
 engineversion: 1.41.2
 master:

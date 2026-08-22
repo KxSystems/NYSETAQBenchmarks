@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A benchmark suite that measures in-memory query performance over public
 [NYSE TAQ](https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/) data across
-KDB-X (q-sql), KDB-X SQL, pykx, DuckDB, Polars and Pandas. It also contains the static dashboard
-([index.html](index.html)) published as GitHub Pages at benchmark.kx.com (see [CNAME](CNAME)).
+KDB-X (q-sql), KDB-X SQL, pykx, DuckDB, chDB, Polars (eager and lazy) and Pandas. It also
+contains the static dashboard ([index.html](index.html)) published as GitHub Pages at
+benchmark.kx.com (see [CNAME](CNAME)).
 
 [README.md](README.md) is the canonical user-facing documentation and stays authoritative —
 when this file or [.claude/skills/run-nyse-taq-benchmarks/SKILL.md](.claude/skills/run-nyse-taq-benchmarks/SKILL.md)
@@ -124,6 +125,18 @@ implemented twice:
   formats.
 * [pysrc/queryrunner/main.py](pysrc/queryrunner/main.py) — Python engines, dispatching to a
   per-engine class in [pysrc/queryrunner/executors/inmemory/](pysrc/queryrunner/executors/inmemory/).
+  `-storage_backend memory` is the only backend it implements; the `executors/ondisk/` tree is
+  gone, so `disk` (still in the `-storage_backend` `choices`) raises.
+
+Where one engine is benchmarked in several configurations, the executors are a base class plus
+thin subclasses: `chdb_base.py` → `chdb.py` / `chdb_pyarrow.py`, and `polars_base.py` →
+`polars_eager.py` / `polars_lazy_streaming.py`. `polars_base.py` owns `load_resources`, the
+setup rows, `get_table_stats` and `write_csv`, and defers the API-specific steps to `_scan`,
+`_transform`, `_sort`, `_frame` and `_collect`: the eager subclass is `DataFrame`s throughout,
+the lazy one hands queries `LazyFrame`s and collects with `engine="streaming"` (the sort
+deliberately stays on the in-memory engine). Both keep `self._tables` as `DataFrame`s, since
+that is what the reported sizes and schemas are read from. `main.py` picks between them on
+`-mode eager|lazy`, which is **mandatory** for `-engine polars`.
 
 Both must: load `exnames`/`master`/`trade`/`quote` into memory then transform → sort → index
 (emitting setup rows with `idx` `0`/`-1`/`-2`/`-3`); run every query 3× (cold, warm, warm) with
@@ -136,9 +149,10 @@ and `convertToJSFormat.py` breaks.
 ### "Solution" is a driver-level concept
 
 A *solution* is an engine plus a specific sort/index/query-file combination — `KDB-X`,
-`KDB-X (Parted)`, `KDB-X (NoAttr)`, `DuckDB (Index)`, `KDB-X (Table Dict Peach)`, … The
-runners know nothing about it: they only receive `-sortcols`, `-indexon`, `-format`,
-`-queryfile` and (for the table-dict variants) `EACHPEACH`. The driver scripts are the
+`KDB-X (Parted)`, `KDB-X (NoAttr)`, `DuckDB (Index)`, `Polars (Eager)`, `Polars (Lazy)`,
+`KDB-X (Table Dict Peach)`, … The runners know nothing about it: they only receive
+`-sortcols`, `-indexon`, `-format`, `-queryfile`, `-mode` (Polars) and (for the table-dict
+variants) `EACHPEACH`. The driver scripts are the
 registry of solutions, and [benchmarks/inmemory/common.sh](benchmarks/inmemory/common.sh)
 `run_solution` / `add_solution_name` prepends the `solution` column to each per-solution PSV
 afterwards. To add or rename a solution, edit the driver — and remember `index.html` and
@@ -155,8 +169,12 @@ then calls `init_benchmark` and `run_suite`.
 ### Query set and parameters are cross-file invariants
 
 Queries are stored **per engine** in `artifacts/queries/inmemory/*.psv`, row-aligned by `idx`
-with the engine-independent `querymeta.psv` (`instrument` and `complexity` drive the dashboard
-filters, and `instrument` is mandatory). Query parameters come from
+with the engine-independent `querymeta.psv` — one file **per solution variant** where the
+syntax differs, so Polars has both `polars.psv` (eager) and `polars_lazy.psv`, which are
+identical except that the six `pivot` queries (idx 24–29) insert a `.collect()` first because
+`pivot` has no `LazyFrame` equivalent. A query added to one of the pair must be added to the
+other. In `querymeta.psv`, `instrument` and `complexity` drive the dashboard filters, and
+`instrument` is mandatory. Query parameters come from
 `artifacts/parameters/<SIZE>/*.txt` and are loaded independently by `load_parameters`
 (Python) and [src/getQueryParameters.q](src/getQueryParameters.q) — a new parameter needs a
 `.txt` in **every** size directory plus both loaders. README's *Extending the Benchmarks*

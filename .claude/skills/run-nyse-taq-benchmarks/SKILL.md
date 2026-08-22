@@ -1,6 +1,6 @@
 ---
 name: run-nyse-taq-benchmarks
-description: Run the KX NYSE TAQ benchmark suite end-to-end. Use when the user wants to benchmark in-memory query engines (KDB-X, KDB-X SQL, Polars, DuckDB, Pandas, pykx) or compare KDB-X attributes/table formats on NYSE TAQ data — i.e. selecting a data SIZE, downloading PSV files, generating kdb+/Parquet databases, and running queryEngines.sh or kdbAttributes.sh and reading the PSV results.
+description: Run the KX NYSE TAQ benchmark suite end-to-end. Use when the user wants to benchmark in-memory query engines (KDB-X, KDB-X SQL, Polars, DuckDB, chDB, Pandas, pykx) or compare KDB-X attributes/table formats on NYSE TAQ data — i.e. selecting a data SIZE, downloading PSV files, generating kdb+/Parquet databases, and running queryEngines.sh or kdbAttributes.sh and reading the PSV results.
 ---
 
 # Run the NYSE TAQ Benchmarks
@@ -20,8 +20,8 @@ Ask (or infer from the request) two things:
 
 1. **Which benchmark?**
    - *In-memory query engine* (`benchmarks/inmemory/queryEngines.sh`) — compares
-     KDB-X, KDB-X SQL, DuckDB, Polars, Pandas, pykx. Needs **both** kdb+ and
-     Hive-partitioned Parquet databases.
+     KDB-X, KDB-X SQL, DuckDB, chDB, Polars (eager and lazy), Pandas, pykx.
+     Needs **both** kdb+ and Hive-partitioned Parquet databases.
    - *KDB-X attribute / table-format* (`benchmarks/inmemory/kdbAttributes.sh`) —
      measures the impact of sort columns, `sym`/`time` attributes, and table-dict
      layout. Needs **only** the kdb+ database.
@@ -139,12 +139,13 @@ the Python dataframe/SQL engines read Parquet:
 | `kdbxsql` | KDB-X SQL | kdb+ |
 | `pykx` | KDB-X Python (`pykx`) | kdb+ |
 | `duckdb` | DuckDB | Parquet |
-| `polars` | Polars | Parquet |
+| `chdb` | chDB (embedded ClickHouse) | Parquet |
+| `polars` | Polars — two solutions, `Polars (Eager)` and `Polars (Lazy)` | Parquet |
 | `pandas` | Pandas | Parquet |
 
 So generate only kdb+ if restricting to `kdb`/`kdbxsql`/`pykx`, only Parquet if
-restricting to `duckdb`/`polars`/`pandas`, and **both** for the default (all
-engines). The attribute benchmark always needs kdb+ only.
+restricting to `duckdb`/`chdb`/`polars`/`pandas`, and **both** for the default
+(all engines). The attribute benchmark always needs kdb+ only.
 
 **For the query-engine benchmark with all engines — generate BOTH formats:**
 ```bash
@@ -209,9 +210,10 @@ Optional:
 | Flag | Meaning | Default |
 | --- | --- | --- |
 | `-t`, `--threads` | space-separated secondary-thread counts to test; each engine runs once per value (`0` = no secondary threads) | `"1 4"` |
-| `-e`, `--engines` | (queryEngines only) comma-separated subset of `kdb,kdbxsql,duckdb,polars,pykx,pandas` | all |
+| `-e`, `--engines` | (queryEngines only) comma-separated subset of `kdb,kdbxsql,duckdb,chdb,polars,pykx,pandas` | all |
+| `-s`, `--solutions` | (queryEngines only) comma-separated subset of the named variants within those engines, or `"ALL"` for every variant. Polars contributes `Polars (Eager)` and `Polars (Lazy)`; picking the `polars` engine alone runs neither unless one of those names is selected | `"KDB-X,DuckDB (Index),Polars (Lazy),Pandas"` |
 | `-i`, `--idx` | run a subset of queries: `42`, `32,42,50`, or range `40-44` | all |
-| `-q`, `--query-output-dir` | persist each engine's query outputs as `queryoutput_<idx>.csv` (per-engine subdir) for cross-engine correctness checks | not persisted |
+| `-q`, `--query-output-dir` | persist each solution's query outputs as `queryoutput_<idx>.csv` (per-solution subdir, e.g. `Polars_Eager_`) for cross-engine correctness checks | not persisted |
 | `-r`, `--result-dir` | directory for the merged `results.psv`, plus per-solution stats (`<solution>/stats.yaml` + `os.txt`) and `environment.yaml` | `./results/inmemory` |
 | `-h`, `--help` | usage | — |
 

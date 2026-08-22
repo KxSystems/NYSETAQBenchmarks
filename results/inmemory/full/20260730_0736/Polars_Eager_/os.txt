@@ -1,7 +1,7 @@
 /home/kxsystems/dev/nysetaqbenchmarks/pysrc/queryrunner/executors/inmemory/polars.py:22: DataOrientationWarning: Row orientation inferred during DataFrame construction. Explicitly specify the orientation by passing `orient="row"` to silence this warning.
   self.params['timeBuckets'] = pl.DataFrame(list(self.params['timeBuckets'].items()), schema=['bucket', 'bound'])
 <string>:1: UserWarning: Sortedness of columns cannot be checked when 'by' groups provided
-	Command being timed: "env POLARS_MAX_THREADS=64 uv run pysrc/queryrunner/main.py -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/full -db /mnt/nvme3p2/nysetaq/full/parquet/rowgroup -engine polars -sortcols time -queryfile ./artifacts/queries/inmemory/polars.psv -result ./results/inmemory/full/20260730_0736/tmp/Polars_64Threads.psv -tableStatsDir ./results/inmemory/full/20260730_0736/Polars"
+	Command being timed: "env POLARS_MAX_THREADS=64 uv run pysrc/queryrunner/main.py -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/full -db /mnt/nvme3p2/nysetaq/full/parquet/rowgroup -engine polars -sortcols time -queryfile ./artifacts/queries/inmemory/polars.psv -result ./results/inmemory/full/20260730_0736/tmp/Polars (Eager)_64Threads.psv -tableStatsDir ./results/inmemory/full/20260730_0736/Polars (Eager)"
 	User time (seconds): 6704.38
 	System time (seconds): 713.13
 	Percent of CPU this job got: 2905%
