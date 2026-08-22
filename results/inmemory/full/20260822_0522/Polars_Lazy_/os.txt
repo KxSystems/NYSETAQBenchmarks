@@ -1,0 +1,27 @@
+/home/kxsystems/dev/nysetaqbenchmarks/pysrc/queryrunner/executors/inmemory/polars_base.py:48: DataOrientationWarning: Row orientation inferred during DataFrame construction. Explicitly specify the orientation by passing `orient="row"` to silence this warning.
+  time_buckets = pl.DataFrame(
+/home/kxsystems/dev/nysetaqbenchmarks/pysrc/queryrunner/executors/inmemory/polars_lazy_streaming.py:35: UserWarning: Sortedness of columns cannot be checked when 'by' groups provided
+  return res.collect(engine="streaming")
+	Command being timed: "env POLARS_MAX_THREADS=64 uv run pysrc/queryrunner/main.py -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/full -db /mnt/nvme3p2/nysetaq/full/parquet/rowgroup -engine polars -mode lazy -sortcols time -queryfile ./artifacts/queries/inmemory/polars_lazy.psv -result ./results/inmemory/full/20260822_0522/tmp/Polars_Lazy__64Threads.psv -tableStatsDir ./results/inmemory/full/20260822_0522/Polars_Lazy_"
+	User time (seconds): 5581.26
+	System time (seconds): 898.23
+	Percent of CPU this job got: 2517%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 4:17.35
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 896936608
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 228
+	Minor (reclaiming a frame) page faults: 139157350
+	Voluntary context switches: 668398
+	Involuntary context switches: 16951
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 208
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
