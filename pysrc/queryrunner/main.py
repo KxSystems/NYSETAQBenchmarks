@@ -169,11 +169,17 @@ def main(args: argparse.Namespace) -> None:
     storage_backend = args.storage_backend.lower()
     if storage_backend == "memory":
         if engine == "polars":
+            import polars as pl
             if len(args.indexon) > 0:
                 raise ValueError("Polars does not support indices")
-            from executors.inmemory.polars import QueryExecutorPolarsInMemory
-            import polars as pl
-            runner = QueryExecutorPolarsInMemory(params, sort_cols=args.sortcols, datadate=args.date)
+            if args.mode == "lazy":
+                from executors.inmemory.polars_lazy_streaming import QueryExecutorPolarsLazy
+                runner = QueryExecutorPolarsLazy(params, sort_cols=args.sortcols, datadate=args.date)
+            elif args.mode == "eager":
+                from executors.inmemory.polars_eager import QueryExecutorPolarsEager
+                runner = QueryExecutorPolarsEager(params, sort_cols=args.sortcols, datadate=args.date)
+            else:
+                raise ValueError("Polars engine requires -mode to be specified as either 'eager' or 'lazy'")
             threadnr = pl.thread_pool_size()
         elif engine == "duckdb_con":
             from executors.inmemory.duckdb_con import QueryExecutorDuckDBCon
@@ -208,19 +214,6 @@ def main(args: argparse.Namespace) -> None:
             runner = QueryExecutorPandas(params, sort_cols=args.sortcols)
             import numexpr
             threadnr = os.environ.get('NUMEXPR_NUM_THREADS', numexpr.nthreads)
-        else:
-            raise ValueError(f"Invalid engine parameter: {args.engine}")
-    elif storage_backend == "disk":
-        if engine == "polars":
-            from executors.ondisk.polars import QueryExecutorPolars
-            import polars as pl
-            runner = QueryExecutorPolars(params)
-            threadnr = pl.thread_pool_size()
-        elif engine == "pykx":
-            from executors.ondisk.pykx import QueryExecutorPyKX
-            import pykx as kx
-            runner = QueryExecutorPyKX(params)
-            threadnr = kx.q.system.num_threads
         else:
             raise ValueError(f"Invalid engine parameter: {args.engine}")
     else:
@@ -320,6 +313,7 @@ def build_parser() -> argparse.ArgumentParser:
         required=True, help="Query engine. Currently supported: polars, duckdb_con, chdb, chdb_pyarrow, pykx, and pandas")
     parser.add_argument('-sortcols', type=parse_sortcols, required=False, help="Comma-separated columns to sort trade/quote by, e.g. 'time' or 'sym,time'.")
     parser.add_argument('-indexon', type=parse_sortcols, required=False, default=[], help="Comma-separated columns to add index to, e.g. 'sym' or 'sym,ex'.")
+    parser.add_argument('-mode', type=str, required=False, choices=["eager", "lazy"], help="Execution mode for the query engine. Currently supported: eager and lazy. Only applicable to Polars engine.")
     parser.add_argument('-queryfile', type=Path, required=True, help="PSV file containing queries")
     parser.add_argument('-querymeta', type=Path, required=True, help="PSV file containing the query metas")
     parser.add_argument('-paramdir', type=Path, required=True, help="Directory containing parameter txt files")

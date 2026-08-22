@@ -1,10 +1,10 @@
-solution: Polars
+solution: Polars (Eager)
 proprietary: 'no'
 engineversion: 1.41.2
 master:
   name: master
-  size (MB): 0.4619140625
-  rowCount: 4184
+  size (MB): 0.7822265625
+  rowCount: 7106
   columnCount: 39
   columns:
   - name: sym
@@ -87,8 +87,8 @@ master:
     type: Boolean
 trade:
   name: trade
-  size (MB): 3412.8330078125
-  rowCount: 50941143
+  size (MB): 5670.7705078125
+  rowCount: 84643907
   columnCount: 15
   columns:
   - name: time
@@ -123,8 +123,8 @@ trade:
     type: Boolean
 quote:
   name: quote
-  size (MB): 127423.130859375
-  rowCount: 1283196520
+  size (MB): 188795.2197265625
+  rowCount: 1901235410
   columnCount: 23
   columns:
   - name: time
