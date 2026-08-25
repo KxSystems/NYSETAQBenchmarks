@@ -1,7 +1,7 @@
-test date: "2026-08-22"
-test time: "03:16:52"
+test date: "2026-08-23"
+test time: "16:53:34"
 parameters:
-  db-dir: "/mnt/nvme3p2/nysetaq/xlarge"
+  db-dir: "/mnt/nvme3p2/nysetaq/full"
   datadate: "20260401"
 envvars:
   NUMANODE: "0"

@@ -1,5 +1,5 @@
-test date: "2026-08-22"
-test time: "03:03:52"
+test date: "2026-08-23"
+test time: "13:37:26"
 parameters:
   db-dir: "/mnt/nvme3p2/nysetaq/large"
   datadate: "20260401"
