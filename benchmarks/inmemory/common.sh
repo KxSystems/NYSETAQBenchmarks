@@ -19,6 +19,10 @@ THREAD_NRS=(1 4)
 IDX_PARAM=""
 QUERY_OUTPUT_DIR=""
 
+# Solutions whose runner exited non-zero, collected by run_solution and reported
+# by run_suite. A crashing runner must not abort the whole suite.
+FAILED_SOLUTIONS=()
+
 # Validate DATE, create the scratch result directory, and point FLUSH at the
 # no-op script (in-memory data needs no cache flush). Call after parsing args.
 function init_benchmark () {
@@ -27,7 +31,6 @@ function init_benchmark () {
     # Per-engine result PSVs are written to a scratch directory and then merged
     # into RESULT_DIR/results.psv; the scratch directory is removed on exit.
     RESULT_TMP_DIR="${RESULT_DIR}/tmp"
-    trap 'rm -rf "${RESULT_TMP_DIR}"' EXIT
 
     # Set FLUSH to a no-op script since we're working with in-memory data
     export FLUSH=${COMMON_DIR}/../../flush/noflush.sh
@@ -177,6 +180,12 @@ function add_solution_name () {
 # path, append -queryOutputDir/-result to the command given in $2..., run it,
 # then label the resulting PSV via add_solution_name. Relies on $s (thread count)
 # and $RESULT_DIR from the enclosing loop in execute_queries.
+#
+# A runner that exits non-zero (crash, OOM, unsupported query) is recorded in
+# FAILED_SOLUTIONS and reported at the end of the suite; the driver scripts run
+# with 'set -e', so the exit status is deliberately swallowed here so the
+# remaining solutions still get benchmarked. Whatever rows the runner managed to
+# write are still labelled and merged.
 function run_solution () {
     local solution="$1"
     shift
@@ -191,7 +200,12 @@ function run_solution () {
         mkdir -p "${QUERY_OUTPUT_DIR}/${safe}"
         query_output_param="-queryOutputDir ${QUERY_OUTPUT_DIR}/${safe}"
     fi
-    $(get_numa_config) /usr/bin/time -v "$@" ${query_output_param} -result ${result} -tableStatsDir ${RESULT_DIR}/${safe} 2> ${RESULT_DIR}/${safe}/os.txt
+    local status=0
+    $(get_numa_config) /usr/bin/time -v "$@" ${query_output_param} -result ${result} -tableStatsDir ${RESULT_DIR}/${safe} 2> ${RESULT_DIR}/${safe}/os.txt || status=$?
+    if (( status != 0 )); then
+        echo "WARNING: solution '${solution}' (${s} threads) exited with status ${status}; see ${RESULT_DIR}/${safe}/os.txt. Continuing with the next solution." >&2
+        FAILED_SOLUTIONS+=("${solution} (${s} threads, exit ${status})")
+    fi
     add_solution_name "${solution}" ${result} ${RESULT_DIR}/${safe}/stats.yaml
 }
 
@@ -244,6 +258,7 @@ function merge_results () {
     # only, then append the data rows from every file.
     awk 'FNR==1 && NR!=1 { next } { print }' "${files[@]}" > "${RESULT_FILE}"
     echo "Merged ${#files[@]} result file(s) -> ${RESULT_FILE}"
+    rm -rf "${RESULT_TMP_DIR}"
 }
 
 
@@ -263,5 +278,11 @@ function run_suite () {
 
     local elapsed=$((end_time - start_time))
 
-    echo "Benchmark completed successfully in $((elapsed / 86400))d $(date -u -d "@$((elapsed % 86400))" +%T)"
+    echo "Benchmark completed in $((elapsed / 86400))d $(date -u -d "@$((elapsed % 86400))" +%T)"
+
+    if (( ${#FAILED_SOLUTIONS[@]} > 0 )); then
+        echo "${#FAILED_SOLUTIONS[@]} solution run(s) failed:"
+        printf '  - %s\n' "${FAILED_SOLUTIONS[@]}"
+        return 1
+    fi
 }

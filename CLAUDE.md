@@ -242,7 +242,10 @@ its `baselineScope` must pin the machine - unlike the hardware page, its series 
 * **Reading results**: compare warm runs (`run2timeNS`/`run3timeNS`) at equal `threadcount`
   and `idx`. IO columns should be ~0 for these in-memory benchmarks. A failing engine yields
   `status=error` rows instead of aborting the suite — inspect those rows and the solution's
-  `os.txt`.
+  `os.txt`. A runner that dies outright doesn't abort the suite either: `run_solution`
+  swallows the non-zero exit status, warns, and records the run in `FAILED_SOLUTIONS` so the
+  remaining solutions still run; `run_suite` lists the failures at the end and returns 1, so
+  the driver's own exit status is non-zero.
 * Commit messages follow `KDBX-<ticket><suffix> <summary>` (e.g.
   `KDBX-694Fix34 adding a dashboard section to the main doc`), with work merged into `main`
   from per-change branches.

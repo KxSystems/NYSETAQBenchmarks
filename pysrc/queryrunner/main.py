@@ -230,7 +230,13 @@ def main(args: argparse.Namespace) -> None:
     row_start = [storage_backend, "nyi", threadnr, "Python", engine, "",
         ','.join(args.indexon)]
     ios = IOStat(args.db)
-    file_ctx = (open(args.result, 'w', newline='', encoding='utf-8')
+    # buffering=1 (line buffered) so every row written - the header, the setup
+    # rows emitted from the executors' load_resources, and each query row - is on
+    # disk as soon as it is written. An engine loading a large in-memory dataset
+    # can die without unwinding (OOM killer, a segfault in the native engine), and
+    # a block-buffered file would lose everything written up to that point. This
+    # also matches runQueries.q, which writes through an hopen handle.
+    file_ctx = (open(args.result, 'w', newline='', encoding='utf-8', buffering=1)
                 if args.result is not None
                 else contextlib.nullcontext(io.StringIO()))
     logger.info(f"Pid of the tester process: {os.getpid()}")
