@@ -2,21 +2,21 @@
   time_buckets = pl.DataFrame(
 /home/kxsystems/dev/nysetaqbenchmarks/pysrc/queryrunner/executors/inmemory/polars_lazy_streaming.py:35: UserWarning: Sortedness of columns cannot be checked when 'by' groups provided
   return res.collect(engine="streaming")
-	Command being timed: "env POLARS_MAX_THREADS=64 uv run pysrc/queryrunner/main.py -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/xlarge -db /mnt/nvme3p2/nysetaq/xlarge/parquet/rowgroup -engine polars -mode lazy -sortcols time -queryfile ./artifacts/queries/inmemory/polars_lazy.psv -result ./results/inmemory/xlarge/20260822_0316/tmp/Polars_Lazy__64Threads.psv -tableStatsDir ./results/inmemory/xlarge/20260822_0316/Polars_Lazy_"
-	User time (seconds): 3972.94
-	System time (seconds): 457.86
-	Percent of CPU this job got: 2710%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:43.45
+	Command being timed: "env POLARS_MAX_THREADS=64 uv run pysrc/queryrunner/main.py -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/xlarge -db /mnt/nvme3p2/nysetaq/xlarge/parquet/rowgroup -engine polars -mode lazy -sortcols time -queryfile ./artifacts/queries/inmemory/polars_lazy.psv -result ./results/inmemory/xlarge/20260823_1350/tmp/Polars_Lazy__64Threads.psv -tableStatsDir ./results/inmemory/xlarge/20260823_1350/Polars_Lazy_"
+	User time (seconds): 3979.86
+	System time (seconds): 453.10
+	Percent of CPU this job got: 2709%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:43.60
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 596347512
+	Maximum resident set size (kbytes): 596353728
 	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 156
-	Minor (reclaiming a frame) page faults: 53377138
-	Voluntary context switches: 570736
-	Involuntary context switches: 12191
+	Major (requiring I/O) page faults: 125
+	Minor (reclaiming a frame) page faults: 52975100
+	Voluntary context switches: 582060
+	Involuntary context switches: 12359
 	Swaps: 0
 	File system inputs: 0
 	File system outputs: 192
