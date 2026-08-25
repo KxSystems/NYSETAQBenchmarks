@@ -28,9 +28,11 @@ which is also what keeps the steps separately measurable:
                  sort step instead, for the reason given there.
   * sort      -- trade and quote ordered by sortcols, ties broken by the parquet
                  row position so the numbering matches the Arrow executor's
-                 stable sort. Unlike there, neither the rowid numbering nor the
-                 LowCardinality encoding can be split off from the sort, so the
-                 cost of both is part of the sort step:
+                 stable sort -- by the file's position in the sorted file names
+                 rather than by its name, see _file_position. Unlike there,
+                 neither the rowid numbering nor the LowCardinality encoding can
+                 be split off from the sort, so the cost of both is part of the
+                 sort step:
 
                  The rows are numbered with rowNumberInAllBlocks() over a sorted
                  subquery rather than with a row_number() window function,
@@ -110,8 +112,11 @@ class QueryExecutorChDB(QueryExecutorChDBBase):
         "trade": ("time", "participantTimestamp", "tradeReportingFacilityTRFTimestamp"),
         "quote": ("time", "participantTimestamp", "FINRAADFTimestamp"),
     }
-    # The parquet row position, kept on the tables that are sorted.
-    ROW_POSITION: tuple[str, ...] = ("_src_file", "_src_row")
+    # The parquet row position, kept on the tables that are sorted: the file the
+    # row was read from, and its row number within that file.
+    SRC_FILE: str = "_src_file"
+    SRC_ROW: str = "_src_row"
+    ROW_POSITION: tuple[str, ...] = (SRC_FILE, SRC_ROW)
     # The tables CHDB_COMPRESS applies to: the two the data is in.
     COMPRESSED_TABLES: tuple[str, ...] = ("trade", "quote")
     # The string columns left unencoded, being unencoded in the other engines
@@ -168,10 +173,35 @@ class QueryExecutorChDB(QueryExecutorChDBBase):
             self._rebuild(name, f"SELECT * REPLACE ({', '.join(replace)}) FROM {name}")
             logger.info("Shape of %s: %s x %s", name, *self._shape(name))
 
+    def _file_position(self, name: str) -> str:
+        """The ORDER BY term that orders the rows by the file they came from.
+
+        The file's position in the table's file names, sorted, rather than the
+        name itself: the tie-break is reached by every pair of rows with equal
+        sort_cols values, and comparing _src_file there means walking a
+        LowCardinality(String) whose values share their prefix and differ only
+        near the end (part-0.parquet, part-1.parquet, ...) instead of comparing
+        an integer. A table of this shape built to measure it -- 20M rows over
+        20 files, 50 rows per distinct sort key, unordered -- sorts in ~11s by
+        the name and ~3s by the position, against ~2.3s with no tie-break at
+        all, so nearly all of the tie-break's cost is the string.
+
+        The file names come from the column itself, so the order is the one
+        ORDER BY _src_file gave and the numbering the sort produces does not
+        change. ClickHouse answers the DISTINCT from the column's
+        LowCardinality dictionaries, without a scan of the rows.
+        """
+        files = self._query(f"SELECT DISTINCT {self.SRC_FILE} FROM {name}"
+                            f" ORDER BY {self.SRC_FILE}", "ArrowTable")[self.SRC_FILE].to_pylist()
+        array = "[" + ", ".join(self._sql_literal(f) for f in files) + "]"
+        return f"indexOf({array}, {self.SRC_FILE})"
+
     def _sort_tables(self) -> None:
-        order_by = ", ".join(list(self.sort_cols) + list(self.ROW_POSITION))
         for name in self.SORTED_TABLES:
-            logger.info("ordering %s by %s", name, order_by)
+            order_by = ", ".join(list(self.sort_cols)
+                                 + [self._file_position(name), self.SRC_ROW])
+            logger.info("ordering %s by %s", name,
+                        ", ".join(list(self.sort_cols) + list(self.ROW_POSITION)))
             self._rebuild(name, f"SELECT * EXCEPT ({', '.join(self.ROW_POSITION)})"
                                 f" REPLACE ({', '.join(self._low_cardinality(name))}),"
                                 " rowNumberInAllBlocks() AS rowid"
