@@ -1,0 +1,4 @@
+solution: DuckDB (Sym, Time Sort)
+proprietary: 'no'
+engineversion: 1.5.4
+sortcols: sym,time
