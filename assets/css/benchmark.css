@@ -21,6 +21,8 @@
   --highlight-color: #E7E9ED; /* neutral-10 */
   --chart-scale-1: #2159B2; /* blue-60 */
   --chart-scale-2: #3272D9; /* blue-50 */
+  --failed-bar: #CBCFD6; /* neutral-20: a solution that failed before reporting anything */
+  --failed-color: #7A8291; /* neutral-40: pale name of a failed solution */
   --tooltip-text-color: #F9FAFB; /* text-tooltip-color: neutral-025 */
   --tooltip-background-color: #1A1D22; /* background-tooltip: neutral-90 */
   --tooltip-border-color: #565E6E;
@@ -55,6 +57,8 @@
   --highlight-color: #2B2F38; /* background-neutral-weak: neutral-80 */
   --chart-scale-1: #FFCB22; /* yellow-20 */
   --chart-scale-2: #D5A600; /* gold */
+  --failed-bar: #565E6E; /* neutral-60: a solution that failed before reporting anything */
+  --failed-color: #A5ABB8; /* neutral-30: pale name of a failed solution */
   --tooltip-text-color: #1A1D22; /* text-tooltip-color: neutral-90 */
   --tooltip-background-color: #FFFFFF; /* background-tooltip: neutral-01 */
   --tooltip-border-color: #CBCFD6;
@@ -322,6 +326,21 @@ a:hover {
 .summary-bar {
   height: 1rem;
   width: 100%;
+}
+
+/* A solution whose run failed before it reported any result: there is no ratio to
+   plot, so the row carries a full-length grey line and the name is paled out
+   instead of taking its series colour, with the exit status in place of a ratio. */
+.summary-bar-failed {
+  background: var(--failed-bar);
+}
+
+/* The name is a link, so the pale colour has to outrank the `a`/`a:visited`/
+   `a:hover` rules above; hence the parent class in every selector. */
+.summary-name .summary-name-failed,
+.summary-name .summary-name-failed:visited,
+.summary-name .summary-name-failed:hover {
+  color: var(--failed-color);
 }
 
 .summary-number {

@@ -1,0 +1,4 @@
+solution: Polars (Lazy)
+proprietary: 'no'
+engineversion: 1.41.2
+sortcols: time

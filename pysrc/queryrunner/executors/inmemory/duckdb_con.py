@@ -134,8 +134,12 @@ class QueryExecutorDuckDBCon:
     def get_table_size(df) -> None:
         return None
 
+    def get_engine_stats(self) -> dict[str, Any]:
+        return {"proprietary": "no", "engineversion": duckdb.__version__}
+
     def get_table_stats(self) -> dict[str, Any]:
-        table_stats_dict = {"proprietary": "no", "engineversion": duckdb.__version__}
+        """The per-table sections, appended to the stats.yaml get_engine_stats started."""
+        table_stats_dict: dict[str, Any] = {}
         for t_name in ["master", "trade", "quote"]:
             df = self.con.table(t_name)
             table_stats = {

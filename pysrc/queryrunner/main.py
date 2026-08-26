@@ -245,15 +245,26 @@ def main(args: argparse.Namespace) -> None:
         if args.result is not None:
             writer.writerow(headers)
 
+        # The solution-level fields (proprietary, engineversion, sortcols) are
+        # written before anything is loaded, and the table statistics appended once
+        # the data is in memory. That way stats.yaml exists even when the engine
+        # never gets that far - an in-memory load of a large data size can end with
+        # the OOM killer - so common.sh's add_solution_name can always label the run
+        # with its solution name and the dashboard conversion can report it as
+        # terminated.
+        if args.stats_dir is not None:
+            logger.info("Saving solution statistics to %s", args.stats_dir)
+            args.stats_dir.mkdir(parents=True, exist_ok=True)
+            with open(args.stats_dir / "stats.yaml", 'w') as f:
+                    yaml.dump(runner.get_engine_stats() | {"sortcols": ','.join(args.sortcols or [])},
+                              f, indent=2, sort_keys=False)
+
         runner.load_resources(db_path=args.db, datadate=args.date, writer=writer, row_start=row_start, ios=ios)
         f_out.flush()
-        if args.table_stats_dir is not None:
-            logger.info("Saving table statistics to %s", args.table_stats_dir)
-            args.table_stats_dir.mkdir(parents=True, exist_ok=True)
-            table_stats_dict = runner.get_table_stats()
-            table_stats_dict["sortcols"] = ','.join(args.sortcols or [])
-            with open(args.table_stats_dir / "stats.yaml", 'w') as f:
-                yaml.dump(table_stats_dict, f, indent=2, sort_keys=False)
+        if args.stats_dir is not None:
+            logger.info("Saving table statistics to %s", args.stats_dir)
+            with open(args.stats_dir / "stats.yaml", 'a') as f:
+                    yaml.dump(runner.get_table_stats(), f, indent=2, sort_keys=False)
 
         if not args.queryfile.exists():
             logger.error("Query file not found: %s", args.queryfile)
@@ -332,7 +343,7 @@ def build_parser() -> argparse.ArgumentParser:
              "A base scope like 'single' or 'multi' also matches its variants "
              "(single:infrequent/frequent, multi:50/1000infreq).")
     parser.add_argument('-queryOutputDir', type=Path, required=False, help="Directory to save query results.")
-    parser.add_argument('-tableStatsDir', dest='table_stats_dir', type=Path, required=False, help="Directory to save master/trade/quote table statistics YAML files.")
+    parser.add_argument('-statsDir', dest='stats_dir', type=Path, required=False, help="Directory to save the solution's stats.yaml (proprietary/engineversion/sortcols plus the master/trade/quote table statistics).")
     parser.add_argument('-date', type=lambda s: datetime.strptime(s, '%Y%m%d').date(), required=True, help='Date in YYYYMMDD format')
 
     parser.add_argument('-result', type=Path, default=None, help="Output PSV file path. If not provided, results are not written.")

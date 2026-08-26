@@ -185,7 +185,10 @@ function add_solution_name () {
 # FAILED_SOLUTIONS and reported at the end of the suite; the driver scripts run
 # with 'set -e', so the exit status is deliberately swallowed here so the
 # remaining solutions still get benchmarked. Whatever rows the runner managed to
-# write are still labelled and merged.
+# write are still labelled and merged. Both runners write the solution-level part
+# of stats.yaml before loading any data, so even a run killed while loading - which
+# produces no result row at all - leaves a stats.yaml for add_solution_name to
+# label.
 function run_solution () {
     local solution="$1"
     shift
@@ -201,7 +204,7 @@ function run_solution () {
         query_output_param="-queryOutputDir ${QUERY_OUTPUT_DIR}/${safe}"
     fi
     local status=0
-    $(get_numa_config) /usr/bin/time -v "$@" ${query_output_param} -result ${result} -tableStatsDir ${RESULT_DIR}/${safe} 2> ${RESULT_DIR}/${safe}/os.txt || status=$?
+    $(get_numa_config) /usr/bin/time -v "$@" ${query_output_param} -result ${result} -statsDir ${RESULT_DIR}/${safe} 2> ${RESULT_DIR}/${safe}/os.txt || status=$?
     if (( status != 0 )); then
         echo "WARNING: solution '${solution}' (${s} threads) exited with status ${status}; see ${RESULT_DIR}/${safe}/os.txt. Continuing with the next solution." >&2
         FAILED_SOLUTIONS+=("${solution} (${s} threads, exit ${status})")

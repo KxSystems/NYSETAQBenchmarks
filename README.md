@@ -368,7 +368,29 @@ The script scans the input directory recursively for benchmark runs — any
 directory holding both `results.psv` and `environment.yaml`, plus the
 per-solution `<solution>/stats.yaml` files — merges the thread counts of the same
 (data date, machine, solution) triple, and keeps the latest measurement when
-runs overlap. It also refreshes
+runs overlap.
+
+A solution whose run failed — the operating system killing it for exceeding the
+available memory on a data size that does not fit is the usual reason — never gets
+to run a query, so at most its load-phase rows reach `results.psv`. Both runners do
+write the solution-level part of `<solution>/stats.yaml` (`proprietary`,
+`engineversion`, `sortcols`) before they load any data, though, so the directory
+still names the solution that ran; paired with the non-zero `Exit status` in the
+`/usr/bin/time -v` output of its `<solution>/os.txt`, the script reports it as an
+entry with no measurement at all, carrying that status as its `exitcode` (every
+other entry gets `0`). Whatever load rows it managed to write are dropped along with
+it: they time a load that never finished, so reporting them would rank the solution
+on work it did not complete. The same goes for a single thread count that loaded but
+ran no query while others of the same solution completed — that thread count is left
+out. Runs made before the runners wrote the solution-level fields up front have no
+stats.yaml to go on and are reported as a warning instead. The dashboard
+lists such a solution in the benchmark summary with a full-length grey line, its
+name paled out and `Exit: 137` (say) in place of a ratio — so a run that failed
+reads as failed rather than as one that was never attempted, instead of
+disappearing from the comparison altogether. It takes no part in
+the detailed comparison or the charts, having nothing to show there.
+
+It also refreshes
 `artifacts/queries/inmemory/querymeta.generated.js`, the fallback copy of the
 query metadata used when the page is opened via `file://` (browsers block
 `fetch()` for local files).
@@ -482,7 +504,8 @@ with the streaming engine.
    | `get_parameters(self, parameter)` | Pre-process the raw `parameter` string into whatever `execute_query` expects (excluded from the measured time). |
    | `execute_query(self, idx, tags, query_str, params, runidx)` | Execute the query and return the result object. |
    | `get_table_size(df)` (static) | Result/table size in KB, or `None` if unavailable. |
-   | `get_table_stats(self)` | Per-table stats dict written to the `--stats-dir` YAML files. Must include the top-level `proprietary` and `engineversion` (version string of the engine library) keys. |
+   | `get_engine_stats(self)` | The solution-level part of the `-statsDir` `stats.yaml`: the `proprietary` and `engineversion` (version string of the engine library) keys. Called **before** `load_resources`, so it must not depend on loaded data. |
+   | `get_table_stats(self)` | One `stats.yaml` section per table, appended after `load_resources` to what the pre-load write left. |
    | `write_csv(self, res, out_file)` | Serialize a result to CSV for cross-engine output comparison. The CSV must be in **kdb+-loadable format**, so values need special formatting: booleans as `1`/`0` (not `true`/`false`), and temporal values as kdb+ literals (e.g. timespans like `0D09:30:00.000000000`). See the `write_csv` implementations in [polars_base.py](./pysrc/queryrunner/executors/inmemory/polars_base.py) and [pandas.py](./pysrc/queryrunner/executors/inmemory/pandas.py) for the duration/boolean conversions. |
 
 2. **Wire it into the runner.** In [main.py](./pysrc/queryrunner/main.py), add an
