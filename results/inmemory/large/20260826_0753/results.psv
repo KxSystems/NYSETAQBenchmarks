@@ -1,0 +1,19 @@
+solution|storagebackend|compparam|threadcount|runner|engine|format|indexon|idx|query|status|run1timeNS|run2timeNS|run3timeNS|run3memKB|run1ioKB|run2ioKB|run3ioKB|ressizeKB
+chDB (Memory, Compressed)|memory|nyi|16|Python|chdb|||0|load a partition into memory|success|197001864861||||73267953|||265669564
+chDB (Memory, Compressed)|memory|nyi|4|Python|chdb|||0|load a partition into memory|success|196445901275||||73268032|||265669560
+chDB (Memory, Compressed)|memory|nyi|64|Python|chdb|||0|load a partition into memory|success|194355726358||||73267950|||265669206
+chDB (PyArrow)|memory|nyi|16|Python|chdb_pyarrow|||0|load a partition into memory|success|136285082370||||73341928|||139331947
+chDB (PyArrow)|memory|nyi|4|Python|chdb_pyarrow|||0|load a partition into memory|success|142224515569||||73312051|||139331947
+chDB (PyArrow)|memory|nyi|64|Python|chdb_pyarrow|||0|load a partition into memory|success|139972335685||||73337471|||139331947
+Polars (Eager)|memory|nyi|16|Python|polars|||0|load a partition into memory|success|146987785641||||73277698|||133314557
+Polars (Eager)|memory|nyi|16|Python|polars|||-1|transform|success|1420260763||||131|||133976505
+Polars (Eager)|memory|nyi|4|Python|polars|||0|load a partition into memory|success|189109174922||||73277706|||133314557
+Polars (Eager)|memory|nyi|4|Python|polars|||-1|transform|success|4426650523||||131|||133976505
+Polars (Eager)|memory|nyi|64|Python|polars|||0|load a partition into memory|success|134116892218||||73277699|||133314557
+Polars (Eager)|memory|nyi|64|Python|polars|||-1|transform|success|1257514584||||131|||133976505
+Polars (Lazy)|memory|nyi|16|Python|polars|||0|load a partition into memory|success|145966590895||||73277694|||133314557
+Polars (Lazy)|memory|nyi|16|Python|polars|||-1|transform|success|1265687005||||700|||133976517
+Polars (Lazy)|memory|nyi|4|Python|polars|||0|load a partition into memory|success|189224887653||||73277784|||133314557
+Polars (Lazy)|memory|nyi|4|Python|polars|||-1|transform|success|4559777449||||700|||133976517
+Polars (Lazy)|memory|nyi|64|Python|polars|||0|load a partition into memory|success|134205632185||||73277768|||133314557
+Polars (Lazy)|memory|nyi|64|Python|polars|||-1|transform|success|716931906||||700|||133976518

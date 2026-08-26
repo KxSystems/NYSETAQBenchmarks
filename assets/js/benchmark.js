@@ -460,10 +460,13 @@ function queryPassesTagFilters(query_num) {
         !tags.some(tag => selectors.tag_exclude[tag]);
 }
 
-/// Machines ordered by the number of results, most covered first.
+/// Machines ordered by how much they measured, most first. A failed entry carries
+/// no measurement, so it does not count - otherwise a machine could lead the list,
+/// and become the default view, on failed runs alone.
 function availableMachines(base) {
+    const measured = machine => base.filter(elem => elem.machine === machine && !elem.exitcode).length;
     return [... new Set(base.map(elem => elem.machine))].sort((a, b) => {
-        const count_diff = base.filter(elem => elem.machine === b).length - base.filter(elem => elem.machine === a).length;
+        const count_diff = measured(b) - measured(a);
         return count_diff == 0 ? a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}) : count_diff;
     });
 }
@@ -809,7 +812,84 @@ function renderMemoryCharts(filtered_data) {
     panel.style.display = has_mem || has_size ? '' : 'none';
 }
 
-function renderSummary(filtered_data, baseline_runs) {
+/// One row of the summary table: the name cell with its remove button, plus an empty
+/// bar cell and number cell for the caller to fill.
+function summaryRow(label, comment) {
+    let tr = document.createElement('tr');
+    tr.className = 'summary-row';
+    tr.dataset.series = label;
+
+    let td_name = document.createElement('td');
+    td_name.className = 'summary-name';
+
+    let remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'remove-system';
+    remove.setAttribute('aria-label', `Remove ${label} from the comparison`);
+    remove.title = `Remove ${label} from the comparison`;
+
+    let removeIcon = document.createElement('span');
+    removeIcon.setAttribute('aria-hidden', 'true');
+    removeIcon.textContent = '×';
+    remove.appendChild(removeIcon);
+    remove.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        selectors[page.series_key][label] = false;
+        seriesSelectorElements().forEach(elem => {
+            if (elem.dataset.series === label) { elem.className = 'selector'; }
+        });
+        render();
+        updateHistory();
+    });
+    td_name.appendChild(remove);
+
+    let name = page.seriesNameNode(label);
+    td_name.appendChild(name);
+
+    if (comment) { td_name.appendChild(addNote(comment)); }
+    td_name.appendChild(document.createTextNode(': '));
+
+    let td_bar = document.createElement('td');
+    td_bar.className = 'summary-bar-cell';
+
+    let td_number = document.createElement('td');
+    td_number.className = 'summary-number';
+
+    tr.appendChild(td_name);
+    tr.appendChild(td_bar);
+    tr.appendChild(td_number);
+
+    return { tr, name, td_bar, td_number };
+}
+
+/// Rows for the series whose benchmark process failed (see failedEntries): they
+/// have no measurement to rank, so they follow the measured rows with a
+/// full-length grey line and the name paled out. In place of a ratio they show the
+/// exit status their runner reported, which says the run failed rather than merely
+/// leaving the reader to guess that it was never attempted.
+function renderFailedRows(table, failed_data) {
+    failed_data.forEach(elem => {
+        const label = page.seriesLabel(elem);
+        const { tr, name, td_bar, td_number } = summaryRow(label, elem.comment);
+        const explanation = `${label} failed with exit status ${elem.exitcode}`
+            + ' before it reported a single query result';
+
+        name.classList.add('summary-name-failed');
+        tr.title = explanation;
+
+        let bar = document.createElement('div');
+        bar.className = 'summary-bar summary-bar-failed';
+        td_bar.appendChild(bar);
+
+        td_number.appendChild(document.createTextNode(`Exit: ${elem.exitcode}`));
+        td_number.setAttribute('aria-label', explanation);
+
+        table.appendChild(tr);
+    });
+}
+
+function renderSummary(filtered_data, failed_data, baseline_runs) {
     let table = document.getElementById('summary');
     clearElement(table);
 
@@ -842,56 +922,17 @@ function renderSummary(filtered_data, baseline_runs) {
         const elem = filtered_data[idx];
         const label = page.seriesLabel(elem);
 
-        let tr = document.createElement('tr');
-        tr.className = 'summary-row';
-
-        tr.dataset.series = label;
-
-        let td_name = document.createElement('td');
-        td_name.className = 'summary-name';
-
-        let remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'remove-system';
-        remove.setAttribute('aria-label', `Remove ${label} from the comparison`);
-        remove.title = `Remove ${label} from the comparison`;
-
-        let removeIcon = document.createElement('span');
-        removeIcon.setAttribute('aria-hidden', 'true');
-        removeIcon.textContent = '×';
-        remove.appendChild(removeIcon);
-        remove.addEventListener('click', e => {
-            e.preventDefault();
-            e.stopPropagation();
-            selectors[page.series_key][label] = false;
-            seriesSelectorElements().forEach(elem => {
-                if (elem.dataset.series === label) { elem.className = 'selector'; }
-            });
-            render();
-            updateHistory();
-        });
-        td_name.appendChild(remove);
-
-        let name = page.seriesNameNode(label);
+        const { tr, name, td_bar, td_number } = summaryRow(label, elem.comment);
         name.style.color = seriesColor(label);
-        td_name.appendChild(name);
-
-        if (elem.comment) { td_name.appendChild(addNote(elem.comment)); }
-        td_name.appendChild(document.createTextNode(': '));
 
         const ratio = summaries[idx];
         const percentage = ratio !== null ? ratio / max_ratio * 100 : 0;
 
-        let td_number = document.createElement('td');
-        td_number.className = 'summary-number';
         if (ratio !== null) {
             appendRatio(td_number, ratio);
         } else {
             td_number.appendChild(document.createTextNode('—'));
         }
-
-        let td_bar = document.createElement('td');
-        td_bar.className = 'summary-bar-cell';
 
         let bar = document.createElement('div');
 
@@ -908,11 +949,10 @@ function renderSummary(filtered_data, baseline_runs) {
 
         td_bar.appendChild(bar);
 
-        tr.appendChild(td_name);
-        tr.appendChild(td_bar);
-        tr.appendChild(td_number);
         table.appendChild(tr);
     });
+
+    renderFailedRows(table, failed_data);
 
     renderFailuresChart(filtered_data);
     renderWinnersPie(filtered_data);
@@ -991,6 +1031,24 @@ function filterEntries() {
     ).map(elem => ({...elem, runs: elem.result[selectors.threads]}));
 }
 
+/// The selected series whose benchmark process failed before it reported a single
+/// result - the operating system killing it for exceeding the available memory is
+/// the usual cause. They carry no timing at all (pysrc/convertToJSFormat.py gives
+/// them their runner's non-zero `exitcode` and leaves their `result` empty), so
+/// filterEntries() never returns them and they take no part in the details table or
+/// the charts; the summary lists them so a solution that hit a wall is visible
+/// rather than silently missing. They have no thread count either, hence no thread
+/// selection here.
+function failedEntries() {
+    return data.filter(elem =>
+        elem.exitcode &&
+        page.matches(elem) &&
+        selectors[page.series_key][page.seriesLabel(elem)] &&
+        page.machineScope(elem) &&
+        elem.datadate == selectors.date
+    );
+}
+
 /// The baseline entry is looked up independently of the series selection, so ratios
 /// stay stable when the baseline series itself is hidden from the charts.
 function findBaselineEntry(filtered_data) {
@@ -1016,10 +1074,12 @@ function render() {
     reconcile();
 
     const filtered_data = filterEntries();
+    const failed_data = failedEntries();
     const baseline_entry = findBaselineEntry(filtered_data);
 
     rebuildDynamicSelectors(new Set(baseline_entry
-        ? [...filtered_data.map(page.seriesLabel), page.seriesLabel(baseline_entry)] : []));
+        ? [...filtered_data.map(page.seriesLabel), ...failed_data.map(page.seriesLabel),
+           page.seriesLabel(baseline_entry)] : []));
 
     const nothingSelectedElement = document.getElementById('nothing-selected');
     const resultsContent = [...document.querySelectorAll('.results-content')];
@@ -1037,7 +1097,7 @@ function render() {
     const baseline_runs = baseline_entry.result[selectors.threads];
     document.getElementById('baseline-name').textContent = page.seriesLabel(baseline_entry);
 
-    const sorted_indices = renderSummary(filtered_data, baseline_runs);
+    const sorted_indices = renderSummary(filtered_data, failed_data, baseline_runs);
 
     /// Generate details
 
@@ -1050,7 +1110,7 @@ function render() {
         checkbox.addEventListener('change', e => {
             [...document.querySelectorAll('.query-checkbox')].map(elem => { elem.checked = e.target.checked });
             selectors.queries.map((_, i) => { selectors.queries[i] = e.target.checked });
-            renderSummary(filtered_data, baseline_runs);
+            renderSummary(filtered_data, failed_data, baseline_runs);
             updateHistory();
         });
         th_checkbox.appendChild(checkbox);
@@ -1161,7 +1221,7 @@ function render() {
         checkbox.checked = selectors.queries[query_num];
         checkbox.addEventListener('change', e => {
             selectors.queries[query_num] = e.target.checked;
-            renderSummary(filtered_data, baseline_runs);
+            renderSummary(filtered_data, failed_data, baseline_runs);
             updateHistory();
         });
         td_checkbox.appendChild(checkbox);
@@ -1239,7 +1299,7 @@ function render() {
         details_body.appendChild(tr);
     }
 
-    findPassiveSelectors(filtered_data);
+    findPassiveSelectors([...filtered_data, ...failed_data]);
 
     /// The small hint below the column heading
     document.getElementById("scale_hint").textContent = 'Each colour band shows the same ratio range at a different scale: 1x and 10x.';
@@ -1588,7 +1648,11 @@ async function initBenchmark() {
     document.getElementById('selector-metric-hot').addEventListener('click', e => { selectors.metric = 'hot'; render(); updateHistory(); });
     document.getElementById('selector-metric-hot2').addEventListener('click', e => { selectors.metric = 'hot2'; render(); updateHistory(); });
 
-    selectors.queries = Object.values(data[0].result)[0].map(k => true);
+    /// One checkbox per query, all ticked. The lengths come from the first entry
+    /// that measured anything - data[0] is whichever entry sorts first, and a
+    /// failed one carries no result at all.
+    const measured = data.find(elem => Object.values(elem.result).length > 0);
+    selectors.queries = (Object.values(measured?.result ?? {})[0] ?? []).map(k => true);
 
     /// Pre-format the per-cell tooltip texts from the query texts and engine name
     /// recorded in each entry by pysrc/convertToJSFormat.py.

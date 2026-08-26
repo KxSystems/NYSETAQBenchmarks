@@ -131,8 +131,12 @@ class QueryExecutorPolarsBase:
     def get_table_size(df) -> int:
         return int(df.estimated_size("kb"))
 
+    def get_engine_stats(self) -> dict[str, Any]:
+        return {"proprietary": "no", "engineversion": pl.__version__}
+
     def get_table_stats(self) -> dict[str, Any]:
-        table_stats_dict = {"proprietary": "no", "engineversion": pl.__version__}
+        """The per-table sections, appended to the stats.yaml get_engine_stats started."""
+        table_stats_dict: dict[str, Any] = {}
         for t_name in self.TABLES:
             df = self._tables[t_name]
             table_stats = {

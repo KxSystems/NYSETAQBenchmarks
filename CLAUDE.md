@@ -131,7 +131,7 @@ implemented twice:
 Where one engine is benchmarked in several configurations, the executors are a base class plus
 thin subclasses: `chdb_base.py` → `chdb.py` / `chdb_pyarrow.py`, and `polars_base.py` →
 `polars_eager.py` / `polars_lazy_streaming.py`. `polars_base.py` owns `load_resources`, the
-setup rows, `get_table_stats` and `write_csv`, and defers the API-specific steps to `_scan`,
+setup rows, `get_engine_stats`/`get_table_stats` and `write_csv`, and defers the API-specific steps to `_scan`,
 `_transform`, `_sort`, `_frame` and `_collect`: the eager subclass is `DataFrame`s throughout,
 the lazy one hands queries `LazyFrame`s and collects with `engine="streaming"` (the sort
 deliberately stays on the in-memory engine). Both keep `self._tables` as `DataFrame`s, since
@@ -141,10 +141,21 @@ that is what the reported sizes and schemas are read from. `main.py` picks betwe
 Both must: load `exnames`/`master`/`trade`/`quote` into memory then transform → sort → index
 (emitting setup rows with `idx` `0`/`-1`/`-2`/`-3`); run every query 3× (cold, warm, warm) with
 `$FLUSH` invoked before the cold run; emit the **same PSV columns in the same order**; honour
-the same `-idx` / `-tags` / `-instrument` filter semantics; and **abort** on an idx mismatch
+the same `-idx` / `-tags` / `-instrument` filter semantics; write the same `-statsDir`
+`stats.yaml` **twice** (see below); and **abort** on an idx mismatch
 against `querymeta.psv` or a missing/invalid `instrument` value. A change to timing, column
 set, or filtering in one runner must be mirrored in the other, or results stop being comparable
 and `convertToJSFormat.py` breaks.
+
+`-statsDir/stats.yaml` is created before the data is loaded with the solution-level fields only
+(`proprietary`, `engineversion`, `sortcols`) and the per-table sections are **appended** once the
+data is in memory — `get_engine_stats` then `get_table_stats` in `main.py`, `getEngineStats` then
+`getTableStats` in `runQueries.q`. Keeping `sortcols` in the early write is what lets the second write
+append instead of rebuilding the file. The early write is also what makes an OOM-killed run
+reportable: the file exists for `add_solution_name` to stamp the solution name onto, which is the
+only place `convertToJSFormat.py` can learn it from. So **`get_engine_stats` must not touch
+loaded data**, and the finished file must read `proprietary`, `engineversion`, `sortcols`, table
+sections in both runners.
 
 ### "Solution" is a driver-level concept
 
@@ -194,7 +205,31 @@ latest per key. `numanode` is the run's `NUMANODE` (`"all"` when it was empty, i
 and belongs in the key: a pinned and an unpinned run see different core counts, so their thread
 counts must not merge into one entry. Machine names come from the CPU
 model → name map in [results/mappings.yaml](results/mappings.yaml); an unmapped CPU is a hard
-error, so a new benchmark host needs an entry there. `index.html` picks its data file from
+error, so a new benchmark host needs an entry there.
+
+A solution the OS killed (an OOM on a size that does not fit) never runs a query, so at
+most its **load rows** reach `results.psv` — the criterion is "no row with `idx > 0`", not "no
+row at all", and getting that wrong ranks a killed partial load as a fast one. A solution whose
+`os.txt` reports a non-zero `Exit status` and that ran no query becomes an entry whose
+`exitcode` is that status, with an empty `result` and no measurement beyond what its stats.yaml
+holds; its load rows are dropped, as is any single thread count that loaded but ran no query
+(reporting it would also leave `result[tc]` a zero-length array, which breaks the details
+table). Every other entry gets `exitcode` `0` — read it as the status of the runs the entry's
+numbers came from, **not** of the solution's last run: a solution measured at 4 threads and
+killed at 64 keeps its 4-thread numbers and `exitcode` `0`, even though its `os.txt` (rewritten
+per thread count) says 137. This works
+because **both runners write the solution-level part of stats.yaml before loading any data** (see
+below), so `add_solution_name` has a file to stamp the solution name onto even when the process
+dies loading — the sanitised directory name cannot be turned back into a solution name, so that
+line is the only record of it. A directory without a stats.yaml (a run predating that), and a
+solution that ran no query yet exited cleanly, both warn and are skipped. A key that measured any
+thread count keeps its numbers and drops the failure marker. `benchmark.js` keeps these entries
+out of `filterEntries` (hence out of the details table, load times and charts) and lists them from
+`failedEntries` at the bottom of the summary as a full-length grey `summary-bar-failed`
+line showing `Exit: <code>` — the point being that a failed run reads as failed rather than as
+never attempted — with the name paled out; `availableMachines` ignores them when ranking machines
+by result count, so a failed run cannot make a machine the default view. The entry has no
+thread count, so the row shows at every thread count of that machine. `index.html` picks its data file from
 `available_sizes` / `?size=` and falls back to the generated `querymeta.generated.js` copy when
 opened over `file://`.
 
@@ -245,7 +280,9 @@ its `baselineScope` must pin the machine - unlike the hardware page, its series 
   `os.txt`. A runner that dies outright doesn't abort the suite either: `run_solution`
   swallows the non-zero exit status, warns, and records the run in `FAILED_SOLUTIONS` so the
   remaining solutions still run; `run_suite` lists the failures at the end and returns 1, so
-  the driver's own exit status is non-zero.
+  the driver's own exit status is non-zero. Such a run leaves `results.psv` with at most the
+  solution's load rows — its outcome is recorded only in `<solution>/os.txt`, which is where
+  `convertToJSFormat.py` picks it up so the dashboard can report the failure and its exit status.
 * Commit messages follow `KDBX-<ticket><suffix> <summary>` (e.g.
   `KDBX-694Fix34 adding a dashboard section to the main doc`), with work merged into `main`
   from per-change branches.

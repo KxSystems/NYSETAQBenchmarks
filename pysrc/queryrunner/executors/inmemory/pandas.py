@@ -84,8 +84,12 @@ class QueryExecutorPandas:
     def get_table_size(df) -> int:
         return int(df.memory_usage(deep=True).sum() / 1024)
 
+    def get_engine_stats(self) -> dict[str, Any]:
+        return {"proprietary": "no", "engineversion": pd.__version__}
+
     def get_table_stats(self) -> dict[str, Any]:
-        table_stats_dict = {"proprietary": "no", "engineversion": pd.__version__}
+        """The per-table sections, appended to the stats.yaml get_engine_stats started."""
+        table_stats_dict: dict[str, Any] = {}
         for t_name in ["master", "trade", "quote"]:
             df = self.eval_context[t_name]
             table_stats = {

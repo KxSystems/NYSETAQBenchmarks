@@ -193,10 +193,14 @@ class QueryExecutorChDBBase:
     def get_table_size(df: pa.Table | ChDBQueryResult) -> int:
         return df.nbytes // 1024
 
-    def get_table_stats(self) -> dict[str, Any]:
+    def get_engine_stats(self) -> dict[str, Any]:
         import importlib.metadata
-        table_stats_dict = {"proprietary": "no"}
-        table_stats_dict["engineversion"] = importlib.metadata.version('chdb')
+        return {"proprietary": "no",
+                "engineversion": importlib.metadata.version('chdb')}
+
+    def get_table_stats(self) -> dict[str, Any]:
+        """The per-table sections, appended to the stats.yaml get_engine_stats started."""
+        table_stats_dict: dict[str, Any] = {}
         for t_name in self.REPORTED_TABLES:
             table_stats_dict[t_name] = self._table_stats(t_name)
         return table_stats_dict

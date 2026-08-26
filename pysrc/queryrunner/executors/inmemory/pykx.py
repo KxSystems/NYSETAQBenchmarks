@@ -84,8 +84,12 @@ class QueryExecutorPyKXInMemory:
     def get_table_size(df) -> int:
         return kx.objsize(df).py() // 1024  # convert to KB
 
+    def get_engine_stats(self) -> dict[str, Any]:
+        return {"proprietary": "yes", "engineversion": kx.__version__}
+
     def get_table_stats(self) -> dict[str, Any]:
-        table_stats_dict = {"proprietary": "yes", "engineversion": kx.__version__}
+        """The per-table sections, appended to the stats.yaml get_engine_stats started."""
+        table_stats_dict: dict[str, Any] = {}
         for t_name in ["master", "trade", "quote"]:
             df = self.eval_context[t_name]
             table_stats = {
