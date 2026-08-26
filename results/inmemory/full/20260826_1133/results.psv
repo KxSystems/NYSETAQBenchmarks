@@ -1,0 +1,19 @@
+solution|storagebackend|compparam|threadcount|runner|engine|format|indexon|idx|query|status|run1timeNS|run2timeNS|run3timeNS|run3memKB|run1ioKB|run2ioKB|run3ioKB|ressizeKB
+DuckDB (Index)|memory|nyi|16|Python|duckdb_con||sym|0|load a partition into memory|success|103501407623||||164496966|||
+DuckDB (Index)|memory|nyi|16|Python|duckdb_con||sym|-1|transform|success|146834849777||||0|||
+DuckDB (Index)|memory|nyi|4|Python|duckdb_con||sym|0|load a partition into memory|success|275556579257||||164496965|||
+DuckDB (Index)|memory|nyi|4|Python|duckdb_con||sym|-1|transform|success|319161178571||||0|||
+DuckDB (Index)|memory|nyi|64|Python|duckdb_con||sym|0|load a partition into memory|success|109294466518||||164496966|||
+DuckDB (Index)|memory|nyi|64|Python|duckdb_con||sym|-1|transform|success|118223914987||||0|||
+DuckDB (No index)|memory|nyi|16|Python|duckdb_con|||0|load a partition into memory|success|103117732209||||164496966|||
+DuckDB (No index)|memory|nyi|16|Python|duckdb_con|||-1|transform|success|146873058611||||0|||
+DuckDB (No index)|memory|nyi|4|Python|duckdb_con|||0|load a partition into memory|success|274300540558||||164496966|||
+DuckDB (No index)|memory|nyi|4|Python|duckdb_con|||-1|transform|success|317398324926||||0|||
+DuckDB (No index)|memory|nyi|64|Python|duckdb_con|||0|load a partition into memory|success|106168878937||||164496966|||
+DuckDB (No index)|memory|nyi|64|Python|duckdb_con|||-1|transform|success|118924222674||||0|||
+DuckDB (Sym, Time Sort)|memory|nyi|16|Python|duckdb_con|||0|load a partition into memory|success|101907406561||||164496965|||
+DuckDB (Sym, Time Sort)|memory|nyi|16|Python|duckdb_con|||-1|transform|success|147431748718||||0|||
+DuckDB (Sym, Time Sort)|memory|nyi|4|Python|duckdb_con|||0|load a partition into memory|success|273610041599||||164496966|||
+DuckDB (Sym, Time Sort)|memory|nyi|4|Python|duckdb_con|||-1|transform|success|317870191243||||0|||
+DuckDB (Sym, Time Sort)|memory|nyi|64|Python|duckdb_con|||0|load a partition into memory|success|104869675123||||164496965|||
+DuckDB (Sym, Time Sort)|memory|nyi|64|Python|duckdb_con|||-1|transform|success|117969326608||||0|||
