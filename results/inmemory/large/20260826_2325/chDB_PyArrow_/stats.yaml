@@ -1,0 +1,180 @@
+solution: chDB (PyArrow)
+proprietary: 'no'
+engineversion: 4.1.8
+sortcols: time
+master:
+  name: master
+  size (MB): 0.6064453125
+  rowCount: 4184
+  columnCount: 39
+  columns:
+  - name: sym
+    type: dictionary<string>
+  - name: description
+    type: string
+  - name: cusip
+    type: dictionary<string>
+  - name: securityType
+    type: dictionary<string>
+  - name: SIPSymbol
+    type: dictionary<string>
+  - name: oldSym
+    type: dictionary<string>
+  - name: testSymFlag
+    type: bool
+  - name: ex
+    type: dictionary<string>
+  - name: tap
+    type: dictionary<string>
+  - name: unit
+    type: uint16
+  - name: roundLot
+    type: uint16
+  - name: NYSEIndustryCode
+    type: dictionary<string>
+  - name: sharesOutstanding
+    type: float64
+  - name: haltDelayReason
+    type: dictionary<string>
+  - name: specialistClearingAgent
+    type: dictionary<string>
+  - name: specialistClearingNumber
+    type: dictionary<string>
+  - name: specialistPostNumber
+    type: int16
+  - name: specialistPanel
+    type: dictionary<string>
+  - name: tradedOnNYSEMKT
+    type: bool
+  - name: tradedOnNASDAQBX
+    type: bool
+  - name: tradedOnNSX
+    type: bool
+  - name: tradedOnFINRA
+    type: bool
+  - name: tradedOnISE
+    type: bool
+  - name: tradedOnEdgeA
+    type: bool
+  - name: tradedOnEdgeX
+    type: bool
+  - name: tradedOnNYSETexas
+    type: bool
+  - name: tradedOnNYSE
+    type: bool
+  - name: tradedOnArca
+    type: bool
+  - name: tradedOnNasdaq
+    type: bool
+  - name: tradedOnCBOE
+    type: bool
+  - name: tradedOnPSX
+    type: bool
+  - name: tradedOnBATSY
+    type: bool
+  - name: tradedOnBATS
+    type: bool
+  - name: tradedOnIEX
+    type: bool
+  - name: tickPilotIndicator
+    type: dictionary<string>
+  - name: effectiveDate
+    type: timestamp[ms]
+  - name: tradedOnLTSE
+    type: bool
+  - name: tradedOnMEMX
+    type: bool
+  - name: tradedOnMIAX
+    type: bool
+trade:
+  name: trade
+  size (MB): 3801.5146484375
+  rowCount: 50941143
+  columnCount: 16
+  columns:
+  - name: time
+    type: duration[ns]
+  - name: ex
+    type: dictionary<string>
+  - name: sym
+    type: dictionary<string>
+  - name: cond
+    type: dictionary<string>
+  - name: size
+    type: float32
+  - name: price
+    type: float32
+  - name: stop
+    type: dictionary<string>
+  - name: corr
+    type: uint16
+  - name: seq
+    type: int32
+  - name: tradeId
+    type: uint64
+  - name: source
+    type: dictionary<string>
+  - name: tradeReportingFacility
+    type: dictionary<string>
+  - name: participantTimestamp
+    type: duration[ns]
+  - name: tradeReportingFacilityTRFTimestamp
+    type: duration[ns]
+  - name: tradeThroughExemptIndicator
+    type: bool
+  - name: rowid
+    type: uint64
+quote:
+  name: quote
+  size (MB): 137213.17578125
+  rowCount: 1283196520
+  columnCount: 24
+  columns:
+  - name: time
+    type: duration[ns]
+  - name: ex
+    type: dictionary<string>
+  - name: sym
+    type: dictionary<string>
+  - name: bid
+    type: float32
+  - name: bsize
+    type: int32
+  - name: ask
+    type: float32
+  - name: asize
+    type: int32
+  - name: cond
+    type: dictionary<string>
+  - name: seq
+    type: int32
+  - name: nationalBBOIndicator
+    type: dictionary<string>
+  - name: finraBBOIndicator
+    type: dictionary<string>
+  - name: finraADFMpidIndicator
+    type: dictionary<string>
+  - name: corr
+    type: dictionary<string>
+  - name: source
+    type: dictionary<string>
+  - name: retailInterestIndicator
+    type: dictionary<string>
+  - name: shortSaleRestrictionIndicator
+    type: dictionary<string>
+  - name: LULDBBOIndicator
+    type: dictionary<string>
+  - name: SIPGeneratedMessageIdentifier
+    type: dictionary<string>
+  - name: nationalBBOLULDIndicator
+    type: dictionary<string>
+  - name: participantTimestamp
+    type: duration[ns]
+  - name: FINRAADFTimestamp
+    type: duration[ns]
+  - name: FINRAADFMarketParticipantQuoteIndicator
+    type: dictionary<string>
+  - name: securityStatusIndicator
+    type: dictionary<string>
+  - name: rowid
+    type: uint64
