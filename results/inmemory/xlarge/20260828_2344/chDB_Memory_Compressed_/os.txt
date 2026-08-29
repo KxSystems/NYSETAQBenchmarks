@@ -1,0 +1,23 @@
+	Command being timed: "env CHDB_THREADS=64 CHDB_COMPRESS=1 uv run pysrc/queryrunner/main.py -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/xlarge -db /mnt/nvme3p2/nysetaq/xlarge/parquet/rowgroup -engine chdb -sortcols time -queryfile ./artifacts/queries/inmemory/chdb.psv -result ./results/inmemory/xlarge/20260828_2344/tmp/chDB_Memory_Compressed__64Threads.psv -statsDir ./results/inmemory/xlarge/20260828_2344/chDB_Memory_Compressed_"
+	User time (seconds): 843116.18
+	System time (seconds): 37258.73
+	Percent of CPU this job got: 5526%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 4:25:29
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 722927552
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 169
+	Minor (reclaiming a frame) page faults: 266374595
+	Voluntary context switches: 2349164387
+	Involuntary context switches: 892141
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 576
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
