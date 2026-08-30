@@ -1,0 +1,180 @@
+solution: chDB (Memory, Compressed)
+proprietary: 'no'
+engineversion: 4.1.8
+sortcols: time
+master:
+  name: master
+  size (MB): 1.669687271118164
+  rowCount: 7106
+  columnCount: 39
+  columns:
+  - name: sym
+    type: LowCardinality(Nullable(String))
+  - name: description
+    type: Nullable(String)
+  - name: cusip
+    type: LowCardinality(Nullable(String))
+  - name: securityType
+    type: LowCardinality(Nullable(String))
+  - name: SIPSymbol
+    type: LowCardinality(Nullable(String))
+  - name: oldSym
+    type: LowCardinality(Nullable(String))
+  - name: testSymFlag
+    type: Nullable(Bool)
+  - name: ex
+    type: LowCardinality(Nullable(String))
+  - name: tap
+    type: LowCardinality(Nullable(String))
+  - name: unit
+    type: Nullable(UInt16)
+  - name: roundLot
+    type: Nullable(UInt16)
+  - name: NYSEIndustryCode
+    type: LowCardinality(Nullable(String))
+  - name: sharesOutstanding
+    type: Nullable(Float64)
+  - name: haltDelayReason
+    type: LowCardinality(Nullable(String))
+  - name: specialistClearingAgent
+    type: LowCardinality(Nullable(String))
+  - name: specialistClearingNumber
+    type: LowCardinality(Nullable(String))
+  - name: specialistPostNumber
+    type: Nullable(Int16)
+  - name: specialistPanel
+    type: LowCardinality(Nullable(String))
+  - name: tradedOnNYSEMKT
+    type: Nullable(Bool)
+  - name: tradedOnNASDAQBX
+    type: Nullable(Bool)
+  - name: tradedOnNSX
+    type: Nullable(Bool)
+  - name: tradedOnFINRA
+    type: Nullable(Bool)
+  - name: tradedOnISE
+    type: Nullable(Bool)
+  - name: tradedOnEdgeA
+    type: Nullable(Bool)
+  - name: tradedOnEdgeX
+    type: Nullable(Bool)
+  - name: tradedOnNYSETexas
+    type: Nullable(Bool)
+  - name: tradedOnNYSE
+    type: Nullable(Bool)
+  - name: tradedOnArca
+    type: Nullable(Bool)
+  - name: tradedOnNasdaq
+    type: Nullable(Bool)
+  - name: tradedOnCBOE
+    type: Nullable(Bool)
+  - name: tradedOnPSX
+    type: Nullable(Bool)
+  - name: tradedOnBATSY
+    type: Nullable(Bool)
+  - name: tradedOnBATS
+    type: Nullable(Bool)
+  - name: tradedOnIEX
+    type: Nullable(Bool)
+  - name: tickPilotIndicator
+    type: LowCardinality(Nullable(String))
+  - name: effectiveDate
+    type: Nullable(DateTime64(3, 'UTC'))
+  - name: tradedOnLTSE
+    type: Nullable(Bool)
+  - name: tradedOnMEMX
+    type: Nullable(Bool)
+  - name: tradedOnMIAX
+    type: Nullable(Bool)
+trade:
+  name: trade
+  size (MB): 5648.689523696899
+  rowCount: 84643907
+  columnCount: 16
+  columns:
+  - name: time
+    type: Nullable(IntervalNanosecond)
+  - name: ex
+    type: LowCardinality(Nullable(String))
+  - name: sym
+    type: LowCardinality(Nullable(String))
+  - name: cond
+    type: LowCardinality(Nullable(String))
+  - name: size
+    type: Nullable(Float32)
+  - name: price
+    type: Nullable(Float32)
+  - name: stop
+    type: LowCardinality(Nullable(String))
+  - name: corr
+    type: Nullable(UInt16)
+  - name: seq
+    type: Nullable(Int32)
+  - name: tradeId
+    type: Nullable(UInt64)
+  - name: source
+    type: LowCardinality(Nullable(String))
+  - name: tradeReportingFacility
+    type: LowCardinality(Nullable(String))
+  - name: participantTimestamp
+    type: Nullable(IntervalNanosecond)
+  - name: tradeReportingFacilityTRFTimestamp
+    type: Nullable(IntervalNanosecond)
+  - name: tradeThroughExemptIndicator
+    type: Nullable(Bool)
+  - name: rowid
+    type: UInt64
+quote:
+  name: quote
+  size (MB): 133608.47350025177
+  rowCount: 1901235410
+  columnCount: 24
+  columns:
+  - name: time
+    type: Nullable(IntervalNanosecond)
+  - name: ex
+    type: LowCardinality(Nullable(String))
+  - name: sym
+    type: LowCardinality(Nullable(String))
+  - name: bid
+    type: Nullable(Float32)
+  - name: bsize
+    type: Nullable(Int32)
+  - name: ask
+    type: Nullable(Float32)
+  - name: asize
+    type: Nullable(Int32)
+  - name: cond
+    type: LowCardinality(Nullable(String))
+  - name: seq
+    type: Nullable(Int32)
+  - name: nationalBBOIndicator
+    type: LowCardinality(Nullable(String))
+  - name: finraBBOIndicator
+    type: LowCardinality(Nullable(String))
+  - name: finraADFMpidIndicator
+    type: LowCardinality(Nullable(String))
+  - name: corr
+    type: LowCardinality(Nullable(String))
+  - name: source
+    type: LowCardinality(Nullable(String))
+  - name: retailInterestIndicator
+    type: LowCardinality(Nullable(String))
+  - name: shortSaleRestrictionIndicator
+    type: LowCardinality(Nullable(String))
+  - name: LULDBBOIndicator
+    type: LowCardinality(Nullable(String))
+  - name: SIPGeneratedMessageIdentifier
+    type: LowCardinality(Nullable(String))
+  - name: nationalBBOLULDIndicator
+    type: LowCardinality(Nullable(String))
+  - name: participantTimestamp
+    type: Nullable(IntervalNanosecond)
+  - name: FINRAADFTimestamp
+    type: Nullable(IntervalNanosecond)
+  - name: FINRAADFMarketParticipantQuoteIndicator
+    type: LowCardinality(Nullable(String))
+  - name: securityStatusIndicator
+    type: LowCardinality(Nullable(String))
+  - name: rowid
+    type: UInt64
