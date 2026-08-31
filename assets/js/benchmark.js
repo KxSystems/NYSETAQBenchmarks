@@ -33,7 +33,6 @@
 ///   baselineScope(elem)       whether the entry may serve as the baseline
 ///   baselineChoices(base)     labels offered as baseline
 
-const constant_time_add = 0.01;
 const missing_result_penalty = 2;
 const ns_to_s = 1e-9;
 
@@ -594,6 +593,16 @@ function selectRun(timings, metric) {
     return timing == null ? null : timing * ns_to_s;
 }
 
+/// Plain ratio of two durations. A missing or zero baseline leaves the ratio
+/// undefined - there is nothing meaningful to divide by - and callers render
+/// null as "no comparable result" rather than Infinity. Note that a baseline in
+/// the microsecond range makes the ratios very large; that is the measurement,
+/// not an artifact.
+function timeRatio(timing, baseline_timing) {
+    if (timing === null || baseline_timing === null || !(baseline_timing > 0)) return null;
+    return timing / baseline_timing;
+}
+
 /// Geometric mean of per-query time ratios against the baseline series.
 /// worst_times[i] is the worst time across the compared series for query i,
 /// used to penalize failed queries (footnote [1] at the page bottom).
@@ -611,9 +620,9 @@ function relativeQueryTime(num_queries, baseline_runs, runs, metric, worst_times
             const curr_timing = selectRun(runs[i], metric);
             /// Failed query: twice the worst ratio across the compared series for
             /// this query (footnote [1] at the page bottom).
-            const ratio = (constant_time_add + (curr_timing ?? worst_times[i])) / (constant_time_add + baseline_timing)
-                * (curr_timing === null ? missing_result_penalty : 1);
-            accumulator += Math.log(ratio);
+            const ratio = timeRatio(curr_timing ?? worst_times[i], baseline_timing);
+            if (ratio === null || !(ratio > 0)) continue;
+            accumulator += Math.log(ratio * (curr_timing === null ? missing_result_penalty : 1));
             ++used_queries;
         }
     }
@@ -896,7 +905,7 @@ function renderSummary(filtered_data, failed_data, baseline_runs) {
     /// Generate summary
 
     /// The algorithm: for each of the queries,
-    /// - if there is a result - take query duration, add 10 ms, and divide it to the corresponding value of the baseline,
+    /// - if there is a result - divide the query duration by the corresponding value of the baseline,
     /// - if there is no result - take the worst time ratio across the compared series for this query and multiply by 2.
     /// Take geometric mean across the queries.
 
@@ -1167,7 +1176,7 @@ function render() {
 
         sorted_indices.map(idx => {
             const curr_total = loadTotal(filtered_data[idx]);
-            const ratio = baseline_total !== null ? (constant_time_add + curr_total) / (constant_time_add + baseline_total) : null;
+            const ratio = timeRatio(curr_total, baseline_total);
 
             let td = document.createElement('td');
             appendTimingWithRatio(td, curr_total, ratio);
@@ -1193,7 +1202,7 @@ function render() {
         sorted_indices.map(idx => {
             /// A phase a series does not report costs it nothing, so it shows as 0.000s.
             const curr_timing = (filtered_data[idx].load_time?.[phase]?.[selectors.threads] ?? 0) * ns_to_s;
-            const ratio = baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
+            const ratio = timeRatio(curr_timing, baseline_timing);
 
             let td = document.createElement('td');
             appendTimingWithRatio(td, curr_timing, ratio);
@@ -1243,7 +1252,7 @@ function render() {
         sorted_indices.map((idx, col) => {
             const curr_timing = selectRun(filtered_data[idx].runs[query_num], selectors.metric);
             const baseline_timing = selectRun(baseline_runs[query_num], selectors.metric);
-            const ratio = curr_timing !== null && baseline_timing !== null ? (constant_time_add + curr_timing) / (constant_time_add + baseline_timing) : null;
+            const ratio = timeRatio(curr_timing, baseline_timing);
 
             let td = document.createElement('td');
             appendTimingWithRatio(td, curr_timing, ratio);
