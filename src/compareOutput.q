@@ -49,8 +49,17 @@ queryoutput2: hsym `$o`queryoutput2
 FLOATDIFFTHREASHOLD: 0.00005
 
 
-tradeTypes: `time`ex`sym`cond`size`price`stop`corr`seq`tradeId`source`tradeReportingFacility`participantTimestamp`tradeReportingFacilityTRFTimestamp`tradeThroughExemptIndicator!"ncsseeshijcsnnb"
-quoteTypes: `time`ex`sym`bid`bsize`ask`asize`cond`seq`nationalBBOIndicator`finraBBOIndicator`finraADFMPIDIndicator`corr`source`retailInterestIndicator`shortSaleRestrictionIndicator`LULDBBOIndicator`SIPGeneratedMessageIdentifier`nationalBBOLULDIndicator`participantTimestamp`FINRAADFTimestamp`FINRAADFMarketParticipantQuoteIndicator`securityStatusIndicator!"ncseieiciccccccccccnncc"
+tradeTypes: ([time: "n"; ex: "c"; sym: "s"; cond: "s"; size: "e"; price: "e"; stop: "s"; corr: "h";
+    seq: "i"; tradeId: "j"; source: "c"; tradeReportingFacility: "s"; participantTimestamp: "n";
+    tradeReportingFacilityTRFTimestamp: "n"; tradeThroughExemptIndicator: "b"])
+
+quoteTypes: ([time: "n"; ex: "c"; sym: "s"; bid: "e"; bsize: "i"; ask: "e"; asize: "i"; cond: "c";
+    seq: "i"; nationalBBOIndicator: "c"; finraBBOIndicator: "c"; finraADFMPIDIndicator: "c";
+    corr: "c"; source: "c"; retailInterestIndicator: "c"; shortSaleRestrictionIndicator: "c";
+    LULDBBOIndicator: "c"; SIPGeneratedMessageIdentifier: "c"; nationalBBOLULDIndicator: "c";
+    participantTimestamp: "n"; FINRAADFTimestamp: "n";
+    FINRAADFMarketParticipantQuoteIndicator: "c"; securityStatusIndicator: "c"])
+
 types: tradeTypes, quoteTypes, ([mid: "f"; avgLiqWMid: "f"]),
  ([avgSpread: "f"; avgWeightedSpread: "f"; devSpread: "f"; maxSpread: "e"; minSpread: "e"]),
  ([weightedBidPrice: "f"; weightedOfferPrice: "f"]),
@@ -61,13 +70,17 @@ types: tradeTypes, quoteTypes, ([mid: "f"; avgLiqWMid: "f"]),
  ([wsumAsk: "f"; wsumBid: "f"; sdevasksize: "f"; sdevbid: "f"; corPrice: "f"; corSize: "f"]),
  ([pricegroup: "i"; FirstTime: "n"; LastTime: "n"; medMidSize: "f"; medSize: "f"; quotecond: "c"; quoteex: "c"])
 
+ERRORS: 0
+
 compare: {[idx: `j; tags: `C]
     filename: `$"queryoutput_" , string[idx], ".csv";
     if[not filename in key queryoutput1;
         .log.error "Missing query output: ", string[filename], " from ", 1_string queryoutput1;
+        ERRORS::ERRORS+1;
         :()];
     if[not filename in key queryoutput2;
         .log.error "Missing query output: ", string[filename], " from ", 1_string queryoutput2;
+        ERRORS::ERRORS+1;
         :()];
 
     srct1: .Q.dd[queryoutput1; `$"queryoutput_" , string[idx], ".csv"];
@@ -80,6 +93,7 @@ compare: {[idx: `j; tags: `C]
 
     if[ not count[t1] = count t2;
         .log.error "Different number of rows: ", string[count t1], " vs ", string count t2;
+        ERRORS::ERRORS+1;
         :()];
     .log.info "Number of rows: \t\tOK";
 
@@ -89,28 +103,38 @@ compare: {[idx: `j; tags: `C]
             .log.error "Columns in ", (1_string srct1), " not in ", (1_string srct2), ": ", "," sv string missing];
         if[count missing: cols[t2] except cols t1;
             .log.error "Columns in ", (1_string srct2), " not in ", (1_string srct1), ": ", "," sv string missing];
+        ERRORS::ERRORS+1;
         :()];
-    .log.info "Number of columns: \t\tOK";
+    .log.info "Number of columns: \tOK";
 
 
     if[ not (asc cols t1) ~ asc cols t2;
         .log.error "Different columns names: ", "," sv string cols[t1] except cols t2;
+        ERRORS::ERRORS+1;
         :()];
     .log.info "Column names: \t\tOK";
 
     t2: cols[t1] xcols t2; / reorder columns to match t1
 
+    errorsBefore: ERRORS;
     {[t1;t2;c]
         notok: not $[.Q.ty[t1 c] in "ef"; FLOATDIFFTHREASHOLD > abs t1[c] - t2 c; "C" ~ .Q.ty t1 c; t1[c] like' t2 c; t1[c] = t2 c];
         if[any notok;
             idx: first where notok;
             .log.error "Differ in column ", string[c], " e.g. index ", string[idx], ": ", string[t1[idx;c]], " vs ", string[t2[idx;c]];
-            ;();
+            ERRORS::ERRORS+1;
+            :();
         ]}[t1;t2] each cols t1;
 
-    .log.info "Content: \t\t\tOK";
+    if[errorsBefore=ERRORS; .log.info "Content: \t\t\tOK"];
   }
 
 (compare . value@) each querymeta;
+
+if[ERRORS;
+    .log.error string[ERRORS], " comparison error(s)";
+    if[not `debug in key o; exit 1]];
+
+if[not ERRORS; .log.info "ALL OK"];
 
 if[not `debug in key o; exit 0];
