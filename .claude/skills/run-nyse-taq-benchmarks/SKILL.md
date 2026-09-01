@@ -28,7 +28,7 @@ Ask (or infer from the request) two things:
 2. **What `SIZE`?** This controls download volume and memory needs (see Step 1).
    Larger sizes require more resources (network, disk, and memory) and take
    longer to run the benchmark. When unsure, recommend `small` for a first run,
-   `medium` for KDB-X Community Edition (it has a memory cap).
+   `tiny` for KDB-X Community Edition (it has a memory cap).
 3. **Is the data already generated?** Steps 2–3 (download + DB generation) are
    the slow, expensive part and are often already done from a previous run. A
    common case is wanting to **re-run queries with different parameters** (e.g.
@@ -86,20 +86,32 @@ mid-pipeline failure:
   For the kdb+ parser, the taq module's own dependencies must also be installed
   to the standard KX module path (see the README's *kdb+ Parser* section).
 - **`numactl`** — only if the user wants NUMA pinning via `NUMANODE` (optional).
-- Disk space matching the chosen `SIZE` (see the HDB-size column below).
+- Disk space and RAM matching the chosen `SIZE` (see the Disk/Memory columns below).
 
 ## Step 1 — Select a data size
 
 ```bash
-export SIZE=small   # small | medium | large | full
+export SIZE=tiny   # tiny | small | medium | large | xlarge | full
 ```
 
-| `SIZE`  | Use for                                   | Symbols | HDB size | # quotes        |
-| ------- | ----------------------------------------- | ------- | -------: | --------------: |
-| `small` | quick familiarization (symbols: Z)        | 94      | ~1 GB    | 4,607,158       |
-| `medium`| KDB-X Community Edition (symbols: I)       | 555     | ~13 GB   | 180,827,332     |
-| `large` | unlimited license, limited RAM (A–H)       | 4,849   | ~52 GB   | 707,738,295     |
-| `full`  | most thorough (A–Z)                        | 11,155  | ~233 GB  | 2,313,872,956   |
+Statistics below are for data from 2026-04-01 (see the README's *Step 1* table):
+
+| `SIZE`   | Use for                                    | Symbol first letters | Memory (GB) | Disk (GB) | # quote symbols | # quotes      |
+| -------- | ------------------------------------------ | -------------------- | ----------: | --------: | --------------: | ------------: |
+| `tiny`   | pipeline testing, KDB-X Community Edition  | Z                    | 1           | 1         | 259             | 9,422,051     |
+| `small`  | pipeline testing / quick familiarization   | X–Z                  | 17          | 9         | 909             | 143,336,607   |
+| `medium` | first realistic run                        | T–Z                  | 70          | 39        | 4,018           | 588,006,863   |
+| `large`  | unlimited license, limited RAM             | P–Z                  | 142         | 83        | 8,964           | 1,283,196,520 |
+| `xlarge` | large machine                              | I–Z                  | 153         | 124       | 15,127          | 1,901,235,410 |
+| `full`   | most thorough                              | A–Z                  | 296         | 187       | 26,396          | 2,860,612,301 |
+
+> **Warning:** `tiny` and `small` are not representative of client data volumes —
+> use them to check the pipeline runs end-to-end, not to draw conclusions from
+> query results.
+
+You are not limited to these presets: both parsers accept an arbitrary
+first-letter interval via `-letters` (e.g. `C-G`) — see the README's *Custom
+sizes* section.
 
 `SIZE` must stay consistent across every later step — the parameter files in
 `artifacts/parameters/${SIZE}` and the symbol subset all key off it. If the user
