@@ -233,6 +233,10 @@ loadRootObjectsIntoMemory: {[db: `s]
   db {[db; f]
     .log.info "loading object ", string[f], " into memory";
     f set (get[.Q.dd[db;f]] ::)}' files;
+
+  if[`exnames in key `.;
+    .log.info "converting values of exnames to symbols";
+    exnames:: `$exnames]
   }
 
 loadKDBDBIntoMemory: ('[{[params]
