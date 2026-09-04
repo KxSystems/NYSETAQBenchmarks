@@ -1,0 +1,26 @@
+KDB-X 5.0 2026.07.06 Copyright (C) 1993-2026 Kx Systems
+l64/ 256()core 2321261MB kxsystems volcano-9af8-os 10.216.167.113 EXPIRE 2027.07.13 insights-devops@kx.com KDBX #101990
+
+	Command being timed: "q ./src/runQueries.q -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/full -db /mnt/nvme3p2/nysetaq/full/kdb -sortcols time -indexon  -queryfile ./artifacts/queries/inmemory/kdb_noattr.psv -s 128 -result ./results/inmemory/full/20260904_0424/tmp/KDB-X_NoAttr__128Threads.psv -statsDir ./results/inmemory/full/20260904_0424/KDB-X_NoAttr_"
+	User time (seconds): 13926.07
+	System time (seconds): 1560.73
+	Percent of CPU this job got: 2464%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 10:28.36
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 459291140
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 12
+	Minor (reclaiming a frame) page faults: 49126347
+	Voluntary context switches: 11310345
+	Involuntary context switches: 23023
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 3600
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
