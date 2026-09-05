@@ -1,0 +1,38 @@
+test date: "2026-09-05"
+test time: "07:30:29"
+parameters:
+  db-dir: "/home/kx/nysetaqdata/large"
+  datadate: "20260401"
+envvars:
+  NUMANODE: "0"
+system:
+  os:
+    name: "Linux"
+    kernel: "5.14.0-362.8.1.el9_3.x86_64"
+    TransparentHugePages: "always"
+    TransparentHugePagesDefrag: "madvise"
+    NumaBalancing: "1"
+  cpu:
+    Arch: "x86_64"
+    Model: "Intel(R) Xeon(R) 6738P"
+    SocketNr: 2
+    CoresPerSocket: 32
+    ThreadsPerCore: 2
+    SimultaneousMultithreading: "1"
+    NumaNodeNr: "2"
+    L1dCache: "3 MiB (64 instances)"
+    L2Cache: "128 MiB (64 instances)"
+    L3Cache: "288 MiB (2 instances)"
+    FrequencyScaling:
+        ScalingGovernor: "performance"
+        Boost: ""
+        EnergyPerformancePreference: "performance"
+        MaxFreqMHz: "4200"
+  memory:
+    TotalGB: 502
+    DIMMCount: "16"
+    DIMMSize: "32 GB"
+    Type: "DDR5"
+    Speed: "6400 MT/s"
+    ConfiguredSpeed: "6400 MT/s"
+    ZoneReclaimMode: "0"
