@@ -29,6 +29,7 @@ class QueryExecutorPyKXInMemory:
             "timedelta": timedelta,
             **param,
         }
+        kx.q._register("./src/loadKDBDBIntoMemory")
 
     def load_resources(self, db_path: Path, datadate: date, writer, row_start, ios) -> None:
         dpath = db_path / datadate.strftime('%Y.%m.%d')
@@ -36,14 +37,16 @@ class QueryExecutorPyKXInMemory:
 
         io_load_start = ios.get_io_stat()
         t_load_start = time.perf_counter_ns()
-        kx.q(f"sym: get `:{db_path}/sym")
-        kx.q(f"exnames: get `:{db_path}/exnames")
-        master = kx.q.get(dpath / "master").select(where=kx.Column('i') > -1)
+        kx.q(".logger: use`kx.log")
+        kx.q(".log:.logger.createLog[]")
+        kx.q(f"loadKDBDBIntoMemory[`:{db_path}; {datadate.strftime('%Y.%m.%d')}]")
+        master = kx.q("master")
         logger.info("Shape of master: %s x %s", master.shape[0], master.shape[1])
-        trade = kx.q.get(dpath / "trade").select(where=kx.Column('i') > -1)
+        trade = kx.q("trade")
         logger.info("Shape of trade: %s x %s", trade.shape[0], trade.shape[1])
-        quote = kx.q.get(dpath / "quote").select(where=kx.Column('i') > -1)
+        quote = kx.q("quote")
         logger.info("Shape of quote: %s x %s", quote.shape[0], quote.shape[1])
+
         t_load_elapsed = time.perf_counter_ns() - t_load_start
         io_load_end = ios.get_io_stat()
         writer.writerow(row_start + [0, "load a partition into memory", "success", t_load_elapsed, None, None,

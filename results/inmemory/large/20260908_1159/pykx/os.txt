@@ -1,0 +1,23 @@
+	Command being timed: "env QARGS=-s 64 uv run pysrc/queryrunner/main.py -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/large -db /home/kx/nysetaqdata/large/kdb -engine pykx -sortcols time -indexon sym -queryfile ./artifacts/queries/inmemory/pykx.psv -result ./results/inmemory/large/20260908_1159/tmp/pykx_64Threads.psv -statsDir ./results/inmemory/large/20260908_1159/pykx"
+	User time (seconds): 1263.16
+	System time (seconds): 190.98
+	Percent of CPU this job got: 421%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 5:45.10
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 268844616
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 320223
+	Minor (reclaiming a frame) page faults: 5563537
+	Voluntary context switches: 4691686
+	Involuntary context switches: 14163
+	Swaps: 0
+	File system inputs: 49647520
+	File system outputs: 184
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
