@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A benchmark suite that measures in-memory query performance over public
 [NYSE TAQ](https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/) data across
-KDB-X (q-sql), KDB-X SQL, pykx, DuckDB, chDB, Polars (eager and lazy) and Pandas. It also
+KDB-X (q-sql), KDB-X SQL, pykx, DuckDB, ClickHouse, Polars (eager and lazy) and Pandas. It also
 contains the static dashboard ([index.html](index.html)) published as GitHub Pages at
 benchmark.kx.com (see [CNAME](CNAME)).
 
@@ -129,7 +129,7 @@ implemented twice:
   gone, so `disk` (still in the `-storage_backend` `choices`) raises.
 
 Where one engine is benchmarked in several configurations, the executors are a base class plus
-thin subclasses: `chdb_base.py` → `chdb.py` / `chdb_pyarrow.py`, and `polars_base.py` →
+thin subclasses: `polars_base.py` →
 `polars_eager.py` / `polars_lazy_streaming.py`. `polars_base.py` owns `load_resources`, the
 setup rows, `get_engine_stats`/`get_table_stats` and `write_csv`, and defers the API-specific steps to `_scan`,
 `_transform`, `_sort`, `_frame` and `_collect`: the eager subclass is `DataFrame`s throughout,
