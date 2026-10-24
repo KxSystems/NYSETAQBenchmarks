@@ -2,7 +2,6 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#   "chdb>=4.1.0",
 #   "duckdb>=1.4",
 #   "numexpr",
 #   "numpy>=1.26",
@@ -20,8 +19,8 @@ Script to run queries on NYSE TAQ and collect performance metrics (like executio
 
 Environment variables:
   FLUSH               (required) Path to the cache-flush binary; called before each cold run
-  CHDB_THREADS        (optional) Number of threads for the chDB engines
-  CHDB_COMPRESS       (optional) Hold the chDB Memory tables compressed
+  CLICKHOUSE_BINARY   (optional) Path to the clickhouse binary of the ClickHouse engine, `clickhouse` by default
+  CLICKHOUSE_THREADS  (optional) Number of threads for the ClickHouse engine
   DUCKDB_THREADS      (optional) Number of threads for DuckDB engines
   NUMEXPR_NUM_THREADS (optional) Number of threads for the Pandas/numexpr engine
 """
@@ -190,18 +189,13 @@ def main(args: argparse.Namespace) -> None:
                 con.execute(f"SET threads = {os.environ['DUCKDB_THREADS']}")
             threadnr = con.sql("SELECT current_setting('threads')").fetchall()[0][0]
             logger.info("Using DuckDB with %s threads", threadnr)
-        elif engine in ("chdb", "chdb_pyarrow"):
+        elif engine == "clickhouse":
             if len(args.indexon) > 0:
-                raise ValueError("chDB does not support indices")
-            # chdb queries ClickHouse Memory tables, chdb_pyarrow queries the
-            # Arrow tables through chDB's Python() table function.
-            if engine == "chdb":
-                from executors.inmemory.chdb import QueryExecutorChDB as ChDBExecutor
-            else:
-                from executors.inmemory.chdb_pyarrow import QueryExecutorChDBPyArrow as ChDBExecutor
-            runner = ChDBExecutor(params, sort_cols=args.sortcols, datadate=args.date)
+                raise ValueError("ClickHouse indexes the sorting key (-sortcols); -indexon is not supported")
+            from executors.inmemory.clickhouse import QueryExecutorClickHouse
+            runner = QueryExecutorClickHouse(params, sort_cols=args.sortcols, datadate=args.date, db_path=args.db)
             threadnr = runner.threads
-            logger.info("Using %s with %s threads", ChDBExecutor.__name__, threadnr)
+            logger.info("Using ClickHouse with %s threads", threadnr)
         elif engine == "pykx":
             from executors.inmemory.pykx import QueryExecutorPyKXInMemory
             import pykx as kx
@@ -326,8 +320,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('-db', type=Path, required=True, help="Path to hive-partitioned parquet DB root")
     parser.add_argument('-storage_backend', type=str, choices=["memory", "disk"],
         required=True, help="Storage backend. Currently supported memory and disk")
-    parser.add_argument('-engine', type=str, choices=["polars", "duckdb_con", "chdb", "chdb_pyarrow", "pykx", "pandas"],
-        required=True, help="Query engine. Currently supported: polars, duckdb_con, chdb, chdb_pyarrow, pykx, and pandas")
+    parser.add_argument('-engine', type=str, choices=["polars", "duckdb_con", "clickhouse", "pykx", "pandas"],
+        required=True, help="Query engine. Currently supported: polars, duckdb_con, clickhouse, pykx, and pandas")
     parser.add_argument('-sortcols', type=parse_sortcols, required=False, help="Comma-separated columns to sort trade/quote by, e.g. 'time' or 'sym,time'.")
     parser.add_argument('-indexon', type=parse_sortcols, required=False, default=[], help="Comma-separated columns to add index to, e.g. 'sym' or 'sym,ex'.")
     parser.add_argument('-mode', type=str, required=False, choices=["eager", "lazy"], help="Execution mode for the query engine. Currently supported: eager and lazy. Only applicable to Polars engine.")

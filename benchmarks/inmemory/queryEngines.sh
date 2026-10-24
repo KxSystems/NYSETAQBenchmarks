@@ -4,8 +4,8 @@ set -euo pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-ENGINES="kdb,kdbxsql,duckdb,chdb,polars,pykx,pandas"
-SOLUTIONS="KDB-X,DuckDB (Index),Polars (Lazy),Pandas"
+ENGINES="kdb,kdbxsql,duckdb,clickhouse,polars,pykx,pandas"
+SOLUTIONS="KDB-X,DuckDB (Index),ClickHouse,Polars (Lazy),Pandas"
 RESULT_DIR="./results/inmemory"
 
 usage() {
@@ -101,17 +101,9 @@ function execute_queries () {
                 run_solution "DuckDB (Index)" env DUCKDB_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine duckdb_con -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/duckdb.psv
             fi
         fi
-        if engine_enabled chdb; then
-            if solution_enabled "chDB (Memory)"; then
-                run_solution "chDB (Memory)" env CHDB_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine chdb -sortcols "time" -queryfile ./artifacts/queries/inmemory/chdb.psv
-            fi
-
-            if solution_enabled "chDB (Memory, Compressed)"; then
-                run_solution "chDB (Memory, Compressed)" env CHDB_THREADS=$(( s > 1 ? s : 1 )) CHDB_COMPRESS=1 uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine chdb -sortcols "time" -queryfile ./artifacts/queries/inmemory/chdb.psv
-            fi
-
-            if solution_enabled "chDB (PyArrow)"; then
-                run_solution "chDB (PyArrow)" env CHDB_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine chdb_pyarrow -sortcols "time" -queryfile ./artifacts/queries/inmemory/chdb.psv
+        if engine_enabled clickhouse; then
+            if solution_enabled "ClickHouse"; then
+                run_solution "ClickHouse" env CLICKHOUSE_THREADS=$(( s > 1 ? s : 1 )) uv run pysrc/queryrunner/main.py ${COMMONPARAMS} -db ${DB_DIR}/parquet/rowgroup -engine clickhouse -sortcols "sym,time" -queryfile ./artifacts/queries/inmemory/clickhouse.psv
             fi
         fi
         if engine_enabled polars; then
