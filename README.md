@@ -669,3 +669,21 @@ To check this, persist each engine's query outputs and compare them:
    continues per query. Pass `-idx` to restrict the comparison to specific query
    indices — single (`42`), list (`32,42,50`) or range (`40-44`) — and `-debug`
    to keep the process alive after comparison for investigation of differences.
+
+## License
+
+This repository is licensed under the [Apache License 2.0](LICENSE), except for the dashboard's
+user interface described below.
+
+The dashboard's user interface is adapted from ClickHouse's
+[ClickBench](https://github.com/ClickHouse/ClickBench) and has been modified. These files are licensed under
+[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/), not Apache 2.0:
+
+- `index.html`
+- `pages/hardware/index.html`
+- `pages/threadscaling/index.html`
+- `assets/js/benchmark.js`
+- `assets/css/benchmark.css`
+
+The ClickBench-derived user interface is being replaced by an independent implementation
+(see [#24](https://github.com/KxSystems/NYSETAQBenchmarks/issues/24)).
