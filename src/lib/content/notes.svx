@@ -1,0 +1,23 @@
+<section class="notes" aria-labelledby="notes-title">
+
+<h2 id="notes-title">Methodology notes</h2>
+
+<ol>
+<li id="note-1">
+
+A failed query counts in the geometric mean with a penalty ratio: twice the worst time posted for that query by any compared solution, divided by the baseline's time. Queries the baseline fails are left out. A solution whose run failed before producing any result is listed with its exit code instead of a score.
+
+</li>
+<li id="note-2">
+
+Times are wall-clock times of each query; the cold run follows a cache flush, the hot runs repeat the query immediately.
+
+</li>
+<li id="note-3">
+
+Benchmark methodology: see <a href="https://kx.com/blog/the-kx-nyse-taq-benchmark/" target="_blank" rel="noopener noreferrer">Methodology and motivation<span class="sr-only"> (opens in new tab)</span></a>.
+
+</li>
+</ol>
+
+</section>

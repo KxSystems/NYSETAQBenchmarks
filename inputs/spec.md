@@ -23,19 +23,21 @@ The site is static: all computation happens in the browser from the JSON files.
 
 | Page | Path | Compares | Release |
 |---|---|---|---|
-| Solution comparison (main) | `/` | solutions, on one machine | **first release** (sections 3–11) |
-| Hardware comparison | `/hardware/` | machines, running one solution | later (section 12) |
-| Thread scaling | `/threads/` | thread counts of one solution on one machine | later (section 12) |
+| Solution comparison (main) | `/` | solutions, on one machine | first release (sections 3–11) |
+| Hardware comparison | `/hardware/` | machines, running one solution | second release (section 12) |
+| Thread scaling | `/threads/` | thread counts of one solution on one machine | second release (section 12) |
 
-**Only the main page is in scope for the first release.** The other two pages will
-share its layout, filters, charts and tables and differ only in what the compared
-**series** are (machines or thread counts instead of solutions). Build the comparison
-parameterised by the series from the start, so the later pages are configuration
-rather than copies — but do not build them now.
+The first release built the solution comparison page, with the comparison
+parameterised by the series. The second release adds the other two pages as further
+configurations of the same comparison: they share its layout, filters, charts and
+tables and differ in what the compared **series** are (machines or thread counts
+instead of solutions). Section 12 lists every difference; anything it does not
+mention works as on the main page.
 
 The previous site published the two secondary pages at `/pages/hardware/index.html`
-and `/pages/threadscaling/index.html`, and blog posts link to them. Until the new
-pages exist, those paths should redirect to `/`.
+and `/pages/threadscaling/index.html`, and blog posts link to them. They redirect to
+`/hardware/` and `/threads/` respectively (until the second release they redirected
+to `/`).
 
 ## 3. Page layout (main page)
 
@@ -75,10 +77,12 @@ pages exist, those paths should redirect to `/`.
 | Reproduce and validate results | Run the benchmark yourself | https://github.com/KxSystems/NYSETAQBenchmarks (external) |
 | Add a solution | Benchmark your own engine | https://github.com/KxSystems/NYSETAQBenchmarks#adding-a-new-python-based-in-memory-query-engine (external) |
 
-When the hardware and thread-scaling pages are added (section 12), they get two more
-links here ("Hardware comparison — One solution across machines", "Thread scaling —
-One solution across thread counts"); the link row should accommodate that without a
-redesign.
+| Hardware comparison | One solution across machines | `/hardware/` |
+| Thread scaling | One solution across thread counts | `/threads/` |
+| Solution comparison | Solutions side by side | `/` (shown on the other two pages only) |
+
+The link to the page being viewed is shown as the current page (highlighted, not
+clickable, `aria-current="page"`).
 
 Intro text (main page): "Query and data load performance of in-memory query engines
 on NYSE TAQ data. Use the filters to choose what to compare; the charts and tables
@@ -432,35 +436,112 @@ tab". The solution, setup and baseline filters apply as on the other tab.
 - Performance: first render of the default view within 1 second on a mid-range laptop
   once the data file is loaded.
 
-## 12. Hardware comparison and thread scaling pages (later release)
+## 12. Hardware comparison and thread scaling pages
 
-**Not part of the first release.** Recorded here so the main page is built in a
-way that makes these pages configuration rather than new code.
+Both pages reuse sections 5–11 with the compared series replaced. In the definitions
+of section 5, read "solution" as "series" where it refers to what is compared; the
+baseline, ratio, score, penalty, wins and failures are computed exactly as there.
 
-Same layout, filters, tabs, charts and breakdown as the main page, with the compared
-series replaced:
+### 12.1 Hardware comparison (`/hardware/`)
 
-**Hardware comparison** (`/hardware/`)
+**Purpose.** How much the hardware matters: one solution, the same thread count, on
+different machines.
 
-- Title "NYSE TAQ Benchmark — Hardware Comparison"; intro: "Query and data load
-  performance of one solution on different machines."
-- Series: machines. A **Solution** single choice (default `KDB-X`) replaces the
-  Solution multi-choice; the open-source and sort-column filters are dropped. The
-  Machine filter becomes a multi choice (default: all) and the baseline is a machine
-  (default `AMD_EPYC_9575F`).
-- Default data size: the largest size with runs on more than one machine (currently
-  `large`).
-- Charts 8.1 and 8.2 and the hover specification apply per machine.
+- Title "NYSE TAQ Benchmark — Hardware Comparison". Intro: "Query and data load
+  performance of one solution on different machines, at the same thread count. Use
+  the filters to choose the solution and machines; the charts and tables update as
+  you go."
+- **Series: machines.** Labels are the machine names; hovering a machine label
+  anywhere (filter chip, chart mark, breakdown column header) shows its full
+  specification as in section 6.3. Each machine has a stable colour, assigned in
+  alphabetical order of all machines in the data file.
+- **Filters**, differences from section 6:
 
-**Thread scaling** (`/threads/`)
+  | Group | Filter | Kind | Values | Default |
+  |---|---|---|---|---|
+  | Solutions | Solution | single | solutions with runs on at least one machine in this size | `KDB-X` (else the first alphabetically) |
+  | Setup | Machines | multi | machines with runs of the solution in this size | all |
+  | Setup | Data size | single | as on the main page | the largest size with runs on more than one machine (currently `large`) |
+  | Setup | Data date | single | dates with runs of the solution on a selected machine | latest |
+  | Setup | Threads | single | thread counts measured by the solution on a selected machine | `4` (else the smallest available) |
 
-- Title "NYSE TAQ Benchmark — Thread Scaling"; intro: "How one solution's query and
-  data load performance scales with the number of threads."
-- Series: the thread counts of one run. **Solution** and **Machine** are single
-  choices (defaults `KDB-X` and the machine with the most results); the Threads filter
-  becomes a multi choice (default: all measured); the baseline is a thread count
-  (default: the smallest).
-- Default data size: `large`.
+  The Open source and Sort columns filters are not shown. NUMA node, Timing and the
+  whole Queries group work as on the main page.
+- **Compared series:** the selected machines with a run of the solution matching the
+  setup (section 5's rule picks one run per machine when several NUMA nodes match).
+  A machine whose run failed is listed as failed, as in 7.1. A selected machine
+  without a run for the selected thread count is dimmed in the Machines filter with
+  the reason.
+- **Baseline:** a machine, chosen in the title of 7.1 and 8.3, default
+  `AMD_EPYC_9575F` (else the first compared machine alphabetically).
+- **Charts and tables** as on the main page with machines in place of solutions:
+  scores, failures and wins per machine; memory and data size per machine; the
+  query breakdown has one column per machine. The query-text tooltip shows the
+  selected solution's query (the same text in every column).
+- **Status line:** "Comparing KDB-X on 2 machines on 57 of 84 queries · large ·
+  2026-04-01 · 4 threads · cold run · baseline AMD_EPYC_9575F".
+
+### 12.2 Thread scaling (`/threads/`)
+
+**Purpose.** How one solution's performance changes with the number of threads, on
+one machine.
+
+- Title "NYSE TAQ Benchmark — Thread Scaling". Intro: "How one solution's query and
+  data load performance scales with the number of threads on one machine. Use the
+  filters to choose the solution, machine and thread counts; the charts and tables
+  update as you go."
+- **Series: thread counts.** A solution's thread counts on one machine can be spread
+  over runs pinned to different NUMA nodes (in the current data, 1–64 threads ran
+  pinned to node 0 and 128 threads unpinned). A series is therefore a
+  (NUMA node, thread count) pair taken from every run of the solution on the
+  machine and date whose NUMA node is selected.
+  - Label: `16 threads`; when the same thread count appears under more than one
+    selected NUMA node, add the node: `64 threads (node 0)`, `64 threads (all nodes)`.
+    A pair whose NUMA node differs from the others' is marked in its tooltip
+    ("ran unpinned, on all NUMA nodes").
+  - Colours: an ordered (sequential) scale of the brand accent from `tokens.md`,
+    lightest for the fewest threads, instead of the categorical palette.
+  - **Order:** in every chart and table the series are in ascending thread count
+    (not by score), so the scaling reads left to right / top to bottom.
+- **Filters**, differences from section 6:
+
+  | Group | Filter | Kind | Values | Default |
+  |---|---|---|---|---|
+  | Solutions | Solution | single | solutions with runs in this size | `KDB-X` (else the first alphabetically) |
+  | Setup | Machine | single | machines with runs of the solution | the one with the most measured thread counts |
+  | Setup | Data size | single | as on the main page | `large` |
+  | Setup | Data date | single | dates with runs of the solution on the machine | latest |
+  | Setup | Threads | multi | every (NUMA node, thread count) pair available, labelled as above | all |
+
+  The Open source and Sort columns filters are not shown. NUMA node, Timing and the
+  Queries group work as on the main page; the NUMA node filter decides which runs
+  contribute pairs.
+- **Baseline:** a series (thread count), chosen in the title of 7.1 and 8.3, default
+  the smallest thread count.
+- **Charts:** 7.1–7.3 and the query breakdown as on the main page, with thread
+  counts as columns and bars. In 7.1, add a dashed line showing ideal linear scaling
+  from the baseline (score = baseline threads ÷ series threads) when the log scale
+  is on; label it "linear scaling".
+- **Load time tab:** the load time chart (8.3) and table (8.4) per thread count.
+  Peak memory and data size are measured once per run, not per thread count, so the
+  memory charts (8.1, 8.2) are replaced by a short note giving the values per run
+  ("Peak memory <x> GB and data size <y> GB (node 0 run); <x> GB and <y> GB
+  (unpinned run)", with the values from `peak_memory_kb` and `data_size_mb`).
+- **Failed runs:** a failed run has no thread counts, so it contributes no series;
+  if the selected solution's only runs on the machine failed, the page shows the
+  empty state of section 9 with the exit code ("KDB-X failed on this machine: exit
+  137").
+- **Status line:** "KDB-X on AMD_EPYC_9575F at 5 thread counts on 57 of 84 queries ·
+  large · 2026-04-01 · cold run · baseline 1 thread".
+
+### 12.3 Shared by both pages
+
+- The URL state (section 10) works the same way; parameters are per page, so a link
+  copied on one page restores that page.
+- The defaults tables of each page take the place of section 13 for that page;
+  **Reset filters** restores them.
+- Accessibility, themes, layout and performance requirements of section 11 apply
+  unchanged.
 
 ## 13. Defaults (main page)
 
@@ -521,5 +602,6 @@ These were requested explicitly and take precedence over any convention:
 5. The per-query table is called "Query breakdown" and is hidden initially; clicking
    a button or a chart mark reveals it.
 6. Two tabs: "Query statistics" (default) and "Load time statistics".
-7. First release: the solution comparison page only; hardware comparison and
-   thread scaling come later.
+7. First release: the solution comparison page. Second release: the hardware
+   comparison and thread scaling pages (section 12), built as configurations of
+   the same comparison rather than copies.
