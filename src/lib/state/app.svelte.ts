@@ -2,17 +2,20 @@ import { pushState, replaceState } from '$app/navigation';
 import { getContext, setContext, tick } from 'svelte';
 import { loadDataset } from '../data/load';
 import type { Dataset } from '../data/types';
+import type { PageConfig } from '../config/types';
 import { effectiveExcludeTags } from '../model/queries';
 import { analyse, type Analysis } from '../model/analysis';
-import { resolve, selectedSolutions, type Resolved } from '../model/series';
-import { canonicalView } from './canonical';
+import { selectedSolutions, type Resolved } from '../model/series';
 import { parseView, serializeView } from './url';
-import { DEFAULT_SOLUTIONS, defaultView, type View } from './view';
+import { DEFAULT_SOLUTIONS, type PanelId, type View } from './view';
 
-export type PanelId = 'solutions' | 'setup' | 'queries';
+export type { PanelId };
 
 export class App {
-	view = $state<View>(defaultView());
+	/** The page this state belongs to: its logic and its text. */
+	readonly page: PageConfig;
+	readonly logic: PageConfig['logic'];
+	view = $state<View>() as View;
 	status = $state<'loading' | 'ready' | 'error'>('loading');
 	ds = $state.raw<Dataset | null>(null);
 	error = $state<string | null>(null);
@@ -22,28 +25,40 @@ export class App {
 	isPhone = $state(false);
 
 	/** The resolved comparison, only for the data file that matches the selected size. */
-	resolved = $derived<Resolved | null>(
-		this.ds && this.ds.size === this.view.size ? resolve(this.ds, this.view) : null
+	resolved = $derived.by<Resolved | null>(() =>
+		this.ds && this.ds.size === this.view.size ? this.logic.resolve(this.ds, this.view) : null
 	);
 
-	analysis = $derived<Analysis | null>(this.resolved ? analyse(this.resolved, this.view.timing) : null);
+	analysis = $derived.by<Analysis | null>(() =>
+		this.resolved ? analyse(this.resolved, this.view.timing) : null
+	);
+
+	/** Display names of every series id the page can show (labels differ from ids for thread counts). */
+	labels = $derived.by(() => new Map((this.resolved?.baselineOptions ?? []).map((o) => [o.id, o.label])));
 
 	#mounted = false;
-	#synced: View = defaultView();
+	#synced: View;
 	#loadToken = 0;
 	#copyTimer: ReturnType<typeof setTimeout> | undefined;
 
+	constructor(page: PageConfig) {
+		this.page = page;
+		this.logic = page.logic;
+		this.view = page.logic.defaultView();
+		this.#synced = structuredClone($state.snapshot(this.view));
+	}
+
 	/** Start in the browser: read the URL, load data, and follow back/forward. */
 	init(): () => void {
-		this.view = parseView(location.search);
+		this.view = parseView(location.search, this.logic.defaultSize);
 		this.#synced = structuredClone($state.snapshot(this.view));
 		this.#mounted = true;
 		void this.#load(this.view.size, true);
 
 		const onPop = () => {
-			const next = parseView(location.search);
+			const next = parseView(location.search, this.logic.defaultSize);
 			this.#synced = structuredClone(next);
-			this.view = this.ds && this.ds.size === next.size ? canonicalView(this.ds, next) : next;
+			this.view = this.ds && this.ds.size === next.size ? this.logic.canonical(this.ds, next) : next;
 			if (!this.ds || this.ds.size !== next.size) void this.#load(next.size, true);
 		};
 		window.addEventListener('popstate', onPop);
@@ -67,7 +82,7 @@ export class App {
 			const ds = await loadDataset(size);
 			if (token !== this.#loadToken) return;
 			this.ds = ds;
-			if (normalise) this.view = canonicalView(ds, this.view);
+			if (normalise) this.view = this.logic.canonical(ds, this.view);
 			this.status = 'ready';
 		} catch (e) {
 			if (token !== this.#loadToken) return;
@@ -88,11 +103,11 @@ export class App {
 			this.status = 'loading';
 			void this.#load(next.size, true);
 		}
-		this.view = this.ds && !sizeChanged ? canonicalView(this.ds, next) : next;
+		this.view = this.ds && !sizeChanged ? this.logic.canonical(this.ds, next) : next;
 	}
 
 	reset() {
-		this.set(defaultView());
+		this.set(this.logic.defaultView());
 	}
 
 	togglePanel(id: PanelId) {
@@ -123,7 +138,7 @@ export class App {
 	/** Write the view into the URL; called from an effect when the view changes. */
 	syncUrl() {
 		const snap = $state.snapshot(this.view);
-		const search = serializeView(snap);
+		const search = serializeView(snap, this.logic.defaultSize);
 		if (!this.#mounted || this.status === 'loading') return;
 		if (search === location.search) {
 			this.#synced = structuredClone(snap);
@@ -142,7 +157,7 @@ export class App {
 	}
 
 	async copyLink() {
-		const url = location.origin + location.pathname + serializeView($state.snapshot(this.view));
+		const url = location.origin + location.pathname + serializeView($state.snapshot(this.view), this.logic.defaultSize);
 		try {
 			await navigator.clipboard.writeText(url);
 		} catch {
@@ -156,6 +171,18 @@ export class App {
 		this.linkCopied = true;
 		clearTimeout(this.#copyTimer);
 		this.#copyTimer = setTimeout(() => (this.linkCopied = false), 2000);
+	}
+
+	/** The name to show for a series id. */
+	label(id: string): string {
+		return this.labels.get(id) ?? id;
+	}
+
+	/** Remove one series from the comparison (the × on a chart row). */
+	removeSeries(id: string) {
+		if (!this.ds) return;
+		const patch = this.logic.removeSeries(this.ds, $state.snapshot(this.view), id);
+		if (patch) this.set(patch);
 	}
 
 	// ---- helpers for the filter UI ----

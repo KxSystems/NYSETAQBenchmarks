@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { capitalise } from '../../model/format';
 	import { FAIL_LABEL, type FailReason } from '../../model/calc';
 	import { useApp } from '../../state/app.svelte';
 	import ChartFrame from './ChartFrame.svelte';
+	import { withSeriesTip } from '../../model/describe';
 	import VBarChart, { type VBar } from './VBarChart.svelte';
 
 	const app = useApp();
@@ -21,11 +23,15 @@
 			const parts = REASONS.map((k) => `${f[k]} ${FAIL_LABEL[k]}`).join(', ');
 			return {
 				id: s.id,
+				label: s.label,
 				style: s.style,
 				segments: REASONS.map((k) => ({ key: k, value: f[k], fill: FILL[k], stroke: 'var(--text-secondary)' })),
 				text: String(f.total),
-				ariaLabel: `${s.id}: ${f.total} failed queries (${parts}).${f.total ? ' Open query breakdown with these queries.' : ''}`,
-				tip: { title: s.id, lines: [`${f.total} failed of ${r.comparedQueries.length} compared queries`, ...REASONS.map((k) => `${FAIL_LABEL[k]}: ${f[k]}`)] },
+				ariaLabel: `${s.label}: ${f.total} failed queries (${parts}).${f.total ? ' Open query breakdown with these queries.' : ''}`,
+				tip: withSeriesTip(
+					{ title: s.label, lines: [`${f.total} failed of ${r.comparedQueries.length} compared queries`, ...REASONS.map((k) => `${FAIL_LABEL[k]}: ${f[k]}`)] },
+					s.tip
+				),
 				onclick: f.total ? () => app.openBreakdown(s.id, { kind: 'fails', series: s.id }) : undefined
 			};
 		})
@@ -48,12 +54,12 @@
 	{/if}
 	{#snippet alt()}
 		<table>
-			<caption>Failed compared queries per solution</caption>
-			<thead><tr><th>Solution</th><th>Total</th><th>Error</th><th>Not run</th><th>Not implemented</th></tr></thead>
+			<caption>Failed compared queries per {app.logic.seriesNoun[0]}</caption>
+			<thead><tr><th>{capitalise(app.logic.seriesNoun[0])}</th><th>Total</th><th>Error</th><th>Not run</th><th>Not implemented</th></tr></thead>
 			<tbody>
 				{#each a.ordered as s (s.id)}
 					{@const f = a.failures.get(s.id)!}
-					<tr><td>{s.id}</td><td>{f.total}</td><td>{f.error}</td><td>{f.notrun}</td><td>{f.notimpl}</td></tr>
+					<tr><td>{s.label}</td><td>{f.total}</td><td>{f.error}</td><td>{f.notrun}</td><td>{f.notimpl}</td></tr>
 				{/each}
 			</tbody>
 		</table>

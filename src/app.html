@@ -18,7 +18,8 @@
 				document.documentElement.setAttribute('data-theme', theme);
 
 				var m = /[?&]size=([a-z0-9_-]+)/i.exec(location.search);
-				var size = m ? m[1] : 'full';
+				// The hardware and thread-scaling pages default to the large data size.
+				var size = m ? m[1] : /^\/(hardware|threads)\//.test(location.pathname) ? 'large' : 'full';
 				var link = document.createElement('link');
 				link.rel = 'preload';
 				link.as = 'fetch';

@@ -31,6 +31,11 @@ export function formatRatioSpoken(r: number, baseline: string): string {
 	return `${(1 / r).toFixed(2)} times faster than ${baseline}`;
 }
 
+/** `solution` → `Solution`. */
+export function capitalise(s: string): string {
+	return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 /** `1 thread`, `4 threads`. */
 export function threadsLabel(n: string | number | null): string {
 	if (n === null) return '? threads';

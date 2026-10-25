@@ -35,9 +35,13 @@ export interface LoadRow {
 }
 
 /** Load rows sorted by total ascending. */
-export function loadRows(compared: Series[], baseline: Series | null): LoadRow[] {
+export function loadRows(
+	compared: Series[],
+	baseline: Series | null,
+	ordering: 'score' | 'natural' = 'score'
+): LoadRow[] {
 	const baseTotal = baseline ? totalLoadNs(baseline) : null;
-	return compared
+	const rows = compared
 		.map((s) => {
 			const total = totalLoadNs(s);
 			return {
@@ -47,7 +51,9 @@ export function loadRows(compared: Series[], baseline: Series | null): LoadRow[]
 				ratio: baseTotal !== null && baseTotal > 0 ? total / baseTotal : null
 			};
 		})
-		.sort((a, b) => a.total - b.total || a.id.localeCompare(b.id));
+		;
+	// Thread-count series keep their order (ascending thread count); the others sort by total.
+	return ordering === 'natural' ? rows : rows.sort((a, b) => a.total - b.total || a.id.localeCompare(b.id));
 }
 
 export interface MemoryBar {

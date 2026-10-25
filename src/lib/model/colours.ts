@@ -9,10 +9,17 @@ export interface SeriesStyle {
 	slot: number;
 	/** 0 = solid fill; 1, 2... = hatch patterns for solutions beyond the palette. */
 	tier: number;
+	/** Position on the sequential brand scale, 0 (lightest) to 1; set for thread-count series. */
+	seq?: number;
 }
 
 export function styleFor(index: number): SeriesStyle {
 	return { index, slot: index % PALETTE_SIZE, tier: Math.floor(index / PALETTE_SIZE) };
+}
+
+/** Style on the sequential scale: `i` of `n` series, the first (fewest threads) lightest. */
+export function seqStyle(i: number, n: number): SeriesStyle {
+	return { index: i, slot: 0, tier: 0, seq: n <= 1 ? 0.5 : i / (n - 1) };
 }
 
 /** Solution names in alphabetical order; their positions fix the colours. */
@@ -24,11 +31,15 @@ const TIER_COUNT = 3;
 
 /** CSS paint for a series: a solid palette colour, or a hatch/dot pattern beyond the palette. */
 export function seriesFill(style: SeriesStyle): string {
+	if (style.seq !== undefined) {
+		return `color-mix(in srgb, var(--seq-dark) ${Math.round(style.seq * 100)}%, var(--seq-light))`;
+	}
 	if (style.tier === 0) return `var(--s${style.slot + 1})`;
 	return `url(#pat-${Math.min(style.tier, TIER_COUNT - 1)}-${style.slot})`;
 }
 
 export function seriesColor(style: SeriesStyle): string {
+	if (style.seq !== undefined) return 'var(--text-secondary)';
 	return `var(--s${style.slot + 1})`;
 }
 

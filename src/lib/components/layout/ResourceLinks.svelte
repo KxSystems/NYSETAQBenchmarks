@@ -9,21 +9,31 @@
 	<ul>
 		{#each links as l (l.href)}
 			<li>
-				<a
-					href={l.href}
-					class="card"
-					target={l.external ? '_blank' : undefined}
-					rel={l.external ? 'noopener noreferrer' : undefined}
-				>
-					<span class="icon"><Icon name={l.icon} size={20} /></span>
-					<span class="text">
-						<span class="label">{l.label}</span>
-						<span class="desc">{l.description}</span>
+				{#if l.current}
+					<span class="card current" aria-current="page">
+						<span class="icon"><Icon name={l.icon} size={20} /></span>
+						<span class="text">
+							<span class="label">{l.label}</span>
+							<span class="desc">{l.description}</span>
+						</span>
 					</span>
-					{#if l.external}
-						<span class="ext"><Icon name="external" size={14} /><span class="sr-only">(opens in new tab)</span></span>
-					{/if}
-				</a>
+				{:else}
+					<a
+						href={l.href}
+						class="card"
+						target={l.external ? '_blank' : undefined}
+						rel={l.external ? 'noopener noreferrer' : undefined}
+					>
+						<span class="icon"><Icon name={l.icon} size={20} /></span>
+						<span class="text">
+							<span class="label">{l.label}</span>
+							<span class="desc">{l.description}</span>
+						</span>
+						{#if l.external}
+							<span class="ext"><Icon name="external" size={14} /><span class="sr-only">(opens in new tab)</span></span>
+						{/if}
+					</a>
+				{/if}
 			</li>
 		{/each}
 	</ul>
@@ -65,6 +75,19 @@
 		background: var(--brand-weak);
 		border-color: var(--link);
 		color: var(--text);
+	}
+	.card.current {
+		background: var(--brand);
+		border-color: var(--on-brand);
+		cursor: default;
+	}
+	.card.current .label,
+	.card.current .desc {
+		color: var(--on-brand);
+	}
+	.card.current .icon {
+		background: var(--surface);
+		color: var(--heading);
 	}
 	.icon {
 		display: grid;

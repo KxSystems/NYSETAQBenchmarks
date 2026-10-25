@@ -13,6 +13,12 @@ export interface RowFilter {
 
 export interface View {
 	size: string;
+	/** Single-choice solution (hardware and thread-scaling pages). */
+	solution: string | null;
+	/** Selected machines (hardware page). */
+	machines: string[] | null;
+	/** Selected `threads@node` pairs (thread-scaling page). */
+	pairs: string[] | null;
 	solutions: string[] | null;
 	openSource: ('yes' | 'no')[] | null;
 	sortCols: string[] | null;
@@ -34,6 +40,8 @@ export interface View {
 	excludeTags: string[] | null;
 }
 
+export type PanelId = 'solutions' | 'setup' | 'queries';
+
 export const DEFAULT_SOLUTIONS = [
 	'DuckDB (Index)',
 	'KDB-X',
@@ -46,9 +54,12 @@ export const DEFAULT_BASELINE = 'KDB-X';
 export const DEFAULT_EXCLUDE_TAGS = ['manydummyfilters', 'unnecessarycolumnfetch'];
 export const DEFAULT_THREADS = '4';
 
-export function defaultView(): View {
+export function defaultView(size: string = DEFAULT_SIZE): View {
 	return {
-		size: DEFAULT_SIZE,
+		size,
+		solution: null,
+		machines: null,
+		pairs: null,
 		solutions: null,
 		openSource: null,
 		sortCols: null,

@@ -20,7 +20,7 @@ export interface Analysis {
 
 export function analyse(r: Resolved, timing: Timing): Analysis {
 	const rows = geoMeanScores(r.compared, r.baseline, r.comparedQueries, timing);
-	const ordered = orderByScore(r.compared, rows);
+	const ordered = r.ordering === 'natural' ? [...r.compared] : orderByScore(r.compared, rows);
 	const wins = winCounts(r.compared, r.comparedQueries, timing);
 	return {
 		ordered,

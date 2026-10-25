@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Comparison from '../lib/components/Comparison.svelte';
-	import { solutionComparison } from '../lib/config/solutions';
+	import { solutionsPage } from '../lib/config/pages';
 </script>
 
-<Comparison config={solutionComparison} />
+<Comparison page={solutionsPage} />

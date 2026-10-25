@@ -1,24 +1,19 @@
 <script lang="ts">
-	import { solutionOrder } from '../../model/colours';
-	import { solutionsWithResults } from '../../model/series';
 	import { useApp } from '../../state/app.svelte';
 
 	const app = useApp();
-	const ds = $derived(app.ds!);
 	const r = $derived(app.resolved!);
-	const names = $derived(solutionOrder(Object.keys(ds.solutions)));
-	const withResults = $derived(solutionsWithResults(ds, r.setup));
 </script>
 
 <select
 	class="baseline"
-	aria-label="Baseline solution"
+	aria-label="Baseline {app.logic.seriesNoun[0]}"
 	value={r.baselineChoice}
 	onchange={(e) => app.set({ baseline: e.currentTarget.value })}
 >
-	{#each names as n (n)}
-		<option value={n} class:dim={!withResults.has(n)}>
-			{n}{withResults.has(n) ? '' : ' (no results)'}
+	{#each r.baselineOptions as o (o.id)}
+		<option value={o.id} class:dim={!o.hasResults}>
+			{o.label}{o.hasResults ? '' : ' (no results)'}
 		</option>
 	{/each}
 </select>

@@ -49,6 +49,16 @@ export function solutionTip(ds: Dataset, name: string): TipContent {
 	return { title: name, lines };
 }
 
+/** The base tooltip with the details of the series appended (machine specification, thread-count run). */
+export function withSeriesTip(base: TipContent, extra: TipContent | undefined): TipContent {
+	if (!extra) return base;
+	return {
+		...base,
+		lines: [...(base.lines ?? []), ...(extra.lines ?? [])],
+		groups: [...(base.groups ?? []), ...(extra.groups ?? [])]
+	};
+}
+
 export function queryTip(q: QueryMeta): TipContent {
 	const [scope, ref] = q.instrument.split(':');
 	const lines = [

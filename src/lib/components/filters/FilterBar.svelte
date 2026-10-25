@@ -1,16 +1,11 @@
 <script lang="ts">
-	import { TIMING_LABEL } from '../../data/types';
-	import { threadsLabel } from '../../model/format';
 	import { useApp, type PanelId } from '../../state/app.svelte';
 	import Icon from '../ui/Icon.svelte';
 	import FilterPanel from './FilterPanel.svelte';
 	import QueriesPanel from './QueriesPanel.svelte';
-	import SetupPanel from './SetupPanel.svelte';
-	import SolutionsPanel from './SolutionsPanel.svelte';
 
 	const app = useApp();
 	const r = $derived(app.resolved!);
-	const onLoadTab = $derived(app.view.tab === 'load');
 
 	const groups: { id: PanelId; label: string }[] = [
 		{ id: 'solutions', label: 'Solutions' },
@@ -18,20 +13,7 @@
 		{ id: 'queries', label: 'Queries' }
 	];
 
-	const chips = $derived<{ group: PanelId; text: string; dim?: boolean }[]>([
-		{ group: 'solutions', text: `${r.compared.length + r.failed.length} solutions` },
-		{ group: 'setup', text: app.view.size },
-		{ group: 'setup', text: r.setup.machine ?? 'no machine' },
-		{ group: 'setup', text: threadsLabel(r.setup.threads) },
-		onLoadTab
-			? { group: 'setup', text: 'n/a on this tab', dim: true }
-			: { group: 'setup', text: TIMING_LABEL[app.view.timing] },
-		{
-			group: 'queries',
-			text: onLoadTab ? 'queries n/a on this tab' : `${r.comparedQueries.length}/${app.ds!.queries.length} queries`,
-			dim: onLoadTab
-		}
-	]);
+	const chips = $derived(app.logic.chips(app.ds!, app.view, r));
 
 	const buttons: Record<string, HTMLButtonElement> = {};
 
@@ -90,11 +72,11 @@
 				{#each app.openPanels as id (id)}
 					{#if id === 'solutions'}
 						<FilterPanel id="panel-solutions" title="Solutions" onclose={() => app.closePanel('solutions')}>
-							<SolutionsPanel />
+							<app.page.SolutionsPanel />
 						</FilterPanel>
 					{:else if id === 'setup'}
 						<FilterPanel id="panel-setup" title="Setup" onclose={() => app.closePanel('setup')}>
-							<SetupPanel />
+							<app.page.SetupPanel />
 						</FilterPanel>
 					{:else}
 						<FilterPanel id="panel-queries" title="Queries" onclose={() => app.closePanel('queries')}>

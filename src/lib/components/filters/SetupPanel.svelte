@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { SIZES } from '../../data/load';
-	import { TIMINGS, TIMING_LABEL } from '../../data/types';
 	import { machineTip } from '../../model/describe';
 	import { hasResultsWith } from '../../model/options';
 	import { dateOptions, machineOptions, numaOptions, threadOptions } from '../../model/setup';
 	import { useApp } from '../../state/app.svelte';
 	import Field from './Field.svelte';
+	import SizeField from './SizeField.svelte';
+	import TimingField from './TimingField.svelte';
 	import Segmented, { type SegOption } from './Segmented.svelte';
 	import ToggleChips, { type ChipOption } from './ToggleChips.svelte';
 
@@ -14,8 +14,6 @@
 	const setup = $derived(app.resolved!.setup);
 
 	const dimTip = (text: string, dim: boolean) => (dim ? text : undefined);
-
-	const sizeOpts: SegOption[] = SIZES.map((s) => ({ value: s, label: s }));
 
 	const machineOpts = $derived<SegOption[]>(
 		machineOptions(ds).map((m) => {
@@ -52,13 +50,10 @@
 			return { value: t, label: t, dim, tip: dimTip(`No results for ${t} threads on this machine`, dim) };
 		})
 	);
-	const timingOpts: SegOption[] = TIMINGS.map((t) => ({ value: t, label: TIMING_LABEL[t] }));
 	const allNuma = $derived(numaOptions(ds, setup.machine, setup.date));
 </script>
 
-<Field label="Data size" help="Amount of TAQ data loaded.">
-	<Segmented name="size" label="Data size" options={sizeOpts} value={app.view.size} onchange={(v) => app.set({ size: v })} />
-</Field>
+<SizeField />
 
 <Field label="Machine" help="Hardware the benchmark ran on.">
 	<Segmented name="machine" label="Machine" options={machineOpts} value={setup.machine} onchange={(v) => app.set({ machine: v })} />
@@ -80,12 +75,7 @@
 	<Segmented name="threads" label="Threads" options={threadOpts} value={setup.threads} onchange={(v) => app.set({ threads: v })} />
 </Field>
 
-<Field
-	label="Timing"
-	help="Which of the three consecutive executions to compare. The cold run follows a cache flush."
->
-	<Segmented name="timing" label="Timing" options={timingOpts} value={app.view.timing} onchange={(v) => app.set({ timing: v as 'cold' | 'hot' | 'hot2' })} />
-</Field>
+<TimingField />
 
 <style>
 	.small {

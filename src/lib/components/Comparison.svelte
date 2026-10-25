@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { ComparisonConfig } from '../config/solutions';
+	import type { PageConfig } from '../config/types';
 	import Notes from '../content/notes.svx';
 	import { App, provideApp } from '../state/app.svelte';
 	import FailuresChart from './charts/FailuresChart.svelte';
 	import GeoMeanChart from './charts/GeoMeanChart.svelte';
 	import LoadTimeChart from './charts/LoadTimeChart.svelte';
 	import MemoryChart from './charts/MemoryChart.svelte';
+	import MemoryNote from './charts/MemoryNote.svelte';
 	import WinsPie from './charts/WinsPie.svelte';
 	import FilterBar from './filters/FilterBar.svelte';
 	import SiteFooter from './layout/SiteFooter.svelte';
@@ -22,20 +23,22 @@
 	import TooltipLayer from './ui/TooltipLayer.svelte';
 	import { dataSizeBars, peakMemoryBars } from '../model/loadtime';
 
-	let { config }: { config: ComparisonConfig } = $props();
+	let { page }: { page: PageConfig } = $props();
 
-	const app = new App();
+	// One page per component instance: the page never changes after creation.
+	// svelte-ignore state_referenced_locally
+	const app = new App(page);
 	provideApp(app);
 	onMount(() => app.init());
 	$effect(() => app.syncUrl());
 
-	const Intro = $derived(config.intro);
+	const Intro = $derived(page.intro);
 	const r = $derived(app.resolved);
 </script>
 
 <svelte:head>
-	<title>{config.title}</title>
-	<meta name="description" content="Query and data load performance of in-memory query engines on NYSE TAQ data." />
+	<title>{page.title}</title>
+	<meta name="description" content={page.description} />
 </svelte:head>
 
 <a class="skip" href="#results">Skip to results</a>
@@ -43,8 +46,8 @@
 <TooltipLayer />
 
 <div class="wrap head">
-	<SiteHeader title={config.title} />
-	<ResourceLinks links={config.links} />
+	<SiteHeader title={page.title} />
+	<ResourceLinks links={page.links} />
 	<div class="intro"><Intro /></div>
 </div>
 
@@ -77,7 +80,7 @@
 		/>
 		<div id="tabpanel" role="tabpanel" aria-labelledby="tab-{app.view.tab}" tabindex="-1" class="panel">
 			{#if r.compared.length === 0 && r.failed.length === 0}
-				<Message title="No results match the selected filters">
+				<Message title={r.emptyReason ?? 'No results match the selected filters'}>
 					{#snippet actions()}
 						<button type="button" class="btn primary" onclick={() => app.togglePanel('solutions')}>Open the Solutions filter</button>
 						<button type="button" class="btn" onclick={() => app.reset()}>Reset filters</button>
@@ -111,22 +114,26 @@
 					These charts describe whole runs, so the query filters and the timing do not apply.
 				</p>
 				<div class="stack">
-					<div class="pair">
-						<MemoryChart
-							id="memory"
-							title="Max resident memory (GB)"
-							subtitle="Peak memory of the benchmark process"
-							data={peakMemoryBars(r.compared)}
-							noun="Peak memory"
-						/>
-						<MemoryChart
-							id="datasize"
-							title="Data size in memory (GB)"
-							subtitle="Size of the loaded tables, as reported by the engine"
-							data={dataSizeBars(r.compared)}
-							noun="Data size"
-						/>
-					</div>
+					{#if app.logic.memory === 'charts'}
+						<div class="pair">
+							<MemoryChart
+								id="memory"
+								title="Max resident memory (GB)"
+								subtitle="Peak memory of the benchmark process"
+								data={peakMemoryBars(r.compared)}
+								noun="Peak memory"
+							/>
+							<MemoryChart
+								id="datasize"
+								title="Data size in memory (GB)"
+								subtitle="Size of the loaded tables, as reported by the engine"
+								data={dataSizeBars(r.compared)}
+								noun="Data size"
+							/>
+						</div>
+					{:else}
+						<MemoryNote />
+					{/if}
 					<LoadTimeChart />
 					<LoadTimeTable />
 				</div>

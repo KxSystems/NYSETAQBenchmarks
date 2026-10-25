@@ -94,14 +94,14 @@
 		const isBase = s.id === baseline?.id;
 		if (t === null) {
 			const reason = FAIL_LABEL[failureReason(s, q.idx)];
-			return { band: 'failed' as Band, label: `Q${q.idx}, ${s.id}: failed, ${reason}`, reason, time: null, ratio: null, isBase };
+			return { band: 'failed' as Band, label: `Q${q.idx}, ${s.label}: failed, ${reason}`, reason, time: null, ratio: null, isBase };
 		}
 		const base = baseline ? timeOf(baseline, q.idx, timing) : null;
 		const rt = isBase ? null : ratio(t, base);
 		const rel = rt === null ? '' : `, ${formatRatioSpoken(rt, baseline!.label)}`;
 		return {
 			band: (rt === null ? 'similar' : bandOf(rt)) as Band,
-			label: `Q${q.idx}, ${s.id}: ${formatTimeSpoken(t)}${rel}`,
+			label: `Q${q.idx}, ${s.label}: ${formatTimeSpoken(t)}${rel}`,
 			reason: null,
 			time: t,
 			ratio: rt,
@@ -132,7 +132,7 @@
 		<p class="filterchip">
 			<button type="button" class="btn small" onclick={() => app.set({ rows: null })}>
 				{rowsFilter.kind === 'fails' ? 'Showing failures of' : 'Showing queries won by'}
-				{rowsFilter.series}
+				{app.label(rowsFilter.series)}
 				<Icon name="close" size={14} />
 				<span class="sr-only">Remove filter</span>
 			</button>
@@ -140,11 +140,11 @@
 	{/if}
 
 	{#if columns.length === 0}
-		<p class="none">No solutions to show.</p>
+		<p class="none">No {app.logic.seriesNoun[1]} to show.</p>
 	{:else}
 		<div class="scroller" role="region" aria-label="Query breakdown table">
 			<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
-			<table bind:this={table} role="grid" aria-label="Time per query and solution" onkeydown={onGridKey}>
+			<table bind:this={table} role="grid" aria-label="Time per query and {app.logic.seriesNoun[0]}" onkeydown={onGridKey}>
 				<thead>
 					<tr>
 						<th class="first" scope="col">
@@ -162,6 +162,7 @@
 						{#each columns as s (s.id)}
 							<th
 								scope="col"
+								use:tip={s.tip}
 								class:hl={app.hovered === s.id}
 								class:pick={app.view.highlight === s.id}
 								onpointerenter={() => (app.hovered = s.id)}
@@ -169,7 +170,7 @@
 							>
 								<span class="colhead">
 									<Swatch style={s.style} />
-									<span>{s.id}</span>
+									<span>{s.label}</span>
 								</span>
 								{#if s.id === baseline?.id}<span class="badge">baseline</span>{/if}
 							</th>
@@ -237,9 +238,9 @@
 										<span id="qtip-live" class="sr-only">Query text shown</span>
 										<QueryTextTip
 											anchor={activeEl}
-											text={ds.solutions[s.id]?.query_text[String(q.idx)]}
-											language={ds.solutions[s.id]?.language ?? null}
-											title="Q{q.idx} · {s.id}"
+											text={ds.solutions[s.solution]?.query_text[String(q.idx)]}
+											language={ds.solutions[s.solution]?.language ?? null}
+											title="Q{q.idx} · {s.label}"
 											onenter={() => clearTimeout(hideTimer)}
 											onleave={hideSoon}
 										/>

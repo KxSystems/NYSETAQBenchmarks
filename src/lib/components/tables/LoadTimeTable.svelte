@@ -4,11 +4,12 @@
 	import { formatRatioCompact, formatRatioSpoken, formatTime, formatTimeSpoken } from '../../model/format';
 	import { loadRows, phaseLabel, phasesPresent, totalLoadNs } from '../../model/loadtime';
 	import { useApp } from '../../state/app.svelte';
+	import { tip } from '../../state/tooltip.svelte';
 	import Swatch from '../ui/Swatch.svelte';
 
 	const app = useApp();
 	const r = $derived(app.resolved!);
-	const rows = $derived(loadRows(r.compared, r.baseline));
+	const rows = $derived(loadRows(r.compared, r.baseline, r.ordering));
 	const phases = $derived(phasesPresent(app.ds!.load_phases, r.compared));
 	const byId = $derived(new Map(r.compared.map((s) => [s.id, s])));
 	const baseline = $derived(r.baseline);
@@ -24,7 +25,7 @@
 			t,
 			rt,
 			band: rt === null ? 'similar' : bandOf(rt),
-			label: `${phase === null ? 'Total' : phaseLabel(phase)}, ${id}: ${formatTimeSpoken(t)}${rt === null ? '' : `, ${formatRatioSpoken(rt, baseline!.label)}`}`
+			label: `${phase === null ? 'Total' : phaseLabel(phase)}, ${app.label(id)}: ${formatTimeSpoken(t)}${rt === null ? '' : `, ${formatRatioSpoken(rt, baseline!.label)}`}`
 		};
 	}
 </script>
@@ -40,8 +41,8 @@
 					<tr>
 						<th class="first" scope="col">Phase</th>
 						{#each rows as x (x.id)}
-							<th scope="col" class:hl={app.hovered === x.id} onpointerenter={() => (app.hovered = x.id)} onpointerleave={() => (app.hovered = null)}>
-								<span class="colhead"><Swatch style={byId.get(x.id)!.style} /><span>{x.id}</span></span>
+							<th scope="col" use:tip={byId.get(x.id)?.tip} class:hl={app.hovered === x.id} onpointerenter={() => (app.hovered = x.id)} onpointerleave={() => (app.hovered = null)}>
+								<span class="colhead"><Swatch style={byId.get(x.id)!.style} /><span>{app.label(x.id)}</span></span>
 								{#if x.id === baseline?.id}<span class="badge">baseline</span>{/if}
 							</th>
 						{/each}
@@ -59,7 +60,7 @@
 										{#if c.rt !== null}<span class="ratio">{formatRatioCompact(c.rt)}</span>{/if}
 									</td>
 								{:else}
-									<td class="na" aria-label="{phaseLabel(phase!)}, {x.id}: not applicable">—</td>
+									<td class="na" aria-label="{phaseLabel(phase!)}, {app.label(x.id)}: not applicable">—</td>
 								{/if}
 							{/each}
 						</tr>

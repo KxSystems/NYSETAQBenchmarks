@@ -11,6 +11,7 @@
 
 	export interface VBar {
 		id: string;
+		label: string;
 		style: SeriesStyle;
 		segments: Segment[];
 		/** Label above the bar, e.g. `3` or `n/a`. */
@@ -113,7 +114,7 @@
 			{#each bars as b (b.id)}
 				<li class:hl={app.hovered === b.id}>
 					<Swatch style={b.style} />
-					<span>{b.id}</span>
+					<span>{b.label}</span>
 				</li>
 			{/each}
 		</ol>

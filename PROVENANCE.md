@@ -39,3 +39,21 @@ it walked the filesystem outside this directory looking for `*.test.*` files. It
 exit code, nothing from it was read or used, and it was stopped and its helper file deleted. The measurement
 was redone inside the project. The directory `~/dev/nysetaqbenchmarks` was never opened or listed by any
 command I ran, but this crawl could have traversed it.
+
+## Session 2 — 2026-10-25, second release (hardware comparison and thread scaling pages)
+
+**Built:** the two pages as configurations of the shared comparison, from `inputs/spec.md` sections 2, 4 and 12 and the
+proposal approved before coding. Series construction for machines (`model/hardware.ts`) and for
+`(thread count, NUMA node)` pairs (`model/threads.ts`); the pure `PageLogic` per page (`model/pages.ts`) with defaults,
+status text, chips and series removal; per-page canonical views and URL parameters (`pairs`, `machines`, `solution`);
+`PageConfig`s, the single-solution, hardware and thread-scaling filter panels; the sequential colour scale;
+series-ordered charts and tables, the linear-scaling line, the per-run memory note and the failed-run empty state;
+resource links with the current page marked; routes `/hardware/` and `/threads/`; redirects of the old `/pages/...`
+paths to them. The main page keeps its behaviour; its header gains the two internal link cards that section 4 requires.
+Vitest tests for the new series, labels, order, baselines, defaults, URL codec, canonical views, links and the shipped
+data; Playwright smoke tests per page, themes, phone width and the redirects; README updated.
+
+**Sources used:** only `inputs/`, this repository and the public documentation of the libraries as shipped in
+`node_modules` (Observable Plot option names). No other benchmark dashboard and no earlier version of this dashboard was
+looked at, and no code was reproduced from memory of one. Every tool (Vitest, Playwright, svelte-check, the build, the
+preview server) ran with this directory as its root; nothing outside it was read, listed or searched.

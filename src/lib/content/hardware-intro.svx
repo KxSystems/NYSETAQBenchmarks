@@ -1,0 +1,1 @@
+Query and data load performance of one solution on different machines, at the same thread count. Use the filters to choose the solution and machines; the charts and tables update as you go.

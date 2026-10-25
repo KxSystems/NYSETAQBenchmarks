@@ -129,12 +129,25 @@ test.describe('solution comparison page', () => {
 		expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/\?threads=16$/);
 	});
 
-	test('the earlier hardware and thread scaling paths redirect to the main page', async ({ page }) => {
-		for (const path of ['/pages/hardware/index.html', '/pages/threadscaling/index.html']) {
+	test('the earlier hardware and thread scaling paths redirect to the new pages', async ({ page }) => {
+		const targets = {
+			'/pages/hardware/index.html': /localhost:\d+\/hardware\/$/,
+			'/pages/threadscaling/index.html': /localhost:\d+\/threads\/$/
+		};
+		for (const [path, url] of Object.entries(targets)) {
 			await page.goto(path);
-			await expect(page).toHaveURL(/localhost:\d+\/$/);
+			await expect(page).toHaveURL(url);
 			await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 		}
+	});
+
+	test('links to the other pages, none marked as current', async ({ page }) => {
+		await page.goto('/');
+		const nav = page.getByRole('navigation', { name: 'Resources' });
+		await expect(nav.getByRole('link', { name: /Hardware comparison/ })).toHaveAttribute('href', '/hardware/');
+		await expect(nav.getByRole('link', { name: /Thread scaling/ })).toHaveAttribute('href', '/threads/');
+		await expect(nav.getByRole('link', { name: /Solution comparison/ })).toHaveCount(0);
+		await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
 	});
 
 	test('shows an error with a retry when the data file cannot be loaded', async ({ page }) => {

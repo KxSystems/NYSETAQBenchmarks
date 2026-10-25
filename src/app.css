@@ -49,6 +49,10 @@
 	--phase-sort: #3272d9;
 	--phase-index: #b3cbf1;
 
+	/* Sequential scale for thread counts: lightest = fewest threads. */
+	--seq-light: var(--phase-index);
+	--seq-dark: var(--phase-load);
+
 	--band-much-faster-bg: #9ed8b8;
 	--band-much-faster-text: #103522;
 	--band-much-faster-border: #21734c;

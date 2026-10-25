@@ -4,6 +4,7 @@ import { solutionOrder, styleFor, type SeriesStyle } from './colours';
 import { compareNames, sortColumnsKey } from './format';
 import { filterQueries } from './queries';
 import { effectiveSetup, pickRun, type Setup } from './setup';
+import type { TipContent } from '../state/tooltip.svelte';
 
 /**
  * One compared item with its measurements. The calculations, charts and tables only
@@ -14,8 +15,14 @@ export interface Series {
 	id: string;
 	label: string;
 	style: SeriesStyle;
+	/** The solution whose query text and language apply to this series. */
+	solution: string;
 	run: Run;
 	m: ThreadMeasurement;
+	/** Hover details shown wherever the series is named (machine specification, thread-count run). */
+	tip?: TipContent;
+	/** Thread count, for series ordered by it. */
+	sortKey?: number;
 }
 
 /** A selected solution whose run failed before running any query. */
@@ -24,6 +31,14 @@ export interface FailedSeries {
 	label: string;
 	style: SeriesStyle;
 	exitCode: number;
+	tip?: TipContent;
+}
+
+/** A series that can serve as the baseline, with whether it has results for the setup. */
+export interface BaselineOption {
+	id: string;
+	label: string;
+	hasResults: boolean;
 }
 
 export interface Resolved {
@@ -40,6 +55,41 @@ export interface Resolved {
 	comparedQueries: QueryMeta[];
 	notices: string[];
 	styles: Map<string, SeriesStyle>;
+	/** How charts and tables order the series: best score first, or as listed (thread counts). */
+	ordering: 'score' | 'natural';
+	baselineOptions: BaselineOption[];
+	/** Why nothing can be compared, when the data says so (e.g. every run failed). */
+	emptyReason: string | null;
+}
+
+/**
+ * The baseline is the visitor's choice when it has a usable run; otherwise the first
+ * compared series, with a notice. The choice itself is kept by the caller.
+ */
+export function chooseBaseline(
+	choiceId: string,
+	choiceLabel: string,
+	candidate: Series | null,
+	compared: Series[]
+): { baseline: Series | null; notice: string | null } {
+	if (candidate) {
+		return { baseline: compared.find((s) => s.id === choiceId) ?? candidate, notice: null };
+	}
+	if (compared.length > 0) {
+		const baseline = compared[0]!;
+		return {
+			baseline,
+			notice: `${choiceLabel} has no results for this setup; using ${baseline.label} as the baseline.`
+		};
+	}
+	return { baseline: null, notice: null };
+}
+
+/** Queries passing the query filters, and of those the ticked ones. */
+export function resolveQueries(ds: Dataset, view: View): { queries: QueryMeta[]; comparedQueries: QueryMeta[] } {
+	const queries = filterQueries(ds, view);
+	const unticked = new Set(view.unticked);
+	return { queries, comparedQueries: queries.filter((q) => !unticked.has(q.idx)) };
 }
 
 export function styleMap(ds: Dataset): Map<string, SeriesStyle> {
@@ -63,7 +113,7 @@ export function passesSolutionFilters(ds: Dataset, name: string, view: View): bo
 	return true;
 }
 
-function measurement(run: Run, setup: Setup): ThreadMeasurement | null {
+export function measurement(run: Run, setup: Setup): ThreadMeasurement | null {
 	if (run.exit_code !== 0 || setup.threads === null) return null;
 	return run.threads[setup.threads] ?? null;
 }
@@ -88,7 +138,7 @@ export function resolve(ds: Dataset, view: View): Resolved {
 		if (run.exit_code !== 0) {
 			failed.push({ id: name, label: name, style: styleOf(name), exitCode: run.exit_code });
 		} else if (m) {
-			compared.push({ id: name, label: name, style: styleOf(name), run, m });
+			compared.push({ id: name, label: name, style: styleOf(name), solution: name, run, m });
 		}
 	}
 	if (multiRun > 0) {
@@ -99,30 +149,44 @@ export function resolve(ds: Dataset, view: View): Resolved {
 
 	// Baseline: the visitor's choice if it has a usable run, else the first compared solution.
 	const baselineChoice = view.baseline ?? DEFAULT_BASELINE;
-	let baseline: Series | null = null;
 	const chosen = ds.solutions[baselineChoice] ? pickRun(ds, baselineChoice, setup).run : null;
 	const chosenM = chosen ? measurement(chosen, setup) : null;
-	if (chosen && chosenM) {
-		baseline =
-			compared.find((s) => s.id === baselineChoice) ?? {
-				id: baselineChoice,
-				label: baselineChoice,
-				style: styleOf(baselineChoice),
-				run: chosen,
-				m: chosenM
-			};
-	} else if (compared.length > 0) {
-		baseline = compared[0]!;
-		notices.push(
-			`${baselineChoice} has no results for this setup; using ${baseline.label} as the baseline.`
-		);
-	}
+	const candidate: Series | null =
+		chosen && chosenM
+			? {
+					id: baselineChoice,
+					label: baselineChoice,
+					style: styleOf(baselineChoice),
+					solution: baselineChoice,
+					run: chosen,
+					m: chosenM
+				}
+			: null;
+	const { baseline, notice } = chooseBaseline(baselineChoice, baselineChoice, candidate, compared);
+	if (notice) notices.push(notice);
 
-	const queries = filterQueries(ds, view);
-	const unticked = new Set(view.unticked);
-	const comparedQueries = queries.filter((q) => !unticked.has(q.idx));
+	const { queries, comparedQueries } = resolveQueries(ds, view);
+	const withResults = solutionsWithResults(ds, setup);
+	const baselineOptions = solutionOrder(Object.keys(ds.solutions)).map((n) => ({
+		id: n,
+		label: n,
+		hasResults: withResults.has(n)
+	}));
 
-	return { setup, compared, failed, baseline, baselineChoice, queries, comparedQueries, notices, styles };
+	return {
+		setup,
+		compared,
+		failed,
+		baseline,
+		baselineChoice,
+		queries,
+		comparedQueries,
+		notices,
+		styles,
+		ordering: 'score',
+		baselineOptions,
+		emptyReason: null
+	};
 }
 
 /** Solutions that have a usable (or failed) run for the setup, ignoring the solution filters. */

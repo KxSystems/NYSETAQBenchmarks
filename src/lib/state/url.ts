@@ -52,8 +52,8 @@ export function formatRanges(nums: readonly number[]): string {
 	return parts.join(',');
 }
 
-export function parseView(search: string): View {
-	const v = defaultView();
+export function parseView(search: string, defaultSize: string = DEFAULT_SIZE): View {
+	const v = defaultView(defaultSize);
 	const q = search.startsWith('?') ? search.slice(1) : search;
 	const params = new Map<string, string>();
 	for (const pair of q.split('&')) {
@@ -69,6 +69,9 @@ export function parseView(search: string): View {
 	const size = one('size');
 	if (size && (SIZES as readonly string[]).includes(size)) v.size = size;
 
+	v.solution = one('solution') || null;
+	v.machines = list('machines');
+	v.pairs = list('pairs');
 	v.solutions = list('solutions');
 	const open = list('open');
 	if (open) v.openSource = open.filter((x): x is 'yes' | 'no' => x === 'yes' || x === 'no');
@@ -103,9 +106,10 @@ export function parseView(search: string): View {
 	return v;
 }
 
-export function serializeView(v: View): string {
+export function serializeView(v: View, defaultSize: string = DEFAULT_SIZE): string {
 	const parts: string[] = [];
-	const enc = encodeURIComponent;
+	// `@` is legal in a query string and keeps thread-count pairs such as `64@0` readable.
+	const enc = (x: string) => encodeURIComponent(x).replace(/%40/g, '@');
 	const one = (k: string, val: string | null) => {
 		if (val !== null && val !== '') parts.push(`${k}=${enc(val)}`);
 	};
@@ -113,7 +117,10 @@ export function serializeView(v: View): string {
 		if (val !== null) parts.push(`${k}=${val.map(enc).join(',')}`);
 	};
 
-	if (v.size !== DEFAULT_SIZE) one('size', v.size);
+	if (v.size !== defaultSize) one('size', v.size);
+	one('solution', v.solution);
+	list('machines', v.machines);
+	list('pairs', v.pairs);
 	list('solutions', v.solutions);
 	list('open', v.openSource);
 	list('sort', v.sortCols);

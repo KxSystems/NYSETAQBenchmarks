@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Plot from '@observablehq/plot';
-	import { formatRatio } from '../../model/format';
+	import { withSeriesTip } from '../../model/describe';
+	import { capitalise, formatRatio } from '../../model/format';
 	import { loadRows, phaseLabel, phasesPresent } from '../../model/loadtime';
 	import { useApp } from '../../state/app.svelte';
 	import { tip } from '../../state/tooltip.svelte';
@@ -19,7 +20,7 @@
 	const MR = 190;
 	const MR_NARROW = 84;
 
-	const rows = $derived(loadRows(r.compared, r.baseline));
+	const rows = $derived(loadRows(r.compared, r.baseline, r.ordering));
 	const phases = $derived(phasesPresent(ds.load_phases, r.compared));
 	const seriesById = $derived(new Map(r.compared.map((s) => [s.id, s])));
 	const height = $derived(MT + rows.length * STEP + MB);
@@ -74,13 +75,13 @@
 	}
 
 	function tipFor(x: (typeof rows)[number]) {
-		return {
-			title: x.id,
+		return withSeriesTip({
+			title: app.label(x.id),
 			lines: [
 				`Total ${seconds(x.total)}${x.ratio === null ? '' : ` (${formatRatio(x.ratio)} vs ${r.baseline?.label})`}`,
 				...phases.filter((p) => p in x.phases).map((p) => `${phaseLabel(p)}: ${seconds(x.phases[p]!)}`)
 			]
-		};
+		}, seriesById.get(x.id)?.tip);
 	}
 </script>
 
@@ -98,8 +99,10 @@
 				{#each rows as x (x.id)}
 					<li class:hl={app.hovered === x.id}>
 						<Swatch style={seriesById.get(x.id)!.style} />
-						<span class="name">{x.id}</span>
-						{#if x.id === r.baseline?.id}<span class="badge">baseline</span>{/if}
+						<span class="namecell">
+							<span class="name">{app.label(x.id)}</span>
+							{#if x.id === r.baseline?.id}<span class="badge">baseline</span>{/if}
+						</span>
 					</li>
 				{/each}
 			</ol>
@@ -111,7 +114,7 @@
 							type="button"
 							class="hit"
 							class:hl={app.hovered === x.id}
-							aria-label="{x.id}: total load time {seconds(x.total)}{x.ratio === null ? '' : `, ${formatRatio(x.ratio)} relative to ${r.baseline?.label}`}"
+							aria-label="{app.label(x.id)}: total load time {seconds(x.total)}{x.ratio === null ? '' : `, ${formatRatio(x.ratio)} relative to ${r.baseline?.label}`}"
 							use:tip={tipFor(x)}
 							onpointerenter={() => (app.hovered = x.id)}
 							onpointerleave={() => (app.hovered = null)}
@@ -127,12 +130,12 @@
 	{/if}
 	{#snippet alt()}
 		<table>
-			<caption>Total load time per solution</caption>
-			<thead><tr><th>Solution</th><th>Total</th>{#each phases as p (p)}<th>{phaseLabel(p)}</th>{/each}</tr></thead>
+			<caption>Total load time per {app.logic.seriesNoun[0]}</caption>
+			<thead><tr><th>{capitalise(app.logic.seriesNoun[0])}</th><th>Total</th>{#each phases as p (p)}<th>{phaseLabel(p)}</th>{/each}</tr></thead>
 			<tbody>
 				{#each rows as x (x.id)}
 					<tr>
-						<td>{x.id}</td><td>{seconds(x.total)}</td>
+						<td>{app.label(x.id)}</td><td>{seconds(x.total)}</td>
 						{#each phases as p (p)}<td>{p in x.phases ? seconds(x.phases[p]!) : '—'}</td>{/each}
 					</tr>
 				{/each}
@@ -164,7 +167,7 @@
 	}
 	.grid {
 		display: grid;
-		grid-template-columns: clamp(116px, 26vw, 220px) minmax(0, 1fr);
+		grid-template-columns: clamp(116px, 26vw, 260px) minmax(0, 1fr);
 		align-items: start;
 	}
 	.labels {
@@ -184,8 +187,27 @@
 	.labels li.hl {
 		background: var(--brand-weak);
 	}
-	.name {
+	.namecell {
 		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 2px;
+	}
+	/* Wide screens keep the badge beside the name, as before. */
+	@media (min-width: 640px) {
+		.namecell {
+			flex-direction: row;
+			align-items: center;
+			gap: 6px;
+		}
+		.name {
+			flex: 1;
+		}
+	}
+	.name {
+		max-width: 100%;
 		min-width: 0;
 		overflow-wrap: anywhere;
 	}

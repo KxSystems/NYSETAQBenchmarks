@@ -2,6 +2,8 @@
 	import { seriesColor, seriesFill } from '../../model/colours';
 	import { useApp } from '../../state/app.svelte';
 	import { tip } from '../../state/tooltip.svelte';
+	import { capitalise } from '../../model/format';
+	import { withSeriesTip } from '../../model/describe';
 	import ChartFrame from './ChartFrame.svelte';
 	import Swatch from '../ui/Swatch.svelte';
 
@@ -39,22 +41,20 @@
 	});
 
 	const share = (n: number) => `${((n / Math.max(1, queryCount)) * 100).toFixed(0)}%`;
-	const tipFor = (id: string, n: number) => ({
-		title: id,
-		lines: [`${n} wins, ${share(n)} of ${queryCount} compared queries`]
-	});
+	const tipFor = (s: (typeof slices)[number]['s'], n: number) =>
+		withSeriesTip({ title: s.label, lines: [`${n} wins, ${share(n)} of ${queryCount} compared queries`] }, s.tip);
 </script>
 
 <ChartFrame
 	id="wins"
-	title="Wins per solution"
-	subtitle="Number of compared queries on which the solution posts the fastest time"
+	title="Wins per {app.logic.seriesNoun[0]}"
+	subtitle="Number of compared queries on which the {app.logic.seriesNoun[0]} posts the fastest time"
 >
 	{#if slices.length === 0}
 		<p class="none">No compared query has a time for any solution.</p>
 	{:else}
 		<div class="pie">
-			<svg viewBox="0 0 200 200" role="group" aria-label="Pie chart of wins per solution">
+			<svg viewBox="0 0 200 200" role="group" aria-label="Pie chart of wins per {app.logic.seriesNoun[0]}">
 				{#each paths as p (p.s.id)}
 					<path
 						d={p.d}
@@ -64,8 +64,8 @@
 						class:hl={app.hovered === p.s.id}
 						tabindex="0"
 						role="button"
-						aria-label="{p.s.id}: {p.n} wins, {share(p.n)} of compared queries. Open query breakdown with these queries."
-						use:tip={tipFor(p.s.id, p.n)}
+						aria-label="{p.s.label}: {p.n} wins, {share(p.n)} of compared queries. Open query breakdown with these queries."
+						use:tip={tipFor(p.s, p.n)}
 						onclick={() => app.openBreakdown(p.s.id, { kind: 'wins', series: p.s.id })}
 						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), app.openBreakdown(p.s.id, { kind: 'wins', series: p.s.id }))}
 						onpointerenter={() => (app.hovered = p.s.id)}
@@ -79,7 +79,7 @@
 				{#each slices as x (x.s.id)}
 					<li class:hl={app.hovered === x.s.id}>
 						<Swatch style={x.s.style} />
-						<span class="n">{x.s.id}</span>
+						<span class="n">{x.s.label}</span>
 						<span class="c">{x.n}</span>
 					</li>
 				{/each}
@@ -88,11 +88,11 @@
 	{/if}
 	{#snippet alt()}
 		<table>
-			<caption>Wins per solution</caption>
-			<thead><tr><th>Solution</th><th>Wins</th></tr></thead>
+			<caption>Wins per {app.logic.seriesNoun[0]}</caption>
+			<thead><tr><th>{capitalise(app.logic.seriesNoun[0])}</th><th>Wins</th></tr></thead>
 			<tbody>
 				{#each a.ordered as s (s.id)}
-					<tr><td>{s.id}</td><td>{a.wins.get(s.id) ?? 0}</td></tr>
+					<tr><td>{s.label}</td><td>{a.wins.get(s.id) ?? 0}</td></tr>
 				{/each}
 			</tbody>
 		</table>

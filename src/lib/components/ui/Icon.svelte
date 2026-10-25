@@ -20,7 +20,8 @@
 		chip: 'M7 7h10v10H7zM9 3v4M15 3v4M9 17v4M15 17v4M3 9h4M3 15h4M17 9h4M17 15h4',
 		fail: 'M6 6l12 12M18 6L6 18',
 		hardware: 'M4 6h16v10H4zM8 20h8M12 16v4',
-		threads: 'M4 6h16M4 12h10M4 18h16'
+		threads: 'M4 6h16M4 12h10M4 18h16',
+		solutions: 'M5 20V10M12 20V4M19 20v-7'
 	} as const;
 </script>
 

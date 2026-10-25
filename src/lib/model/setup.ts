@@ -8,6 +8,12 @@ export interface Setup {
 	date: string | null;
 	numa: string[];
 	threads: string | null;
+	/** The single selected solution (hardware and thread-scaling pages). */
+	solution?: string | null;
+	/** Selected machines (hardware page; `machine` is then the first of them). */
+	machines?: string[];
+	/** Every available thread-count series (thread-scaling page). */
+	pairs?: { id: string; label: string }[];
 }
 
 const ok = (r: Run) => r.exit_code === 0;
