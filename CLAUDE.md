@@ -265,7 +265,7 @@ builds and deploys it to GitHub Pages on pushes to `main`.
   validate them against explicit `MANDATORY` / `ALLOWED` symbol lists, printing `USAGE` and
   exiting non-zero — keep that pattern when adding options.
 * **Engine equivalence is a hard requirement**, not a nicety: a new or changed query must
-  return identical output across engines (floats within `FLOATDIFFTHREASHOLD`), verified with
+  return identical output across engines (floats within `FLOATDIFFTHRESHOLD`), verified with
   `--query-output-dir` + `src/compareOutput.q`. Executor `write_csv` output must be
   kdb+-loadable (booleans as `1`/`0`, temporals as q literals).
 * **Reading results**: compare warm runs (`run2timeNS`/`run3timeNS`) at equal `threadcount`

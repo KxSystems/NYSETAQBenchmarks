@@ -340,9 +340,19 @@ It has three pages:
   count.
 * **Thread scaling** — one solution on one machine across thread counts.
 
-Filters cover the solutions, data size, machine, data date, NUMA node, thread
+Filters cover the benchmark version, the solutions, data size, machine, data date, NUMA node, thread
 count, cold or hot run, query complexity, instrument scope and query tags, and
 every view can be shared as a link.
+
+##### Benchmark version
+
+The [VERSION](./VERSION) file holds the version of the benchmark: its query set and
+data schema. Results are only comparable within one version, so bump it whenever a
+change affects comparability (queries added or changed, a different data schema) and
+leave it alone for fixes that do not. The benchmark drivers record it as
+`benchmarkversion` in each solution's `stats.yaml`; `convertToJSON.py` carries it into
+the data files as `benchmark_version`, and the dashboard shows one version at a time
+(the latest by default). Tag the commit that introduces a version, for example `v1.0`.
 
 ##### Running the dashboard locally
 
@@ -628,7 +638,7 @@ that timings compare like for like. For integer and categorical/enum columns
 a single cell, fails the verification. Floating-point columns are the tricky
 exception: engines may legitimately differ in the last bits due to summation
 order and intermediate precision, so they are compared within a small tolerance
-(`FLOATDIFFTHREASHOLD`, see below) rather than bit-for-bit.
+(`FLOATDIFFTHRESHOLD`, see below) rather than bit-for-bit.
 
 To check this, persist each engine's query outputs and compare them:
 
@@ -650,7 +660,7 @@ To check this, persist each engine's query outputs and compare them:
    checks row count, column count, column names, and then compares content
    cell-by-cell, logging the first mismatch per column. Integer and
    categorical/enum columns must match exactly — any difference is a failure.
-   Only floats get slack: they compare within `FLOATDIFFTHREASHOLD` (and char
+   Only floats get slack: they compare within `FLOATDIFFTHRESHOLD` (and char
    columns via `like`), since floating-point results can drift slightly across
    engines:
 

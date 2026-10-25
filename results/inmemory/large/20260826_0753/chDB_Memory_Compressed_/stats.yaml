@@ -1,4 +1,5 @@
 solution: chDB (Memory, Compressed)
+benchmarkversion: '1.0'
 proprietary: 'no'
 engineversion: 4.1.8
 sortcols: time

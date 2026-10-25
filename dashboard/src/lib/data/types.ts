@@ -37,6 +37,8 @@ export interface Run {
 	datadate: string;
 	numa_node: string;
 	test_date: string;
+	/** Version of the benchmark (query set and data schema) the run was made with; null when unknown. */
+	benchmark_version: string | null;
 	engine_version: string | null;
 	exit_code: number;
 	data_size_mb: number | null;

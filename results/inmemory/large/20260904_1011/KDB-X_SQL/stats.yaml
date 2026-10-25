@@ -1,4 +1,5 @@
 solution: KDB-X SQL
+benchmarkversion: '1.0'
 proprietary: 'yes'
 engineversion: '2026.07.06'
 sortcols: 'time'

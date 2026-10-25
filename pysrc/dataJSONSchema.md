@@ -94,7 +94,7 @@ New keys may appear; a reader should display whatever is there.
 
 ## `runs[]`
 
-One entry per (`solution`, `machine`, `datadate`, `numa_node`).
+One entry per (`solution`, `machine`, `datadate`, `numa_node`, `benchmark_version`).
 
 | Field | Type | Description |
 |---|---|---|
@@ -103,6 +103,7 @@ One entry per (`solution`, `machine`, `datadate`, `numa_node`).
 | `datadate` | string | Trading day of the NYSE TAQ data the run used. |
 | `numa_node` | string | NUMA node the run was pinned to (`"0"`, `"1"`, ...), or `"all"` when it was not pinned. |
 | `test_date` | string | Date of the latest measurement in the run. |
+| `benchmark_version` | string \| null | Version of the benchmark (the `VERSION` file at the repository root) the run was made with, e.g. `"1.0"`. Results of different versions are not comparable: the dashboard shows one version at a time. `null` when unknown. |
 | `engine_version` | string \| null | Version of the engine library. |
 | `exit_code` | integer | `0` for a run that produced results; otherwise the exit status of a run that failed before running any query (`137`: killed by the operating system, usually for running out of memory). |
 | `data_size_mb` | number \| null | Size of the loaded tables in memory. `null` for a failed run. |
@@ -152,7 +153,7 @@ measurement.
   },
   "runs": [
     { "solution": "KDB-X", "machine": "AMD_EPYC_9575F", "datadate": "2026-04-01",
-      "numa_node": "0", "test_date": "2026-09-03", "engine_version": "2026.07.06",
+      "numa_node": "0", "test_date": "2026-09-03", "benchmark_version": "1.0", "engine_version": "2026.07.06",
       "exit_code": 0, "data_size_mb": 323984.13, "peak_memory_kb": 482067440,
       "threads": {
         "16": { "load_ns": { "load": 4979078620, "transform": 0,
@@ -160,7 +161,7 @@ measurement.
                 "query_ns": { "1": [275913376, 276753315, 277085437] },
                 "query_status": { "24": "error" } } } },
     { "solution": "DuckDB (Index)", "machine": "AMD_EPYC_9575F", "datadate": "2026-04-01",
-      "numa_node": "0", "test_date": "2026-08-26", "engine_version": "1.5.4",
+      "numa_node": "0", "test_date": "2026-08-26", "benchmark_version": "1.0", "engine_version": "1.5.4",
       "exit_code": 137, "data_size_mb": null, "peak_memory_kb": null, "threads": {} }
   ]
 }

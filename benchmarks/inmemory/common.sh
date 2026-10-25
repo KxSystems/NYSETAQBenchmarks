@@ -13,6 +13,11 @@
 COMMON_DIR=$(dirname "${BASH_SOURCE[0]}")
 source "${COMMON_DIR}/../../external/kx/taq/scripts/util.sh"
 
+# Benchmark version: the query set and data schema the results belong to, from the
+# VERSION file at the repository root. add_solution_name records it in every
+# solution's stats.yaml so the dashboard can tell results of different versions apart.
+BENCHMARK_VERSION=$(tr -d '[:space:]' < "${COMMON_DIR}/../../VERSION")
+
 # Defaults shared by all in-memory benchmark scripts. Scripts may add their own
 # defaults and override these during argument parsing.
 THREAD_NRS=(1 4)
@@ -171,7 +176,7 @@ function add_solution_name () {
     awk -v sol="${sol}" 'BEGIN{FS=OFS="|"} {print (NR==1 ? "solution" : sol), $0}' "${file}" > "${file}.tmp"
     mv "${file}.tmp" "${file}"
     if [[ -f "${statsfile}" ]]; then
-        { echo "solution: ${sol}"; cat "${statsfile}"; } > "${statsfile}.tmp"
+        { echo "solution: ${sol}"; echo "benchmarkversion: '${BENCHMARK_VERSION}'"; cat "${statsfile}"; } > "${statsfile}.tmp"
         mv "${statsfile}.tmp" "${statsfile}"
     fi
 }

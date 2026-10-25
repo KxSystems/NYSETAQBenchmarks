@@ -13,6 +13,8 @@ export interface RowFilter {
 
 export interface View {
 	size: string;
+	/** Benchmark version; null follows the latest. */
+	version: string | null;
 	/** Single-choice solution (hardware and thread-scaling pages). */
 	solution: string | null;
 	/** Selected machines (hardware page). */
@@ -57,6 +59,7 @@ export const DEFAULT_THREADS = '4';
 export function defaultView(size: string = DEFAULT_SIZE): View {
 	return {
 		size,
+		version: null,
 		solution: null,
 		machines: null,
 		pairs: null,

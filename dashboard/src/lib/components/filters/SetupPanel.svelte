@@ -5,6 +5,7 @@
 	import { useApp } from '../../state/app.svelte';
 	import Field from './Field.svelte';
 	import SizeField from './SizeField.svelte';
+	import VersionField from './VersionField.svelte';
 	import TimingField from './TimingField.svelte';
 	import Segmented, { type SegOption } from './Segmented.svelte';
 	import ToggleChips, { type ChipOption } from './ToggleChips.svelte';
@@ -53,6 +54,7 @@
 	const allNuma = $derived(numaOptions(ds, setup.machine, setup.date));
 </script>
 
+<VersionField />
 <SizeField />
 
 <Field label="Machine" help="Hardware the benchmark ran on.">
