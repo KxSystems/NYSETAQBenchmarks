@@ -9,7 +9,7 @@
 //   - number of columns
 //   - column names
 // and then compares the content cell-by-cell. Floating-point columns are
-// compared within FLOATDIFFTHREASHOLD, char columns via `like`, and all other
+// compared within FLOATDIFFTHRESHOLD, char columns via `like`, and all other
 // types by exact match. The first mismatch per column is logged.
 //
 // Usage:
@@ -46,7 +46,7 @@ if[`idx in ko;
 queryoutput1: hsym `$o`queryoutput1
 queryoutput2: hsym `$o`queryoutput2
 
-FLOATDIFFTHREASHOLD: 0.00005
+FLOATDIFFTHRESHOLD: 0.00005
 
 
 tradeTypes: ([time: "n"; ex: "c"; sym: "s"; cond: "s"; size: "e"; price: "e"; stop: "s"; corr: "h";
@@ -118,7 +118,7 @@ compare: {[idx: `j; tags: `C]
 
     errorsBefore: ERRORS;
     {[t1;t2;c]
-        notok: not $[.Q.ty[t1 c] in "ef"; FLOATDIFFTHREASHOLD > abs t1[c] - t2 c; "C" ~ .Q.ty t1 c; t1[c] like' t2 c; t1[c] = t2 c];
+        notok: not $[.Q.ty[t1 c] in "ef"; FLOATDIFFTHRESHOLD > abs t1[c] - t2 c; "C" ~ .Q.ty t1 c; t1[c] like' t2 c; t1[c] = t2 c];
         if[any notok;
             idx: first where notok;
             .log.error "Differ in column ", string[c], " e.g. index ", string[idx], ": ", string[t1[idx;c]], " vs ", string[t2[idx;c]];

@@ -638,7 +638,7 @@ that timings compare like for like. For integer and categorical/enum columns
 a single cell, fails the verification. Floating-point columns are the tricky
 exception: engines may legitimately differ in the last bits due to summation
 order and intermediate precision, so they are compared within a small tolerance
-(`FLOATDIFFTHREASHOLD`, see below) rather than bit-for-bit.
+(`FLOATDIFFTHRESHOLD`, see below) rather than bit-for-bit.
 
 To check this, persist each engine's query outputs and compare them:
 
@@ -660,7 +660,7 @@ To check this, persist each engine's query outputs and compare them:
    checks row count, column count, column names, and then compares content
    cell-by-cell, logging the first mismatch per column. Integer and
    categorical/enum columns must match exactly — any difference is a failure.
-   Only floats get slack: they compare within `FLOATDIFFTHREASHOLD` (and char
+   Only floats get slack: they compare within `FLOATDIFFTHRESHOLD` (and char
    columns via `like`), since floating-point results can drift slightly across
    engines:
 
