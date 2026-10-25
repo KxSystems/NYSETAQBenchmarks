@@ -3,6 +3,10 @@
     "deny": [
       "Read(//Users/fbodon/dev/nysetaqbenchmarks/**)",
       "Edit(//Users/fbodon/dev/nysetaqbenchmarks/**)",
+      "Read(//Users/fbodon/.claude/projects/-Users-fbodon-dev/**)",
+      "Read(//Users/fbodon/.claude/file-history/**)",
+      "Read(//Users/fbodon/.claude/backups/**)",
+      "Read(//private/tmp/claude-502/-Users-fbodon-dev/**)",
       "Bash(git -C:*)",
       "Bash(gh:*)",
       "Bash(curl:*)",
