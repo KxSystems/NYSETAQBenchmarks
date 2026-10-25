@@ -1,0 +1,8 @@
+{
+	"extends": "$app/tsconfig",
+	"compilerOptions": {
+		"noUncheckedIndexedAccess": true
+	},
+	"include": ["src", "tests", "*.ts", "*.js"],
+	"exclude": ["src/service-worker"]
+}

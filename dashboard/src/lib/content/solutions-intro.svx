@@ -1,0 +1,1 @@
+Query and data load performance of in-memory query engines on NYSE TAQ data. Use the filters to choose what to compare; the charts and tables update as you go.
