@@ -2,9 +2,19 @@ import type { Dataset } from './types';
 
 export const SUPPORTED_SCHEMA_VERSION = 1;
 
-/** Data sizes that have a file under /data/. Order is the order shown in the filter. */
-export const SIZES = ['full', 'xlarge', 'large'] as const;
-export const DEFAULT_SIZE = 'full';
+/**
+ * Data sizes that have a file under /data/, in the order shown in the filter. The list is
+ * read from static/data/*.json when Vite starts (see vite.config.ts), so a newly generated
+ * file shows up after restarting `npm run dev`.
+ */
+export const SIZES: readonly string[] = __DATA_SIZES__;
+
+/** `preferred` when it has a data file, otherwise the first size that does. */
+export function availableSize(preferred: string): string {
+	return SIZES.includes(preferred) ? preferred : (SIZES[0] ?? preferred);
+}
+
+export const DEFAULT_SIZE = availableSize('full');
 
 export class DataError extends Error {}
 

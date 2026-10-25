@@ -1,4 +1,4 @@
-/** Shapes of the dashboard data files (inputs/schema.md). Times are ns, memory kB, sizes MB. */
+/** Shapes of the dashboard data files (pysrc/dataJSONSchema.md in the repository root). Times are ns, memory kB, sizes MB. */
 
 export interface QueryMeta {
 	idx: number;

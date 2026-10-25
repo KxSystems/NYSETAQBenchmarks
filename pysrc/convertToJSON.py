@@ -7,7 +7,11 @@
 #   "sqlparse==0.5.3",
 # ]
 # ///
-"""Convert NYSE TAQ benchmark results into the dashboard's data.json.
+"""Convert NYSE TAQ benchmark results into the dashboard's data file.
+
+Usage (the dashboard reads dashboard/static/data/<size>.json):
+
+  uv run pysrc/convertToJSON.py ./results/inmemory/full ./dashboard/static/data/full.json
 
 The input directory (e.g. ``results/inmemory/full``) is scanned recursively
 for benchmark runs; a run is any directory that contains both:

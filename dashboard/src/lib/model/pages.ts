@@ -1,3 +1,4 @@
+import { availableSize } from '../data/load';
 import { TIMING_LABEL } from '../data/types';
 import type { Dataset } from '../data/types';
 import { canonicalHardware, canonicalThreads, canonicalView } from '../state/canonical';
@@ -64,7 +65,7 @@ function timingChip(view: View): Chip {
 export const solutionsLogic: PageLogic = {
 	id: 'solutions',
 	seriesNoun: ['solution', 'solutions'],
-	defaultSize: 'full',
+	defaultSize: availableSize('full'),
 	memory: 'charts',
 	defaultView: () => defaultView(),
 	canonical: canonicalView,
@@ -97,7 +98,7 @@ export const solutionsLogic: PageLogic = {
 export const hardwareLogic: PageLogic = {
 	id: 'hardware',
 	seriesNoun: ['machine', 'machines'],
-	defaultSize: 'large',
+	defaultSize: availableSize('large'),
 	memory: 'charts',
 	defaultView: () => defaultView('large'),
 	canonical: canonicalHardware,
@@ -132,7 +133,7 @@ export const hardwareLogic: PageLogic = {
 export const threadsLogic: PageLogic = {
 	id: 'threads',
 	seriesNoun: ['thread count', 'thread counts'],
-	defaultSize: 'large',
+	defaultSize: availableSize('large'),
 	memory: 'note',
 	defaultView: () => defaultView('large'),
 	canonical: canonicalThreads,

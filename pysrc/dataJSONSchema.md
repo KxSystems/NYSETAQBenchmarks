@@ -1,11 +1,12 @@
-# Dashboard data format (`data.json`)
+# Dashboard data format
 
-[convertToJSON.py](convertToJSON.py) writes one `data.json` per data size
-(`results/inmemory/<size>/data.json`). Each file is self-contained: it holds the
-query list, the solutions, the machines and every measured run for that size.
+[convertToJSON.py](convertToJSON.py) writes one JSON file per data size, which the
+dashboard reads from `dashboard/static/data/<size>.json`. Each file is
+self-contained: it holds the query list, the solutions, the machines and every
+measured run for that size.
 
 ```bash
-uv run pysrc/convertToJSON.py ./results/inmemory/<size> ./results/inmemory/<size>/data.json
+uv run pysrc/convertToJSON.py ./results/inmemory/<size> ./dashboard/static/data/<size>.json
 ```
 
 ## Conventions

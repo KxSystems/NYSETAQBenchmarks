@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A benchmark suite that measures in-memory query performance over public
 [NYSE TAQ](https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/) data across
 KDB-X (q-sql), KDB-X SQL, pykx, DuckDB, chDB, Polars (eager and lazy) and Pandas. It also
-contains the static dashboard ([index.html](index.html)) published as GitHub Pages at
-benchmark.kx.com (see [CNAME](CNAME)).
+contains the dashboard ([dashboard/](dashboard/), a SvelteKit static site) published as
+GitHub Pages at benchmark.kx.com (see [dashboard/static/CNAME](dashboard/static/CNAME)).
 
 [README.md](README.md) is the canonical user-facing documentation and stays authoritative —
 when this file or [.claude/skills/run-nyse-taq-benchmarks/SKILL.md](.claude/skills/run-nyse-taq-benchmarks/SKILL.md)
@@ -97,8 +97,9 @@ Both accept `-help` (q) / `--help` (Python).
 q src/compareOutput.q -querymeta ./artifacts/queries/inmemory/querymeta.psv \
   -queryoutput1 ./results/inmemory/output/KDB-X -queryoutput2 ./results/inmemory/output/DuckDB_Index_
 
-# Regenerate dashboard data for a size
-uv run pysrc/convertToJSON.py ./results/inmemory/${SIZE} ./results/inmemory/${SIZE}/data.json
+# Regenerate dashboard data for a size, then view it (Node.js >= 24.10)
+uv run pysrc/convertToJSON.py ./results/inmemory/${SIZE} ./dashboard/static/data/${SIZE}.json
+(cd dashboard && npm ci && npm run dev)
 
 # Query parameter files for a new SIZE
 q artifacts/parameters/genParameters.q -db ${NYSEBENCHMARKDIR}/${SIZE}/kdb -dst ./artifacts/parameters/${SIZE}
@@ -166,7 +167,10 @@ A *solution* is an engine plus a specific sort/index/query-file combination — 
 variants) `EACHPEACH`. The driver scripts are the
 registry of solutions, and [benchmarks/inmemory/common.sh](benchmarks/inmemory/common.sh)
 `run_solution` / `add_solution_name` prepends the `solution` column to each per-solution PSV
-afterwards. To add or rename a solution, edit the driver — and remember `index.html` and
+afterwards. To add or rename a solution, edit the driver — and remember the dashboard
+(`DEFAULT_SOLUTIONS` / `DEFAULT_BASELINE` in
+[dashboard/src/lib/state/view.ts](dashboard/src/lib/state/view.ts), the page defaults in
+[dashboard/src/lib/model/pages.ts](dashboard/src/lib/model/pages.ts)) and
 `results/mappings.yaml` refer to solutions by these exact display names.
 
 `common.sh` also owns everything shared by both drivers: `init_benchmark` (validates
@@ -199,7 +203,7 @@ runs) and `<solution>/{stats.yaml,os.txt}` (per-table stats incl. `proprietary`/
 `sortcols`, and `/usr/bin/time -v` output).
 
 [pysrc/convertToJSON.py](pysrc/convertToJSON.py) turns a tree of such run directories
-into one self-contained `data.json` per size (format: [pysrc/dataJSONSchema.md](pysrc/dataJSONSchema.md)),
+into one self-contained JSON file per size, `dashboard/static/data/<size>.json` (format: [pysrc/dataJSONSchema.md](pysrc/dataJSONSchema.md)),
 keyed by `(datadate, machine, solution, numanode)` and merging thread counts across runs, keeping
 the latest per key. `numanode` is the run's `NUMANODE` (`"all"` when it was empty, i.e. unpinned)
 and belongs in the key: a pinned and an unpinned run see different core counts, so their thread
@@ -229,26 +233,20 @@ line is the only record of it. A directory without a stats.yaml (a run predating
 solution that ran no query yet exited cleanly, both warn and are skipped. A key that measured any
 thread count keeps its numbers and drops the failure marker.
 
-The dashboard is three pages over one engine: [assets/js/benchmark.js](assets/js/benchmark.js)
-owns everything (selectors, summary, charts, details, load times, URL state, accessibility) and
-is generic over the *series* being compared. Each page loads its results, defines a `page`
-object in a small inline script at the bottom of `<body>` and calls `startBenchmark()`:
-[index.html](index.html) compares solutions on one machine (series = `solution`, with the
-open-source / sort-columns / hardware inline filters and the memory, data-size and
-query-failure charts), [pages/hardware/index.html](pages/hardware/index.html) compares machines
-running one solution (series = `machine`, `page_solution` picks it), and
-[pages/threadscaling/index.html](pages/threadscaling/index.html) compares the thread counts of
-one solution on one machine (series = the thread count). All three carry the NUMA node filter,
-built with the engine's `buildMultiSelect` from `availableNumanodes()` and applied in
-`page.matches` via `numanodeSelected`. The contract of `page` is documented at the top of
-`benchmark.js`; a new comparison page should be another `page` object rather than a copy of
-the engine.
-
-The thread scaling page is the one that reshapes its data: the engine keys measurements as
-`result[thread count]` and picks one with the single-selection `selectors.threads`, so the page
-splits each entry per thread count and re-keys `result`/`load_time` under one collapsed key,
-freeing the thread count to be the series. Its `selectors_threads` row is therefore hidden, and
-its `baselineScope` must pin the machine - unlike the hardware page, its series label does not.
+The dashboard ([dashboard/](dashboard/), Svelte 5 + TypeScript + SvelteKit with
+adapter-static, Observable Plot) has three pages over one parameterised comparison: `/`
+compares solutions on one machine, `/hardware/` machines running one solution, `/threads/` the
+`(thread count, NUMA node)` pairs of one solution on one machine. The calculations, charts and
+tables only see a resolved list of *series*; each page supplies a `PageLogic`
+([dashboard/src/lib/model/pages.ts](dashboard/src/lib/model/pages.ts)) that builds it, so a new
+comparison page is a new `PageLogic` + `PageConfig`, not a copy. The data sizes offered are the
+files in `dashboard/static/data/` when Vite starts (`dashboard/vite.config.ts`). Behaviour is
+specified in [dashboard/docs/spec.md](dashboard/docs/spec.md); code layout, tests
+(`npm run check`, `npm test`, `npm run test:e2e`) and deployment are in
+[dashboard/README.md](dashboard/README.md). The site is a clean-room implementation
+([dashboard/PROVENANCE.md](dashboard/PROVENANCE.md)): do not port code from the pre-2026-10 dashboard
+in git history into it. [.github/workflows/deploy.yml](.github/workflows/deploy.yml) tests,
+builds and deploys it to GitHub Pages on pushes to `main`.
 
 ## Conventions and gotchas
 

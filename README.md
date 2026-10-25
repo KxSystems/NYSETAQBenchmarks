@@ -29,10 +29,12 @@ export NUMANODE=0
 
 Results are written to `./results/inmemory/${SIZE}/results.psv` (one row per
 query, as a pipe-separated values file). See [Results](#results) for the column
-descriptions. To prepare them for the dashboard, convert them to `data.json`:
+descriptions. To view them in the dashboard, convert them to the dashboard's data
+format and start it locally (needs [Node.js](https://nodejs.org) 24.10 or later):
 
 ```bash
-uv run pysrc/convertToJSON.py ./results/inmemory/${SIZE} ./results/inmemory/${SIZE}/data.json
+uv run pysrc/convertToJSON.py ./results/inmemory/${SIZE} ./dashboard/static/data/${SIZE}.json
+cd dashboard && npm ci && npm run dev
 ```
 
 Your CPU model must appear in the `machines` mapping of
@@ -324,23 +326,64 @@ columns for setup rows).
 The raw PSV files are complete but hard to work with: with several engines,
 thread counts, machines and dozens of queries per run, slicing the numbers and
 comparing solutions in a text file (or a spreadsheet) quickly becomes tedious.
-KX publishes its curated results in an interactive dashboard at
-[benchmark.kx.com](https://benchmark.kx.com). The dashboard is being rebuilt (see
-[#24](https://github.com/KxSystems/NYSETAQBenchmarks/issues/24)); the new one
-reads one `data.json` per data size.
+The repository therefore ships an interactive dashboard,
+[dashboard/](./dashboard/), that you can run on **your own** results. KX publishes
+its curated results with it at [benchmark.kx.com](https://benchmark.kx.com).
 
-To produce that file from your own results, run
-[pysrc/convertToJSON.py](./pysrc/convertToJSON.py):
+It has three pages:
 
-```bash
-uv run pysrc/convertToJSON.py ./results/inmemory/${SIZE} ./results/inmemory/${SIZE}/data.json
-```
+* **Solution comparison** — solutions side by side on one machine: the geometric
+  mean of per-query time ratios against a baseline of your choice (failed queries
+  count with a penalty), query failures, wins per solution, a per-query breakdown
+  showing the query each solution ran, and memory use, data size and load times.
+* **Hardware comparison** — one solution on different machines at the same thread
+  count.
+* **Thread scaling** — one solution on one machine across thread counts.
 
-The format is described in [pysrc/dataJSONSchema.md](./pysrc/dataJSONSchema.md).
-Your machine's CPU model must be listed in the `machines` mapping of
-[results/mappings.yaml](./results/mappings.yaml) (override the path with
-`--mappings`); the script stops with an explanatory message if it is not, since
-results are grouped by machine.
+Filters cover the solutions, data size, machine, data date, NUMA node, thread
+count, cold or hot run, query complexity, instrument scope and query tags, and
+every view can be shared as a link.
+
+##### Running the dashboard locally
+
+1. Convert your results to the dashboard's data format with
+   [pysrc/convertToJSON.py](./pysrc/convertToJSON.py), one file per data size,
+   written straight into the dashboard's data directory:
+
+   ```bash
+   uv run pysrc/convertToJSON.py ./results/inmemory/${SIZE} ./dashboard/static/data/${SIZE}.json
+   ```
+
+   The format is described in [pysrc/dataJSONSchema.md](./pysrc/dataJSONSchema.md).
+   Your machine's CPU model must be listed in the `machines` mapping of
+   [results/mappings.yaml](./results/mappings.yaml) (override the path with
+   `--mappings`); the script stops with an explanatory message if it is not,
+   since results are grouped by machine.
+
+2. Start the dashboard (needs [Node.js](https://nodejs.org) 24.10 or later;
+   `npm ci` is only needed the first time):
+
+   ```bash
+   cd dashboard
+   npm ci
+   npm run dev
+   ```
+
+   and open the address it prints (by default http://localhost:5173). The Data
+   size filter offers every file found in `dashboard/static/data/` when the
+   server starts, so after converting a new size, restart `npm run dev`.
+
+   `npm run build` followed by `npm run preview` serves the production build
+   instead. [dashboard/README.md](./dashboard/README.md) describes the
+   dashboard's code, tests and deployment.
+
+`dashboard/static/data/` holds the `full`, `xlarge` and `large` files KX
+publishes; regenerating one of those with your own results replaces it locally.
+On every push to `main`, the workflow in
+[.github/workflows/deploy.yml](./.github/workflows/deploy.yml) tests and builds
+the dashboard and publishes it to GitHub Pages.
+
+##### How the converter works
 
 The script scans the input directory recursively for benchmark runs — any
 directory holding both `results.psv` and `environment.yaml`, plus the
@@ -628,18 +671,4 @@ To check this, persist each engine's query outputs and compare them:
 
 ## License
 
-This repository is licensed under the [Apache License 2.0](LICENSE), except for the dashboard's
-user interface described below.
-
-The dashboard's user interface is adapted from ClickHouse's
-[ClickBench](https://github.com/ClickHouse/ClickBench) and has been modified. These files are licensed under
-[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/), not Apache 2.0:
-
-- `index.html`
-- `pages/hardware/index.html`
-- `pages/threadscaling/index.html`
-- `assets/js/benchmark.js`
-- `assets/css/benchmark.css`
-
-The ClickBench-derived user interface is being replaced by an independent implementation
-(see [#24](https://github.com/KxSystems/NYSETAQBenchmarks/issues/24)).
+This repository is licensed under the [Apache License 2.0](LICENSE).

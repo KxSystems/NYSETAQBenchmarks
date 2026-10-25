@@ -16,12 +16,16 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version-file: dashboard/.nvmrc
           cache: npm
+          cache-dependency-path: dashboard/package-lock.json
       - run: npm ci
       - run: npm run check
       - run: npm test
@@ -33,7 +37,7 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
-          path: build
+          path: dashboard/build
 
   deploy:
     needs: build

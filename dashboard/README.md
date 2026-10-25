@@ -9,7 +9,9 @@ Static site (SvelteKit, Svelte 5, TypeScript, Observable Plot) published at http
 | Thread scaling | `/threads/` | thread counts of one solution on one machine |
 
 The earlier `/pages/hardware/index.html` and `/pages/threadscaling/index.html` redirect to `/hardware/` and `/threads/`.
-Behaviour is specified in `inputs/spec.md`, the data format in `inputs/schema.md`, the design tokens in `inputs/tokens.md`.
+Behaviour is specified in [docs/spec.md](docs/spec.md), the data format in
+[pysrc/dataJSONSchema.md](../pysrc/dataJSONSchema.md), the design tokens in [docs/tokens.md](docs/tokens.md).
+The site was built as a clean-room implementation; [PROVENANCE.md](PROVENANCE.md) records how.
 
 ```bash
 npm ci
@@ -25,8 +27,16 @@ Run `npx playwright install chromium` once before the end-to-end tests.
 
 ## Data
 
-`static/data/<size>.json` (`full`, `xlarge`, `large`) are copies of `inputs/data/`. To publish new results, replace
-those files; to add a data size, add the file and append its name to `SIZES` in `src/lib/data/load.ts`.
+The site reads one `static/data/<size>.json` per data size, written by
+[pysrc/convertToJSON.py](../pysrc/convertToJSON.py) from the benchmark's result directories. From the repository root:
+
+```bash
+uv run pysrc/convertToJSON.py ./results/inmemory/${SIZE} ./dashboard/static/data/${SIZE}.json
+```
+
+The sizes offered by the Data size filter are the files found in `static/data/` when Vite starts (`vite.config.ts`),
+so a new size appears after restarting `npm run dev`; no code change is needed. The files KX publishes (`full`,
+`xlarge`, `large`) are committed.
 
 ## Layout
 
@@ -58,5 +68,6 @@ to the page defaults are omitted.
 
 ## Deployment
 
-`.github/workflows/deploy.yml` checks, tests, builds and deploys `build/` to GitHub Pages on pushes to `main`.
-`static/CNAME` holds the custom domain.
+[.github/workflows/deploy.yml](../.github/workflows/deploy.yml) in the repository root checks, tests, builds and
+deploys `dashboard/build/` to GitHub Pages on pushes to `main` (the repository's Pages source must be set to
+"GitHub Actions"). `static/CNAME` holds the custom domain.

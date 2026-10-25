@@ -2,7 +2,7 @@
 @import '@fontsource/inter/600.css';
 @import '@fontsource/inter/700.css';
 
-/* KX design tokens (inputs/tokens.md). The theme is set by data-theme on <html>. */
+/* KX design tokens (docs/tokens.md). The theme is set by data-theme on <html>. */
 :root,
 :root[data-theme='light'] {
 	color-scheme: light;

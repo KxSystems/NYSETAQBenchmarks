@@ -1,8 +1,8 @@
 # KX NYSE TAQ Benchmark dashboard — specification
 
 This document describes **what the site does**. It is the source of truth for the
-build. Data comes from `inputs/data/<size>.json` (format: `inputs/schema.md`); look
-and feel from `inputs/tokens.md`. Where this document says "should", treat it as a
+build. Data comes from `static/data/<size>.json` (format: `pysrc/dataJSONSchema.md` in the
+repository root); look and feel from `docs/tokens.md`. Where this document says "should", treat it as a
 requirement; where it says "may", it is optional.
 
 ## 1. Purpose and audience
@@ -420,7 +420,7 @@ tab". The solution, setup and baseline filters apply as on the other tab.
 
 ## 11. Look and feel, accessibility, responsiveness
 
-- Colours, typography and spacing from `inputs/tokens.md` (KX design tokens) for both
+- Colours, typography and spacing from `docs/tokens.md` (KX design tokens) for both
   themes. Font: Inter.
 - **Theme:** follows the operating system by default; the toggle overrides it and the
   choice is remembered on the device. Both themes must meet WCAG AA contrast for
