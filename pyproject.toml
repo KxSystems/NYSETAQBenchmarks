@@ -4,10 +4,11 @@ version = "1.0.0"
 description = "Benchmark suite for NYSE TAQ data"
 readme = "README.md"
 requires-python = ">=3.10"
-# Union of the PEP 723 inline dependencies of pysrc/queryrunner/main.py and
-# pysrc/taqToParquet/main.py (those blocks stay authoritative for `uv run`),
-# plus pyyaml for pysrc/convertToJSFormat.py.
+# Union of the PEP 723 inline dependencies of pysrc/queryrunner/main.py,
+# pysrc/taqToParquet/main.py and pysrc/convertToJSON.py (those blocks stay
+# authoritative for `uv run`).
 dependencies = [
+    "black==25.1.0",
     "chdb>=4.1",
     "duckdb>=1.4",
     "numexpr",
@@ -18,6 +19,7 @@ dependencies = [
     "pyarrow>=13.0.0",
     "pykx>=4.0.0",
     "pyyaml",
+    "sqlparse==0.5.3",
     "toolz>=0.8.0",
 ]
 

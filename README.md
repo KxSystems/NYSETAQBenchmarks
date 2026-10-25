@@ -29,23 +29,18 @@ export NUMANODE=0
 
 Results are written to `./results/inmemory/${SIZE}/results.psv` (one row per
 query, as a pipe-separated values file). See [Results](#results) for the column
-descriptions. You can also view the results in the bundled dashboard:
+descriptions. To view them in the dashboard, convert them to the dashboard's data
+format and start it locally (needs [Node.js](https://nodejs.org) 24.10 or later):
 
 ```bash
-uv run pysrc/convertToJSFormat.py ./results/inmemory/${SIZE} ./results/inmemory/${SIZE}/data.generated.js
+uv run pysrc/convertToJSON.py ./results/inmemory/${SIZE} ./dashboard/static/data/${SIZE}.json
+cd dashboard && npm ci && npm run dev
 ```
 
-Two local adjustments are needed before the page shows your data — see
-[Result Dashboard and benchmark.kx.com](#result-dashboard-and-benchmarkkxcom) for details:
-
-* Your CPU model must appear in the `machines` mapping of
-  [results/mappings.yaml](./results/mappings.yaml), otherwise the conversion
-  stops with an explanatory error.
-* [index.html](./index.html) ships configured for the sizes KX publishes
-  (`full`, `xlarge`, `large`), so set `available_sizes` and `default_size` at the
-  top of the file to the size you generated, e.g. `['tiny']` / `'tiny'`.
-
-Then open `index.html` in a browser.
+Your CPU model must appear in the `machines` mapping of
+[results/mappings.yaml](./results/mappings.yaml), otherwise the conversion stops
+with an explanatory error — see
+[Result Dashboard and benchmark.kx.com](#result-dashboard-and-benchmarkkxcom).
 
 ## Overview
 
@@ -331,44 +326,71 @@ columns for setup rows).
 The raw PSV files are complete but hard to work with: with several engines,
 thread counts, machines and dozens of queries per run, slicing the numbers and
 comparing solutions in a text file (or a spreadsheet) quickly becomes tedious.
+The repository therefore ships an interactive dashboard,
+[dashboard/](./dashboard/), that you can run on **your own** results. KX publishes
+its curated results with it at [benchmark.kx.com](https://benchmark.kx.com).
 
-To make the results consumable, the repository ships an interactive dashboard,
-[index.html](./index.html), that you can point at **your own** results. It lets
-you slice and dice the measurements — filter by solution, thread count, machine,
-data size, data date, cold/hot run, query complexity, instrument scope and query
-tags — and shows aggregates such as the geometric mean of per-query time ratios
-relative to a baseline solution of your choice, so you can read off how many
-times faster one solution is than another.
+It has three pages:
 
-A second page, [hardware/index.html](./hardware/index.html), turns the comparison
-around: it puts KDB-X side by side on the machines it was benchmarked on, with the
-same query filters and a baseline machine of your choice, so you can read off how
-much of a difference the hardware makes. Both pages are configuration on top of one
-shared dashboard engine, [assets/js/benchmark.js](./assets/js/benchmark.js); what
-differs is only the `page` object at the bottom of each HTML file, which says
-whether the compared series are the solutions or the machines.
+* **Solution comparison** — solutions side by side on one machine: the geometric
+  mean of per-query time ratios against a baseline of your choice (failed queries
+  count with a penalty), query failures, wins per solution, a per-query breakdown
+  showing the query each solution ran, and memory use, data size and load times.
+* **Hardware comparison** — one solution on different machines at the same thread
+  count.
+* **Thread scaling** — one solution on one machine across thread counts.
 
-KX also publishes its own curated results with this dashboard at
-[benchmark.kx.com](https://benchmark.kx.com).
+Filters cover the solutions, data size, machine, data date, NUMA node, thread
+count, cold or hot run, query complexity, instrument scope and query tags, and
+every view can be shared as a link.
 
-To use the dashboard locally, first convert your PSV results into the JavaScript
-format the page loads (`data.generated.js`) using
-[pysrc/convertToJSFormat.py](./pysrc/convertToJSFormat.py):
+##### Running the dashboard locally
 
-```bash
-uv run pysrc/convertToJSFormat.py ./results/inmemory/${SIZE} ./results/inmemory/${SIZE}/data.generated.js
-```
+1. Convert your results to the dashboard's data format with
+   [pysrc/convertToJSON.py](./pysrc/convertToJSON.py), one file per data size,
+   written straight into the dashboard's data directory:
 
-Your machine's CPU model must be listed in the `machines` mapping of
-[results/mappings.yaml](./results/mappings.yaml) (override the path with
-`--mappings`); the script stops with an explanatory message if it is not, since
-the dashboard groups results by machine.
+   ```bash
+   uv run pysrc/convertToJSON.py ./results/inmemory/${SIZE} ./dashboard/static/data/${SIZE}.json
+   ```
+
+   The format is described in [pysrc/dataJSONSchema.md](./pysrc/dataJSONSchema.md).
+   Your machine's CPU model must be listed in the `machines` mapping of
+   [results/mappings.yaml](./results/mappings.yaml) (override the path with
+   `--mappings`); the script stops with an explanatory message if it is not,
+   since results are grouped by machine.
+
+2. Start the dashboard (needs [Node.js](https://nodejs.org) 24.10 or later;
+   `npm ci` is only needed the first time):
+
+   ```bash
+   cd dashboard
+   npm ci
+   npm run dev
+   ```
+
+   and open the address it prints (by default http://localhost:5173). The Data
+   size filter offers every file found in `dashboard/static/data/` when the
+   server starts, so after converting a new size, restart `npm run dev`.
+
+   `npm run build` followed by `npm run preview` serves the production build
+   instead. [dashboard/README.md](./dashboard/README.md) describes the
+   dashboard's code, tests and deployment.
+
+`dashboard/static/data/` holds the `full`, `xlarge` and `large` files KX
+publishes; regenerating one of those with your own results replaces it locally.
+On every push to `main`, the workflow in
+[.github/workflows/deploy.yml](./.github/workflows/deploy.yml) tests and builds
+the dashboard and publishes it to GitHub Pages.
+
+##### How the converter works
 
 The script scans the input directory recursively for benchmark runs — any
 directory holding both `results.psv` and `environment.yaml`, plus the
 per-solution `<solution>/stats.yaml` files — merges the thread counts of the same
-(data date, machine, solution) triple, and keeps the latest measurement when
-runs overlap.
+(data date, machine, solution, NUMA node) key, and keeps the latest measurement
+when runs overlap. It also stores each solution's query texts, formatted for
+display, and the machine specification from `environment.yaml`.
 
 A solution whose run failed — the operating system killing it for exceeding the
 available memory on a data size that does not fit is the usual reason — never gets
@@ -376,37 +398,14 @@ to run a query, so at most its load-phase rows reach `results.psv`. Both runners
 write the solution-level part of `<solution>/stats.yaml` (`proprietary`,
 `engineversion`, `sortcols`) before they load any data, though, so the directory
 still names the solution that ran; paired with the non-zero `Exit status` in the
-`/usr/bin/time -v` output of its `<solution>/os.txt`, the script reports it as an
-entry with no measurement at all, carrying that status as its `exitcode` (every
-other entry gets `0`). Whatever load rows it managed to write are dropped along with
+`/usr/bin/time -v` output of its `<solution>/os.txt`, the script reports it as a
+run with no measurement at all, carrying that status as its `exit_code` (every
+other run gets `0`). Whatever load rows it managed to write are dropped along with
 it: they time a load that never finished, so reporting them would rank the solution
 on work it did not complete. The same goes for a single thread count that loaded but
 ran no query while others of the same solution completed — that thread count is left
 out. Runs made before the runners wrote the solution-level fields up front have no
-stats.yaml to go on and are reported as a warning instead. The dashboard
-lists such a solution in the benchmark summary with a full-length grey line, its
-name paled out and `Exit: 137` (say) in place of a ratio — so a run that failed
-reads as failed rather than as one that was never attempted, instead of
-disappearing from the comparison altogether. It takes no part in
-the detailed comparison or the charts, having nothing to show there.
-
-It also refreshes
-`artifacts/queries/inmemory/querymeta.generated.js`, the fallback copy of the
-query metadata used when the page is opened via `file://` (browsers block
-`fetch()` for local files).
-
-You may then need to adjust the small configuration block at the top of
-[index.html](./index.html):
-
-* `available_sizes` lists the data sizes with published results, and
-  `default_size` the one shown initially. KX only publishes `full`, `xlarge` and
-  `large` results, so set these to the sizes you actually generated (e.g.
-  `['tiny']`).
-* The `data.generated.js` location is derived from the selected size as
-  `results/inmemory/<size>/data.generated.js`. Change that path if you keep your generated file elsewhere.
-* [hardware/index.html](./hardware/index.html) has the same block (loading
-  `../results/inmemory/<size>/data.generated.js`), with `default_size` set to the
-  largest size benchmarked on more than one machine.
+stats.yaml to go on and are reported as a warning instead.
 
 ### 2. In-Memory KDB-X Attribute Benchmark — `benchmarks/inmemory/kdbAttributes.sh`
 
@@ -672,18 +671,4 @@ To check this, persist each engine's query outputs and compare them:
 
 ## License
 
-This repository is licensed under the [Apache License 2.0](LICENSE), except for the dashboard's
-user interface described below.
-
-The dashboard's user interface is adapted from ClickHouse's
-[ClickBench](https://github.com/ClickHouse/ClickBench) and has been modified. These files are licensed under
-[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/), not Apache 2.0:
-
-- `index.html`
-- `pages/hardware/index.html`
-- `pages/threadscaling/index.html`
-- `assets/js/benchmark.js`
-- `assets/css/benchmark.css`
-
-The ClickBench-derived user interface is being replaced by an independent implementation
-(see [#24](https://github.com/KxSystems/NYSETAQBenchmarks/issues/24)).
+This repository is licensed under the [Apache License 2.0](LICENSE).

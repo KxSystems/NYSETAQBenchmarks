@@ -1,0 +1,1 @@
+How one solution's query and data load performance scales with the number of threads on one machine. Use the filters to choose the solution, machine and thread counts; the charts and tables update as you go.
