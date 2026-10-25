@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(//Users/fbodon/dev/nysetaqbenchmarks/**)",
+      "Edit(//Users/fbodon/dev/nysetaqbenchmarks/**)",
+      "Bash(git -C:*)",
+      "Bash(gh:*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:clickhouse.com)",
+      "WebFetch(domain:benchmark.clickhouse.com)"
+    ]
+  }
+}
