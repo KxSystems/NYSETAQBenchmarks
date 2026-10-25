@@ -69,6 +69,7 @@ export function parseView(search: string, defaultSize: string = DEFAULT_SIZE): V
 	const size = one('size');
 	if (size && (SIZES as readonly string[]).includes(size)) v.size = size;
 
+	v.version = one('version') || null;
 	v.solution = one('solution') || null;
 	v.machines = list('machines');
 	v.pairs = list('pairs');
@@ -118,6 +119,7 @@ export function serializeView(v: View, defaultSize: string = DEFAULT_SIZE): stri
 	};
 
 	if (v.size !== defaultSize) one('size', v.size);
+	one('version', v.version);
 	one('solution', v.solution);
 	list('machines', v.machines);
 	list('pairs', v.pairs);

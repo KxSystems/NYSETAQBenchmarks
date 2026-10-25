@@ -13,6 +13,7 @@ describe('URL codec', () => {
 	it('round-trips every field', () => {
 		const v: View = {
 			size: 'large',
+			version: '1.0',
 			solution: 'KDB-X (Manual Opt)',
 			machines: ['AMD_EPYC_9575F', 'INTEL_XEON_6738P'],
 			pairs: ['1@0', '64@0', '128@all'],

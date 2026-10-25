@@ -1,4 +1,5 @@
 solution: Polars (Lazy)
+benchmarkversion: '1.0'
 proprietary: 'no'
 engineversion: 1.41.2
 master:

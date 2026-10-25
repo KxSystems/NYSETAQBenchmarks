@@ -23,7 +23,9 @@ alongside per-solution ``<solution>/stats.yaml`` and ``<solution>/os.txt``. The
 run's "test date" is taken from environment.yaml; directory names carry no
 meaning.
 
-Measurements are keyed by the (datadate, machine, solution, numanode) tuple. A
+Measurements are keyed by the (datadate, machine, solution, numanode, version)
+tuple, where version is the benchmark version (the repository's VERSION file at
+the time of the run, recorded in stats.yaml as ``benchmarkversion``). A
 key's thread counts may be split across several run directories (e.g. one per
 thread count); they are merged into a single run of the output. When the same
 thread count of a key appears in several runs, only the one with the latest
@@ -336,11 +338,11 @@ def format_query(text: str, language: str, warn):
 
 
 def parse_stats(stats_path: Path):
-    """Return (proprietary, engineversion, sortcols, data_size_mb) from a solution's stats.yaml.
+    """Return (proprietary, engineversion, sortcols, data_size_mb, benchmarkversion) from a solution's stats.yaml.
 
     The file comes in two shapes: a nested mapping (one key per table) and a
     flat concatenation of table documents. Both keep ``proprietary`` (and,
-    since they were added, ``engineversion`` and ``sortcols``) as top-level
+    since they were added, ``engineversion``, ``sortcols`` and ``benchmarkversion``) as top-level
     scalars and repeat ``size (MB):`` once per table, so these fields are read
     directly with regexes rather than fully parsing (a plain YAML load would
     collapse the flat form's duplicate keys and lose sizes).
@@ -354,6 +356,7 @@ def parse_stats(stats_path: Path):
     proprietary = scalar(r"^\s*proprietary\s*:\s*(.+?)\s*$")
     engineversion = scalar(r"^\s*engineversion\s*:\s*(.+?)\s*$")
     sortcols = scalar(r"^sortcols\s*:\s*(.+?)\s*$")
+    benchmarkversion = scalar(r"^benchmarkversion\s*:\s*(.+?)\s*$")
 
     total = None
     for raw in re.findall(r"size \(MB\)\s*:\s*(\S+)", text):
@@ -365,7 +368,7 @@ def parse_stats(stats_path: Path):
     if total is not None and total == int(total):
         total = int(total)
 
-    return proprietary, engineversion, sortcols, total
+    return proprietary, engineversion, sortcols, total, benchmarkversion
 
 
 def parse_exit_status(os_txt_path: Path):
@@ -460,7 +463,7 @@ def load_psv(psv_path: Path):
 def process_run(run_dir: Path, machines: dict, mappings_path: Path):
     """Extract per-(solution, thread count) measurements from one run directory.
 
-    Yields (datadate, machine, solution, numanode, threadcount, date, payload)
+    Yields (datadate, machine, solution, numanode, version, threadcount, date, payload)
     tuples, where payload holds the load/query rows for that thread count plus
     the solution's stats. A solution whose runner was killed is yielded once
     with the FAILED thread count and no rows.
@@ -510,16 +513,16 @@ def process_run(run_dir: Path, machines: dict, mappings_path: Path):
     for solution in solutions:
         stats_dir = stats_dirs.get(solution)
         if stats_dir is None:
-            stats = (None, None, None, None)
+            stats = (None, None, None, None, None)
             max_res_mem = None
             print(f"warning: no stats.yaml directory found for solution "
                   f"{solution!r} in {run_dir}; its stats are set to null", file=sys.stderr)
         else:
             stats = parse_stats(stats_dir / "stats.yaml")
             max_res_mem = parse_max_res_mem(stats_dir / "os.txt")
-        proprietary, engineversion, sortcols, data_size = stats
+        proprietary, engineversion, sortcols, data_size, version = stats
         for tc in sorted(tc for (sol, tc) in measured if sol == solution):
-            yield datadate, machine, solution, numanode, tc, date, dict(
+            yield datadate, machine, solution, numanode, version, tc, date, dict(
                 grouped[(solution, tc)], proprietary=proprietary,
                 engineversion=engineversion, sortcols=sortcols,
                 data_size=data_size, max_res_mem=max_res_mem, exitcode=0)
@@ -534,10 +537,10 @@ def process_run(run_dir: Path, machines: dict, mappings_path: Path):
             print(f"warning: solution {solution!r} in {run_dir} ran no query yet its "
                   f"runner reported exit status {exitcode}; skipped", file=sys.stderr)
             continue
-        proprietary, engineversion, sortcols, _ = parse_stats(stats_dir / "stats.yaml")
+        proprietary, engineversion, sortcols, _, version = parse_stats(stats_dir / "stats.yaml")
         engine = next((rows["engine"] for (sol, _), rows in grouped.items()
                        if sol == solution and rows["engine"]), None)
-        yield datadate, machine, solution, numanode, FAILED, date, {
+        yield datadate, machine, solution, numanode, version, FAILED, date, {
             "engine": engine, "load": [], "query": [],
             "proprietary": proprietary, "engineversion": engineversion,
             "sortcols": sortcols, "data_size": None, "max_res_mem": None,
@@ -613,7 +616,7 @@ def build_solutions(latest: dict, warn):
     """Solution-level fields and query texts, from every kept measurement of each solution."""
     fields = defaultdict(lambda: defaultdict(list))
     texts = defaultdict(lambda: defaultdict(list))
-    for (_, _, solution, _, _), (date, payload) in latest.items():
+    for (_, _, solution, _, _, _), (date, payload) in latest.items():
         f = fields[solution]
         f["engine"].append((date, payload["engine"]))
         f["open_source"].append((date, None if payload["proprietary"] is None
@@ -665,14 +668,14 @@ def build_machines(run_dirs, machines: dict):
 
 
 def build_runs(latest: dict):
-    """One run per (datadate, machine, solution, numanode), with its thread counts merged."""
+    """One run per (datadate, machine, solution, numanode, version), with its thread counts merged."""
     by_key = defaultdict(dict)
-    for (datadate, machine, solution, numanode, tc), dated_payload in latest.items():
-        by_key[(datadate, machine, solution, numanode)][tc] = dated_payload
+    for (datadate, machine, solution, numanode, version, tc), dated_payload in latest.items():
+        by_key[(datadate, machine, solution, numanode, version)][tc] = dated_payload
 
     runs = []
     for key in sorted(by_key, key=lambda k: tuple(str(part) for part in k)):
-        datadate, machine, solution, numanode = key
+        datadate, machine, solution, numanode, version = key
         measurements = by_key[key]
         # A key that measured any thread count did not fail - a run of it was
         # killed, but the numbers of the others stand - so its marker is dropped.
@@ -686,6 +689,7 @@ def build_runs(latest: dict):
             "datadate": datadate,
             "numa_node": numanode,
             "test_date": date,
+            "benchmark_version": version,
             "engine_version": newest["engineversion"],
             "exit_code": newest["exitcode"] if failed else 0,
             "data_size_mb": newest["data_size"],
@@ -734,12 +738,12 @@ def main():
         print(f"warning: {message}", file=sys.stderr)
 
     # Keep the latest-dated measurement per (datadate, machine, solution,
-    # numanode, threadcount); a key's thread counts may be spread over several runs.
+    # numanode, version, threadcount); a key's thread counts may be spread over several runs.
     latest = {}
     for run_dir in run_dirs:
-        for datadate, machine, solution, numanode, tc, date, payload in process_run(
+        for datadate, machine, solution, numanode, version, tc, date, payload in process_run(
                 run_dir, machines, args.mappings):
-            key = (datadate, machine, solution, numanode, tc)
+            key = (datadate, machine, solution, numanode, version, tc)
             if key not in latest or date > latest[key][0]:
                 latest[key] = (date, payload)
 

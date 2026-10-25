@@ -14,6 +14,7 @@
 	import Field from './Field.svelte';
 	import Segmented, { type SegOption } from './Segmented.svelte';
 	import SizeField from './SizeField.svelte';
+	import VersionField from './VersionField.svelte';
 	import TimingField from './TimingField.svelte';
 	import ToggleChips, { type ChipOption } from './ToggleChips.svelte';
 
@@ -53,6 +54,7 @@
 	);
 </script>
 
+<VersionField />
 <SizeField />
 
 <Field label="Machines" help="Machines to compare. Only machines with runs of the selected solution are listed.">

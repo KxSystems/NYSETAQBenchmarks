@@ -4,6 +4,7 @@ import { loadDataset } from '../data/load';
 import type { Dataset } from '../data/types';
 import type { PageConfig } from '../config/types';
 import { effectiveExcludeTags } from '../model/queries';
+import { effectiveVersion, forVersion, versionOptions } from '../model/version';
 import { analyse, type Analysis } from '../model/analysis';
 import { selectedSolutions, type Resolved } from '../model/series';
 import { parseView, serializeView } from './url';
@@ -17,7 +18,12 @@ export class App {
 	readonly logic: PageConfig['logic'];
 	view = $state<View>() as View;
 	status = $state<'loading' | 'ready' | 'error'>('loading');
-	ds = $state.raw<Dataset | null>(null);
+	/** The data file as loaded: runs of every benchmark version. */
+	rawDs = $state.raw<Dataset | null>(null);
+	/** The file narrowed to the selected benchmark version; everything but the version filter reads this. */
+	ds = $derived.by<Dataset | null>(() =>
+		this.rawDs ? forVersion(this.rawDs, effectiveVersion(this.rawDs, this.view.version)) : null
+	);
 	error = $state<string | null>(null);
 	openPanels = $state<PanelId[]>([]);
 	hovered = $state<string | null>(null);
@@ -58,8 +64,8 @@ export class App {
 		const onPop = () => {
 			const next = parseView(location.search, this.logic.defaultSize);
 			this.#synced = structuredClone(next);
-			this.view = this.ds && this.ds.size === next.size ? this.logic.canonical(this.ds, next) : next;
-			if (!this.ds || this.ds.size !== next.size) void this.#load(next.size, true);
+			this.view = this.rawDs && this.rawDs.size === next.size ? this.#canonical(this.rawDs, next) : next;
+			if (!this.rawDs || this.rawDs.size !== next.size) void this.#load(next.size, true);
 		};
 		window.addEventListener('popstate', onPop);
 
@@ -74,6 +80,13 @@ export class App {
 		};
 	}
 
+	/** Canonical view for the file: the version first (null when it is the latest), the rest within that version's runs. */
+	#canonical(raw: Dataset, view: View): View {
+		const version = effectiveVersion(raw, view.version);
+		const canon = this.logic.canonical(forVersion(raw, version), view);
+		return { ...canon, version: view.version === version && version !== versionOptions(raw).at(-1) ? version : null };
+	}
+
 	async #load(size: string, normalise: boolean) {
 		const token = ++this.#loadToken;
 		this.status = 'loading';
@@ -81,8 +94,8 @@ export class App {
 		try {
 			const ds = await loadDataset(size);
 			if (token !== this.#loadToken) return;
-			this.ds = ds;
-			if (normalise) this.view = this.logic.canonical(ds, this.view);
+			this.rawDs = ds;
+			if (normalise) this.view = this.#canonical(ds, this.view);
 			this.status = 'ready';
 		} catch (e) {
 			if (token !== this.#loadToken) return;
@@ -103,7 +116,7 @@ export class App {
 			this.status = 'loading';
 			void this.#load(next.size, true);
 		}
-		this.view = this.ds && !sizeChanged ? this.logic.canonical(this.ds, next) : next;
+		this.view = this.rawDs && !sizeChanged ? this.#canonical(this.rawDs, next) : next;
 	}
 
 	reset() {

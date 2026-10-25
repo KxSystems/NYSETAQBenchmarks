@@ -340,9 +340,19 @@ It has three pages:
   count.
 * **Thread scaling** — one solution on one machine across thread counts.
 
-Filters cover the solutions, data size, machine, data date, NUMA node, thread
+Filters cover the benchmark version, the solutions, data size, machine, data date, NUMA node, thread
 count, cold or hot run, query complexity, instrument scope and query tags, and
 every view can be shared as a link.
+
+##### Benchmark version
+
+The [VERSION](./VERSION) file holds the version of the benchmark: its query set and
+data schema. Results are only comparable within one version, so bump it whenever a
+change affects comparability (queries added or changed, a different data schema) and
+leave it alone for fixes that do not. The benchmark drivers record it as
+`benchmarkversion` in each solution's `stats.yaml`; `convertToJSON.py` carries it into
+the data files as `benchmark_version`, and the dashboard shows one version at a time
+(the latest by default). Tag the commit that introduces a version, for example `v1.0`.
 
 ##### Running the dashboard locally
 

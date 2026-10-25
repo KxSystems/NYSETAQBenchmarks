@@ -1,4 +1,5 @@
 solution: Pandas
+benchmarkversion: '1.0'
 proprietary: 'no'
 engineversion: 2.3.3
 master:
