@@ -85,7 +85,7 @@ function execute_queries () {
         fi
         if engine_enabled kdbxsql; then
             if solution_enabled "KDB-X SQL"; then
-                run_solution "KDB-X SQL" q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -engine sql -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/sql.psv -s ${s}
+                run_solution "KDB-X SQL" q ./src/runQueries.q ${COMMONPARAMS} -db ${DB_DIR}/kdb -engine sql -sortcols "time" -indexon "sym" -queryfile ./artifacts/queries/inmemory/kdbxsql.psv -s ${s}
             fi
         fi
         if engine_enabled duckdb; then

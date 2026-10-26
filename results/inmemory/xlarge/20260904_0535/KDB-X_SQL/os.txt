@@ -1,7 +1,7 @@
 KDB-X 5.0 2026.07.06 Copyright (C) 1993-2026 Kx Systems
 l64/ 256()core 2321261MB kxsystems volcano-9af8-os 10.216.167.113 EXPIRE 2027.07.13 insights-devops@kx.com KDBX #101990
 
-	Command being timed: "q ./src/runQueries.q -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/xlarge -db /mnt/nvme3p2/nysetaq/xlarge/kdb -engine sql -sortcols time -indexon sym -queryfile ./artifacts/queries/inmemory/sql.psv -s 128 -result ./results/inmemory/xlarge/20260904_0535/tmp/KDB-X_SQL_128Threads.psv -statsDir ./results/inmemory/xlarge/20260904_0535/KDB-X_SQL"
+	Command being timed: "q ./src/runQueries.q -date 20260401 -storage_backend memory -querymeta ./artifacts/queries/inmemory/querymeta.psv -paramdir ./artifacts/parameters/xlarge -db /mnt/nvme3p2/nysetaq/xlarge/kdb -engine sql -sortcols time -indexon sym -queryfile ./artifacts/queries/inmemory/kdbxsql.psv -s 128 -result ./results/inmemory/xlarge/20260904_0535/tmp/KDB-X_SQL_128Threads.psv -statsDir ./results/inmemory/xlarge/20260904_0535/KDB-X_SQL"
 	User time (seconds): 2435.87
 	System time (seconds): 824.78
 	Percent of CPU this job got: 675%
