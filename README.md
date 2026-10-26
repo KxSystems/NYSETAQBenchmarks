@@ -555,7 +555,7 @@ with the streaming engine.
 
 Queries are defined **per engine** in PSV files under
 [artifacts/queries/inmemory/](./artifacts/queries/inmemory/) (`kdb.psv`,
-`sql.psv`, `duckdb.psv`, `chdb.psv`, `polars.psv`, `polars_lazy.psv`,
+`kdbxsql.psv`, `duckdb.psv`, `chdb.psv`, `polars.psv`, `polars_lazy.psv`,
 `pandas.psv`, `pykx.psv`, and the attribute-benchmark variants
 `kdb_noattr.psv`, `kdb_tabledict.psv`). A single engine can have more than one
 query file when it is benchmarked in several configurations: `polars.psv` holds
