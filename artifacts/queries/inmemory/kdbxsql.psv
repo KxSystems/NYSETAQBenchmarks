@@ -45,15 +45,15 @@ idx|tags|query|parameter
 44||SELECT DISTINCT sym, ex FROM trade WHERE size>CAST(700000 AS REAL)|
 45||SELECT weighted_avg(bsize, bid) AS weightedBidPrice, weighted_avg(asize, ask) AS weightedOfferPrice FROM quote WHERE sym IN $1 GROUP BY sym|fiftyInstrs
 46||SELECT weighted_avg(bsize, bid) AS weightedBidPrice, weighted_avg(asize, ask) AS weightedOfferPrice FROM quote WHERE sym IN $1 GROUP BY sym|thousandInfreqInstrs
-47|||
-48|||
-49|||
-50|||
-51|||
-52|||
-53|||
-54|||
-55|||
+47||SELECT time, AVG(price) OVER (ORDER BY time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS price FROM trade WHERE sym = $1|infreqInstr
+48||SELECT time, AVG(price) OVER (ORDER BY time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS price FROM trade WHERE sym = $1|freqInstr
+49||SELECT sym, time, AVG((bsize * bid + asize * ask) / (bsize + asize)) OVER (PARTITION BY sym ORDER BY time ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) AS movingLiqWMid, AVG(asize + bsize) OVER (PARTITION BY sym ORDER BY time ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) AS movingsize FROM quote WHERE sym IN $1 ORDER BY sym|fiftyInstrs
+50||SELECT sym, time, AVG((bsize * bid + asize * ask) / (bsize + asize)) OVER (PARTITION BY sym ORDER BY time ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) AS movingLiqWMid, AVG(asize + bsize) OVER (PARTITION BY sym ORDER BY time ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) AS movingsize FROM quote WHERE sym IN $1 ORDER BY sym|thousandInfreqInstrs
+51||SELECT time, SUM(size) OVER (ORDER BY time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS size FROM trade WHERE sym = $1|infreqInstr
+52||SELECT time, SUM(size) OVER (ORDER BY time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS size FROM trade WHERE sym = $1|freqInstr
+53||SELECT time, SUM(size) OVER (ORDER BY time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS size FROM trade WHERE ex = 'L'|
+54||SELECT sym, time, price, size, SUM(price * size) OVER (PARTITION BY sym ORDER BY time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) / SUM(size) OVER (PARTITION BY sym ORDER BY time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS movingvwap FROM trade WHERE time::TIME BETWEEN '08:00' AND '08:15'|
+55||SELECT time, SUM(size) OVER (ORDER BY time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS size FROM trade WHERE ex = 'T'|
 56||SELECT time, ex, sym, cond, size, price, stop, corr, seq, tradeId, source, tradeReportingFacility, participantTimestamp, tradeReportingFacilityTRFTimestamp, tradeThroughExemptIndicator FROM (SELECT *, MAX(size) OVER (PARTITION BY ex) AS max_size FROM trade) WHERE size = max_size|
 57||SELECT time, ex, sym, bid, bsize, ask, asize, cond, seq, nationalBBOIndicator, finraBBOIndicator, finraADFMPIDIndicator, corr, source, retailInterestIndicator, shortSaleRestrictionIndicator, LULDBBOIndicator, SIPGeneratedMessageIdentifier, nationalBBOLULDIndicator, participantTimestamp, FINRAADFTimestamp, FINRAADFMarketParticipantQuoteIndicator, securityStatusIndicator, tag FROM (SELECT *, 'maxbid' AS tag FROM ( SELECT *, MIN(time) OVER (PARTITION BY ex) AS min_time FROM (SELECT *, MAX(bid) OVER (PARTITION BY ex) AS max_bid FROM quote WHERE sym=$1) WHERE bid = max_bid) WHERE time = min_time UNION ALL SELECT *, 'minask' AS tag FROM ( SELECT *, MIN(time) OVER (PARTITION BY ex) AS min_time FROM (SELECT *, MIN(ask) OVER (PARTITION BY ex) AS min_ask FROM quote WHERE sym=$1) WHERE ask = min_ask) WHERE time = min_time ORDER BY tag, time)|infreqInstr
 58||SELECT time, ex, sym, bid, bsize, ask, asize, cond, seq, nationalBBOIndicator, finraBBOIndicator, finraADFMPIDIndicator, corr, source, retailInterestIndicator, shortSaleRestrictionIndicator, LULDBBOIndicator, SIPGeneratedMessageIdentifier, nationalBBOLULDIndicator, participantTimestamp, FINRAADFTimestamp, FINRAADFMarketParticipantQuoteIndicator, securityStatusIndicator, tag FROM (SELECT *, 'maxbid' AS tag FROM ( SELECT *, MIN(time) OVER (PARTITION BY ex) AS min_time FROM (SELECT *, MAX(bid) OVER (PARTITION BY ex) AS max_bid FROM quote WHERE sym=$1) WHERE bid = max_bid) WHERE time = min_time UNION ALL SELECT *, 'minask' AS tag FROM ( SELECT *, MIN(time) OVER (PARTITION BY ex) AS min_time FROM (SELECT *, MIN(ask) OVER (PARTITION BY ex) AS min_ask FROM quote WHERE sym=$1) WHERE ask = min_ask) WHERE time = min_time ORDER BY tag, time)|freqInstr
@@ -69,11 +69,11 @@ idx|tags|query|parameter
 68||SELECT weighted_sum(asize, ask) AS wsumAsk, weighted_sum(bsize, bid) AS wsumBid, STDDEV(asize) AS sdevasksize, STDDEV(bid) AS sdevbid, CORR(ask, bid) AS corPrice, CORR(asize, bsize) AS corSize FROM quote WHERE sym IN $1 GROUP BY sym|fiftyInstrs
 69||SELECT weighted_sum(asize, ask) AS wsumAsk, weighted_sum(bsize, bid) AS wsumBid, STDDEV(asize) AS sdevasksize, STDDEV(bid) AS sdevbid, CORR(ask, bid) AS corPrice, CORR(asize, bsize) AS corSize FROM quote WHERE sym IN $1 GROUP BY sym|thousandInfreqInstrs
 70||SELECT time, ex, sym, cond, size, price, stop, corr, seq, tradeId, source, tradeReportingFacility, participantTimestamp, tradeReportingFacilityTRFTimestamp, tradeThroughExemptIndicator FROM (SELECT *, MIN(price) OVER (PARTITION BY sym) AS min_price FROM trade) WHERE price = min_price|
-71|||
-72|||
-73|||
-74|||
-75|||
+71||WITH src AS (SELECT * FROM trade WHERE sym = $1), changes AS (SELECT *, (price IS DISTINCT FROM LAG(price) OVER (ORDER BY time))::INT AS price_changed FROM src), runs AS (SELECT *, SUM(price_changed) OVER (ORDER BY time ROWS UNBOUNDED PRECEDING) AS pricegroup FROM changes) SELECT pricegroup, FIRST(price) AS price, MIN(time) AS FirstTime, MAX(time) AS LastTime, COUNT(*) AS cnt, SUM(size) AS size FROM runs GROUP BY pricegroup ORDER BY pricegroup|infreqInstr
+72||WITH src AS (SELECT * FROM trade WHERE sym = $1), changes AS (SELECT *, (price IS DISTINCT FROM LAG(price) OVER (ORDER BY time))::INT AS price_changed FROM src), runs AS (SELECT *, SUM(price_changed) OVER (ORDER BY time ROWS UNBOUNDED PRECEDING) AS pricegroup FROM changes) SELECT pricegroup, FIRST(price) AS price, MIN(time) AS FirstTime, MAX(time) AS LastTime, COUNT(*) AS cnt, SUM(size) AS size FROM runs GROUP BY pricegroup ORDER BY pricegroup|freqInstr
+73||WITH src AS (SELECT * FROM trade WHERE sym IN $1), changes AS (SELECT *, (price IS DISTINCT FROM LAG(price) OVER (PARTITION BY sym ORDER BY time))::INT AS price_changed FROM src), runs AS (SELECT *, SUM(price_changed) OVER (PARTITION BY sym ORDER BY time ROWS UNBOUNDED PRECEDING) AS pricegroup FROM changes) SELECT sym, pricegroup, FIRST(price) AS price, MIN(time) AS FirstTime, MAX(time) AS LastTime, COUNT(*) AS cnt, SUM(size) AS size FROM runs GROUP BY sym, pricegroup ORDER BY sym, pricegroup|fiftyInstrs
+74||WITH src AS (SELECT * FROM trade WHERE sym IN $1), changes AS (SELECT *, (price IS DISTINCT FROM LAG(price) OVER (PARTITION BY sym ORDER BY time))::INT AS price_changed FROM src), runs AS (SELECT *, SUM(price_changed) OVER (PARTITION BY sym ORDER BY time ROWS UNBOUNDED PRECEDING) AS pricegroup FROM changes) SELECT sym, pricegroup, FIRST(price) AS price, MIN(time) AS FirstTime, MAX(time) AS LastTime, COUNT(*) AS cnt, SUM(size) AS size FROM runs GROUP BY sym, pricegroup ORDER BY sym, pricegroup|thousandInfreqInstrs
+75||WITH src AS (SELECT * FROM trade WHERE ex IN ('L', 'M')), changes AS (SELECT *, (price IS DISTINCT FROM LAG(price) OVER (PARTITION BY sym ORDER BY time))::INT AS price_changed FROM src), runs AS (SELECT *, SUM(price_changed) OVER (PARTITION BY sym ORDER BY time ROWS UNBOUNDED PRECEDING) AS pricegroup FROM changes) SELECT sym, pricegroup, FIRST(price) AS price, MIN(time) AS FirstTime, MAX(time) AS LastTime, COUNT(*) AS cnt, SUM(size) AS size FROM runs GROUP BY sym, pricegroup ORDER BY sym, pricegroup|
 76||SELECT MEDIAN(bsize + asize) AS medMidSize FROM quote WHERE sym=$1|infreqInstr
 77||SELECT MEDIAN(bsize + asize) AS medMidSize FROM quote WHERE sym=$1|freqInstr
 78||SELECT MEDIAN(size) AS medSize FROM trade GROUP BY ex|
